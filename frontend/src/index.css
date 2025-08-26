@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base typography + smoothing */
+html, body {
+  @apply bg-background text-text font-sans antialiased;
+}
+
+/* Splash screen styling */
+.splash {
+  @apply bg-background-dark text-text-white min-h-screen flex items-center justify-center;
+  background: radial-gradient(circle at center, #121212 0%, #0F0F0F 100%);
+}
+
+/* Navbar */
+.navbar {
+  @apply bg-black text-text-white shadow-md;
+}
+
+/* Dashboard background */
+.dashboard {
+  background-image: theme("backgroundImage.dashboard-gradient");
+  @apply min-h-screen text-text-white;
+}
+
+/* Card components */
+.card {
+  @apply bg-background shadow-card border border-border rounded-xl p-4;
+}
+
+/* Buttons */
+.btn-primary {
+  background-image: theme("backgroundImage.button-gradient");
+  @apply text-white font-semibold rounded-xl px-4 py-2 transition-all;
+}
+.btn-primary:hover {
+  @apply shadow-glow scale-105;
+}
+.btn-secondary {
+  @apply border border-accent-purple text-accent-purple rounded-xl px-4 py-2 transition-all;
+}
+.btn-secondary:hover {
+  @apply shadow-glow text-accent-teal border-accent-teal;
+}
