@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import schemas, crud, auth
 from app.database import SessionLocal
+from fastapi.security import OAuth2PasswordRequestForm
+from app.auth import create_access_token 
 
 router = APIRouter()
 
@@ -25,4 +27,7 @@ def login(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not db_user.is_active:
         raise HTTPException(status_code=403, detail="Account pending approval")
-    return {"message": "Login successful"}
+
+    access_token = create_access_token(data={"sub": str(db_user.id)})
+
+    return {"access_token": access_token, "token_type": "bearer"}

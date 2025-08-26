@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric,DateTime
 from sqlalchemy.dialects.postgresql import UUID 
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -41,3 +41,21 @@ class Player(Base):
 
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
     team = relationship("Team", back_populates="players")
+
+class UserTeam(Base):
+    __tablename__ = "user_teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    gameweek_id = Column(Integer, ForeignKey("gameweeks.id"))
+    player_id = Column(Integer, ForeignKey("players.id"))
+    player_role = Column(String)
+    team_name = Column(String)
+
+
+class Gameweek(Base):
+    __tablename__ = "gameweeks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    gw_number = Column(Integer, nullable=False)
+    deadline = Column(DateTime, nullable=False)

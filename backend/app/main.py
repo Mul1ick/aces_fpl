@@ -5,6 +5,8 @@ from app.database import engine
 from app import models
 from app.config import CORS_ORIGINS
 from app.routes import player_routes
+from app.routes import team
+from app.routes import gameweek_routes
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -21,6 +23,8 @@ app.add_middleware(
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 app.include_router(user_routes.router, prefix="/users", tags=["Users"])
 app.include_router(player_routes.router)
+app.include_router(team.router)
+app.include_router(gameweek_routes.router, tags=["Gameweeks"])
 
 @app.get("/")
 def root():
