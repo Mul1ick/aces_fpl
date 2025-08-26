@@ -26,22 +26,7 @@ const TEAM_JERSEYS = {
   'Umaag Foundation Trust': tshirtGreen,
 };
 
-const mockPlayers = [
-    { id: 1, name: 'Haaland', pos: 'FWD', club: 'Titans', price: 14.0, points: 150, tsb: 82.5 },
-    { id: 2, name: 'Salah', pos: 'MID', club: 'Satan', price: 13.0, points: 145, tsb: 58.2 },
-    { id: 3, name: 'Son', pos: 'MID', club: 'Mumbai Hotspurs', price: 9.5, points: 120, tsb: 45.1 },
-    { id: 4, name: 'Trippier', pos: 'DEF', club: 'Southside', price: 7.0, points: 110, tsb: 55.3 },
-    { id: 5, name: 'Raya', pos: 'GK', club: 'Satan', price: 5.0, points: 90, tsb: 30.8 },
-    { id: 6, name: 'Fernandes', pos: 'MID', club: 'Bandra United', price: 8.5, points: 115, tsb: 35.7 },
-    { id: 7, name: 'Watkins', pos: 'FWD', club: 'Titans', price: 8.0, points: 105, tsb: 40.1 },
-    { id: 8, name: 'Saka', pos: 'MID', club: 'Satan', price: 9.0, points: 125, tsb: 60.5 },
-    { id: 9, name: 'James', pos: 'DEF', club: 'Bandra United', price: 5.5, points: 85, tsb: 25.2 },
-    { id: 10, name: 'Maddison', pos: 'MID', club: 'Mumbai Hotspurs', price: 8.0, points: 100, tsb: 38.9 },
-    { id: 11, name: 'Pope', pos: 'GK', club: 'Southside', price: 5.5, points: 95, tsb: 28.4 },
-    { id: 12, name: 'Saliba', pos: 'DEF', club: 'Satan', price: 5.5, points: 92, tsb: 48.7 },
-    { id: 13, name: 'Rashford', pos: 'MID', club: 'Bandra United', price: 9.0, points: 118, tsb: 42.3 },
-    { id: 14, name: 'Kane', pos: 'FWD', club: 'Mumbai Hotspurs', price: 12.5, points: 140, tsb: 50.1 },
-];
+
 
 const FilterModal = ({ isOpen, onClose, title, children }) => (
     <AnimatePresence>
@@ -112,6 +97,188 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isSortOpen, setIsSortOpen] = useState(false);
     const [isPriceOpen, setIsPriceOpen] = useState(false);
+    const [players, setPlayers] = useState([]);
+
+
+useEffect(() => {
+    const MOCK_PLAYERS = [
+  {
+    id: 1,
+    name: "Erling Haaland",
+    pos: "FWD",
+    club: "Mumbai Mavericks",
+    price: 14.0,
+    points: 120,
+    tsb: 45,
+  },
+  {
+    id: 2,
+    name: "Mohammed Salah",
+    pos: "MID",
+    club: "Mumbai Mavericks",
+    price: 12.0,
+    points: 115,
+    tsb: 38,
+  },
+  {
+    id: 3,
+    name: "James Maddison",
+    pos: "MID",
+    club: "Mumbai Mavericks",
+    price: 8.0,
+    points: 87,
+    tsb: 29,
+  },
+  {
+    id: 4,
+    name: "Kevin De Bruyne",
+    pos: "MID",
+    club: "Delhi Dynamos",
+    price: 12.0,
+    points: 110,
+    tsb: 36,
+  },
+  {
+    id: 5,
+    name: "Ederson Moraes",
+    pos: "GK",
+    club: "Delhi Dynamos",
+    price: 5.5,
+    points: 98,
+    tsb: 33,
+  },
+  {
+    id: 6,
+    name: "Marcus Rashford",
+    pos: "MID",
+    club: "Bandra United",
+    price: 9.0,
+    points: 92,
+    tsb: 27,
+  },
+  {
+    id: 7,
+    name: "Bruno Fernandes",
+    pos: "MID",
+    club: "Bandra United",
+    price: 8.5,
+    points: 89,
+    tsb: 31,
+  },
+  {
+    id: 8,
+    name: "Reece James",
+    pos: "DEF",
+    club: "Bandra United",
+    price: 5.5,
+    points: 76,
+    tsb: 23,
+  },
+  {
+    id: 9,
+    name: "Kieran Trippier",
+    pos: "DEF",
+    club: "Southside FC",
+    price: 7.0,
+    points: 94,
+    tsb: 40,
+  },
+  {
+    id: 10,
+    name: "Nick Pope",
+    pos: "GK",
+    club: "Southside FC",
+    price: 5.5,
+    points: 84,
+    tsb: 26,
+  },
+  {
+    id: 11,
+    name: "Harry Kane",
+    pos: "FWD",
+    club: "Titans",
+    price: 12.5,
+    points: 118,
+    tsb: 47,
+  },
+  {
+    id: 12,
+    name: "Ollie Watkins",
+    pos: "FWD",
+    club: "Titans",
+    price: 8.0,
+    points: 90,
+    tsb: 30,
+  },
+  {
+    id: 13,
+    name: "Bukayo Saka",
+    pos: "MID",
+    club: "Satan",
+    price: 9.0,
+    points: 93,
+    tsb: 32,
+  },
+  {
+    id: 14,
+    name: "Son Heung-min",
+    pos: "MID",
+    club: "Satan",
+    price: 9.5,
+    points: 95,
+    tsb: 34,
+  },
+  {
+    id: 15,
+    name: "David Raya",
+    pos: "GK",
+    club: "Satan",
+    price: 5.0,
+    points: 80,
+    tsb: 25,
+  },
+  {
+    id: 16,
+    name: "William Saliba",
+    pos: "DEF",
+    club: "Satan",
+    price: 5.5,
+    points: 83,
+    tsb: 28,
+  },
+  // add more as needed
+];
+
+const fetchPlayers = async () => {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/players/`);
+    if (!response.ok) throw new Error('API failed');
+    const data = await response.json();
+
+    const mapped = data.map(player => ({
+      id: player.id ?? player.full_name,
+      name: player.full_name,
+      pos: player.position === 'ST' ? 'FWD' : player.position,
+      club: player.team?.name || 'Unknown',
+      price: player.price,
+      points: Math.floor(Math.random() * 50) + 100,
+      tsb: Math.floor(Math.random() * 50) + 30
+    }));
+
+    setPlayers(mapped);
+  } catch (err) {
+    console.warn('Using mock data instead:', err.message);
+    setPlayers(MOCK_PLAYERS);
+  }
+};
+
+    fetchPlayers();
+}, []);
+useEffect(() => {
+    if (players.length > 0) {
+        resetFilters();
+    }
+}, [players]);
 
     useEffect(() => {
         if (positionFilter) {
@@ -136,7 +303,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     };
 
     const filteredAndSortedPlayers = useMemo(() => {
-        return mockPlayers
+        return players
             .filter(p => {
                 if (squadPlayerIds.includes(p.id)) {
                     return false;

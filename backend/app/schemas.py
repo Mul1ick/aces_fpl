@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from uuid import UUID
+from pydantic import ConfigDict
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -12,3 +13,17 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class TeamOut(BaseModel):
+    name: str
+    short_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PlayerOut(BaseModel):
+    full_name: str
+    position: str
+    price: float
+    team: TeamOut   # Nested
+
+    model_config = ConfigDict(from_attributes=True)

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { API } from "../lib/api";
 
 interface User {
   id: string;
@@ -52,49 +53,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      setIsLoading(true);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock successful login
-      const mockUser: User = {
-        id: "1",
-        email,
-        name: "John Doe",
-        teamName: "Aces United"
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem("aces_fpl_user", JSON.stringify(mockUser));
-      return true;
-    } catch (error) {
-      console.error("Login failed:", error);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  try {
+    setIsLoading(true);
 
-  const signup = async (name: string, email: string, password: string): Promise<boolean> => {
-    try {
-      setIsLoading(true);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mock signup - goes to pending approval
+    const response = await fetch(API.endpoints.login, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (response.status === 403) {
+      setPendingApproval(true);
+      return false;
+    }
+
+    if (!response.ok) {
+      throw new Error("Login failed");
+    }
+
+    const data = await response.json();
+
+    const loggedInUser: User = {
+      id: data.id ?? "unknown", // expects `id` in backend response
+      email: data.email ?? email,
+      name: data.name ?? "User", // optional
+      teamName: data.teamName ?? "",
+    };
+
+    setUser(loggedInUser);
+    localStorage.setItem("aces_fpl_user", JSON.stringify(loggedInUser));
+    return true;
+  } catch (error) {
+    console.error("Login failed:", error);
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const signup = async (name: string, email: string, password: string): Promise<boolean> => {
+  try {
+    setIsLoading(true);
+
+    const response = await fetch(API.endpoints.signup, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+      // Add `name` to backend schema later if needed
+    });
+
+    if (response.ok) {
       setPendingApproval(true);
       return true;
-    } catch (error) {
-      console.error("Signup failed:", error);
-      return false;
-    } finally {
-      setIsLoading(false);
+    } else {
+      throw new Error("Signup failed");
     }
-  };
-
+  } catch (error) {
+    console.error("Signup failed:", error);
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+};
   const logout = () => {
     setUser(null);
     setPendingApproval(false);

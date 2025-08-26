@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,30 +17,21 @@ const initialSquad = {
   FWD: [null, null, null],
 };
 
-const mockPlayers = [
-    { id: 1, name: 'Haaland', pos: 'FWD', club: 'Titans', price: 14.0, points: 150, tsb: 82.5 },
-    { id: 2, name: 'Salah', pos: 'MID', club: 'Satan', price: 13.0, points: 145, tsb: 58.2 },
-    { id: 3, name: 'Son', pos: 'MID', club: 'Mumbai Hotspurs', price: 9.5, points: 120, tsb: 45.1 },
-    { id: 4, name: 'Trippier', pos: 'DEF', club: 'Southside', price: 7.0, points: 110, tsb: 55.3 },
-    { id: 5, name: 'Raya', pos: 'GK', club: 'Satan', price: 5.0, points: 90, tsb: 30.8 },
-    { id: 6, name: 'Fernandes', pos: 'MID', club: 'Bandra United', price: 8.5, points: 115, tsb: 35.7 },
-    { id: 7, name: 'Watkins', pos: 'FWD', club: 'Titans', price: 8.0, points: 105, tsb: 40.1 },
-    { id: 8, name: 'Saka', pos: 'MID', club: 'Satan', price: 9.0, points: 125, tsb: 60.5 },
-    { id: 9, name: 'James', pos: 'DEF', club: 'Bandra United', price: 5.5, points: 85, tsb: 25.2 },
-    { id: 10, name: 'Maddison', pos: 'MID', club: 'Mumbai Hotspurs', price: 8.0, points: 100, tsb: 38.9 },
-    { id: 11, name: 'Pope', pos: 'GK', club: 'Southside', price: 5.5, points: 95, tsb: 28.4 },
-    { id: 12, name: 'Saliba', pos: 'DEF', club: 'Satan', price: 5.5, points: 92, tsb: 48.7 },
-    { id: 13, name: 'Rashford', pos: 'MID', club: 'Bandra United', price: 9.0, points: 118, tsb: 42.3 },
-    { id: 14, name: 'Kane', pos: 'FWD', club: 'Mumbai Hotspurs', price: 12.5, points: 140, tsb: 50.1 },
-];
-
 // --- MAIN TRANSFERS PAGE ---
 const Transfers: React.FC = () => {
+  const [playerPool, setPlayerPool] = useState([]);
   const [squad, setSquad] = useState(initialSquad);
   const [isPlayerSelectionOpen, setIsPlayerSelectionOpen] = useState(false);
   const [isEnterSquadModalOpen, setIsEnterSquadModalOpen] = useState(false);
   const [positionToFill, setPositionToFill] = useState<{ position: string; index: number } | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetch('http://localhost:8000/players')
+      .then(res => res.json())
+      .then(data => setPlayerPool(data))
+      .catch(err => console.error("Failed to fetch player pool:", err));
+  }, []);
 
   const handleSlotClick = (position: string, index: number) => {
     setPositionToFill({ position, index });
@@ -60,16 +51,15 @@ const Transfers: React.FC = () => {
     setIsPlayerSelectionOpen(false);
     setPositionToFill(null);
   };
-  
+
   const handleAutoFill = () => {
     let budget = 102.0;
-    const newSquad = JSON.parse(JSON.stringify(squad)); // Deep copy to keep existing players
-    let availablePlayers = [...mockPlayers];
+    const newSquad = JSON.parse(JSON.stringify(squad));
+    let availablePlayers = [...playerPool];
 
-    // Account for already selected players
     const alreadySelectedIds = Object.values(newSquad).flat().filter(p => p).map(p => p.id);
     availablePlayers = availablePlayers.filter(p => !alreadySelectedIds.includes(p.id));
-    
+
     Object.values(newSquad).flat().forEach(player => {
         if (player) {
             budget -= player.price;
@@ -82,15 +72,14 @@ const Transfers: React.FC = () => {
         const needed = formation[pos] - newSquad[pos].filter(p => p !== null).length;
         if (needed > 0) {
             let playersForPos = availablePlayers
-                .filter(p => p.pos === pos)
-                .sort((a, b) => b.points - a.price); // Prioritize players with high points
+                .filter(p => p.position === pos)
+                .sort((a, b) => b.points - a.price);
 
             for (let i = 0; i < needed; i++) {
                 const emptySlotIndex = newSquad[pos].findIndex(slot => slot === null);
                 if (emptySlotIndex !== -1) {
-                    // Find the best player that fits the budget and club constraints
                     const affordablePlayer = playersForPos.find(p => {
-                        const playersFromSameClub = Object.values(newSquad).flat().filter(sp => sp?.club === p.club).length;
+                        const playersFromSameClub = Object.values(newSquad).flat().filter(sp => sp?.team_id === p.team_id).length;
                         return p.price <= budget && playersFromSameClub < 2;
                     });
 
@@ -112,10 +101,9 @@ const Transfers: React.FC = () => {
   };
 
   const handleConfirmSquad = (teamName: string, favouriteClub: string) => {
-    // Here you would typically make an API call to save the squad
     console.log("Squad Confirmed:", { teamName, favouriteClub, squad });
     setIsEnterSquadModalOpen(false);
-    navigate('/team'); // Redirect to the Pick Team page
+    navigate('/team');
   };
 
   const { playersSelected, bank } = useMemo(() => {
