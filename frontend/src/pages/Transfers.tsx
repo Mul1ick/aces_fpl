@@ -41,16 +41,20 @@ const Transfers: React.FC = () => {
   };
 
   const handlePlayerSelect = (player: any) => {
-    if (positionToFill) {
-      const newSquad = { ...squad };
-      const newPositionArray = [...newSquad[positionToFill.position]];
-      newPositionArray[positionToFill.index] = player;
-      newSquad[positionToFill.position] = newPositionArray;
-      setSquad(newSquad);
-    }
-    setIsPlayerSelectionOpen(false);
-    setPositionToFill(null);
-  };
+  console.log("🧠 [handlePlayerSelect] Player received:", player);
+  
+  if (positionToFill) {
+    const newSquad = { ...squad };
+    const newPositionArray = [...newSquad[positionToFill.position]];
+    newPositionArray[positionToFill.index] = player;
+    newSquad[positionToFill.position] = newPositionArray;
+    console.log(`✅ [handlePlayerSelect] Updated squad for position ${positionToFill.position}:`, newPositionArray);
+    setSquad(newSquad);
+  }
+
+  setIsPlayerSelectionOpen(false);
+  setPositionToFill(null);
+};
 
   const handleAutoFill = () => {
     let budget = 102.0;
@@ -100,11 +104,49 @@ const Transfers: React.FC = () => {
     setSquad(initialSquad);
   };
 
-  const handleConfirmSquad = (teamName: string, favouriteClub: string) => {
-    console.log("Squad Confirmed:", { teamName, favouriteClub, squad });
-    setIsEnterSquadModalOpen(false);
-    navigate('/team');
+const handleConfirmSquad = async (teamName: string) => {
+  const token = localStorage.getItem("access_token");
+
+  console.log("📦 [Submit] Current squad state before formatting:", squad);
+
+  const players = Object.entries(squad).flatMap(([position, playerArray]) =>
+    playerArray
+      .filter(p => p !== null)
+      .map(p => {
+        console.log(`🔁 [Submit] Mapping player ${p.name} => { id: ${p.id}, position: ${position} }`);
+        return { id: p.id, position };
+      })
+  );
+
+  const payload = {
+    team_name: teamName,
+    players: players
   };
+
+  console.log("🚀 [Submit] Payload being sent:", JSON.stringify(payload, null, 2));
+
+  try {
+    const response = await fetch("http://localhost:8000/submit-team", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error);
+    }
+
+    const data = await response.json();
+    console.log("✅ [Submit] Team submitted successfully:", data);
+    navigate('/team');
+  } catch (error) {
+    console.error("❌ [Submit] Error submitting team:", error);
+  }
+};
 
   const { playersSelected, bank } = useMemo(() => {
     const allPlayers = Object.values(squad).flat();
@@ -129,7 +171,7 @@ const Transfers: React.FC = () => {
         <div className="lg:col-span-6 flex flex-col h-screen">
           <div className="p-4 space-y-4">
             <TransfersHeroCard 
-              teamName="Aces United"
+              teamName="silly United"
               managerName="Steven Carter"
               playersSelected={playersSelected}
               bank={bank}

@@ -1,31 +1,24 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X } from 'lucide-react';
-
-const clubs = [
-  'Satan', 'Mumbai Hotspurs', 'Bandra United', 'Southside', 'Titans', 'Umaag Foundation Trust', 'None'
-];
 
 interface EnterSquadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (teamName: string, favouriteClub: string) => void;
+  onConfirm: (teamName: string) => void;
 }
 
 export const EnterSquadModal: React.FC<EnterSquadModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const [teamName, setTeamName] = useState('');
-  const [favouriteClub, setFavouriteClub] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleConfirm = () => {
-    if (teamName.trim() && favouriteClub && termsAccepted) {
-      onConfirm(teamName, favouriteClub);
+    if (teamName.trim() && termsAccepted) {
+      onConfirm(teamName);
     } else {
       alert('Please fill in all fields and accept the terms.');
     }
@@ -70,20 +63,6 @@ export const EnterSquadModal: React.FC<EnterSquadModalProps> = ({ isOpen, onClos
                 />
               </div>
 
-              <div>
-                <Label htmlFor="favourite-club" className="font-bold">Choose your favourite club</Label>
-                <Select onValueChange={setFavouriteClub}>
-                  <SelectTrigger id="favourite-club" className="w-full mt-2">
-                    <SelectValue placeholder="Pick Team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clubs.map(club => (
-                      <SelectItem key={club} value={club}>{club}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="flex items-start space-x-2">
                 <Checkbox id="terms" checked={termsAccepted} onCheckedChange={setTermsAccepted} />
                 <div className="grid gap-1.5 leading-none">
@@ -103,7 +82,7 @@ export const EnterSquadModal: React.FC<EnterSquadModalProps> = ({ isOpen, onClos
 
             <div className="grid grid-cols-2 gap-4 mt-6">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={!termsAccepted || !teamName.trim() || !favouriteClub}>Enter Squad</Button>
+              <Button onClick={handleConfirm} disabled={!termsAccepted || !teamName.trim()}>Enter Squad</Button>
             </div>
           </motion.div>
         </motion.div>

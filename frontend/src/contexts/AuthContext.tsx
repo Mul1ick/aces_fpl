@@ -75,12 +75,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const data = await response.json();
 
-    const loggedInUser: User = {
-      id: data.id ?? "unknown", // expects `id` in backend response
-      email: data.email ?? email,
-      name: data.name ?? "User", // optional
-      teamName: data.teamName ?? "",
-    };
+localStorage.setItem("access_token", data.access_token); // ✅ store JWT for future requests
+
+const loggedInUser: User = {
+  id: data.id ?? "unknown",
+  email: data.email ?? email,
+  name: data.name ?? "User",
+  teamName: data.teamName ?? "",
+};
+
+setUser(loggedInUser);
+localStorage.setItem("aces_fpl_user", JSON.stringify(loggedInUser));
 
     setUser(loggedInUser);
     localStorage.setItem("aces_fpl_user", JSON.stringify(loggedInUser));
