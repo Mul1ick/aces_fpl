@@ -25,7 +25,7 @@ app.add_middleware(
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 app.include_router(user_routes.router, prefix="/users", tags=["Users"])
 app.include_router(player_routes.router)
-app.include_router(team.router)
+app.include_router(team.router,prefix="/teams", tags=["Teams"])
 app.include_router(gameweek_routes.router, tags=["Gameweeks"])
 
 @app.get("/")

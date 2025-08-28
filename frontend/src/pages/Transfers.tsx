@@ -126,7 +126,7 @@ const handleConfirmSquad = async (teamName: string) => {
   console.log("🚀 [Submit] Payload being sent:", JSON.stringify(payload, null, 2));
 
   try {
-    const response = await fetch("http://localhost:8000/submit-team", {
+    const response = await fetch("http://localhost:8000/teams/submit-team", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

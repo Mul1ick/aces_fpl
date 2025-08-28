@@ -35,3 +35,19 @@ class PlayerSelection(BaseModel):
 
 class SubmitTeamRequest(BaseModel):
     players: List[PlayerSelection]
+
+class PlayerDisplay(BaseModel):
+    id: int
+    full_name: str
+    position: str
+    price: float
+    is_captain: bool
+    is_vice_captain: bool
+    team: TeamOut  # already defined
+
+    model_config = ConfigDict(from_attributes=True)
+
+class GetTeamResponse(BaseModel):
+    team_name: str
+    starting: List[PlayerDisplay]
+    bench: List[PlayerDisplay]

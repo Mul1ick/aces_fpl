@@ -27,6 +27,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="user")
     is_active = Column(Boolean, default=False)
+    fantasy_team = relationship("FantasyTeam", back_populates="user", uselist=False)
+
 
 # ─────────────────────────────
 # ✅ Player model
@@ -49,6 +51,11 @@ class UserTeam(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     gameweek_id = Column(Integer, ForeignKey("gameweeks.id"))
     player_id = Column(Integer, ForeignKey("players.id"))
+    is_captain = Column(Boolean, default=False)
+    is_vice_captain = Column(Boolean, default=False)
+    is_benched = Column(Boolean, default=False)
+    player = relationship("Player", backref="user_teams")
+    
 
 
 class Gameweek(Base):
@@ -57,3 +64,13 @@ class Gameweek(Base):
     id = Column(Integer, primary_key=True, index=True)
     gw_number = Column(Integer, nullable=False)
     deadline = Column(DateTime, nullable=False)
+
+class FantasyTeam(Base):
+    __tablename__ = "fantasy_teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(ForeignKey("users.id"), unique=True, nullable=False)
+    name = Column(String(100), nullable=False)
+
+    user = relationship("User", back_populates="fantasy_team")
+    
