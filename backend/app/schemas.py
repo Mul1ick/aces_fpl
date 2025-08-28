@@ -22,6 +22,7 @@ class TeamOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class PlayerOut(BaseModel):
+    id:int
     full_name: str
     position: str
     price: float
@@ -31,8 +32,6 @@ class PlayerOut(BaseModel):
 
 class PlayerSelection(BaseModel):
     id: int
-    position: str
 
 class SubmitTeamRequest(BaseModel):
-    team_name: str
     players: List[PlayerSelection]

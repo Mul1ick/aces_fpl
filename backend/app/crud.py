@@ -22,14 +22,14 @@ def approve_user(db: Session, user_id: int):
 def get_user_by_id(db: Session, user_id: str):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
-def save_user_team(db, user_id: str, gameweek_id: int, team_name: str,  players: list[dict]):
+def save_user_team(db, user_id: str, gameweek_id: int,   players: list[dict]):
     for player in players:
         entry = models.UserTeam(
             user_id=user_id,
             gameweek_id=gameweek_id,
-            player_id=player["id"],
-            player_role=player["position"],
-            team_name=team_name,
+            player_id=player["id"]
+            
+
         )
         db.add(entry)
     db.commit()

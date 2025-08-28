@@ -21,7 +21,6 @@ def submit_team(
         db=db,
         user_id=current_user.id,
         gameweek_id=gameweek_id,
-        team_name=team.team_name,
         players=[p.dict() for p in team.players]
     )
 

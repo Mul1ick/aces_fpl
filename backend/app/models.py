@@ -49,8 +49,6 @@ class UserTeam(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     gameweek_id = Column(Integer, ForeignKey("gameweeks.id"))
     player_id = Column(Integer, ForeignKey("players.id"))
-    player_role = Column(String)
-    team_name = Column(String)
 
 
 class Gameweek(Base):
