@@ -119,7 +119,7 @@ const handleConfirmSquad = async (teamName: string) => {
   );
 
   const payload = {
-    // team_name: teamName,
+    team_name: teamName,
     players: players
   };
 

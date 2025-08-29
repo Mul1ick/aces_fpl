@@ -24,16 +24,27 @@ def approve_user(db: Session, user_id: int):
 def get_user_by_id(db: Session, user_id: str):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
-def save_user_team(db, user_id: str, gameweek_id: int,   players: list[dict]):
+def save_user_team(db: Session, user_id: str, gameweek_id: int, team_name: str, players: list[dict]):
+    # Find if the user already has a fantasy team
+    db_fantasy_team = db.query(FantasyTeam).filter(FantasyTeam.user_id == user_id).first()
+
+    if db_fantasy_team:
+        # If they do, just update the name
+        db_fantasy_team.name = team_name
+    else:
+        # If not, create a new one
+        db_fantasy_team = FantasyTeam(name=team_name, user_id=user_id)
+        db.add(db_fantasy_team)
+    
+    # This part for saving the 11 players remains the same
     for player in players:
-        entry = models.UserTeam(
+        entry = UserTeam(
             user_id=user_id,
             gameweek_id=gameweek_id,
             player_id=player["id"]
-            
-
         )
         db.add(entry)
+        
     db.commit()
 
 

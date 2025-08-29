@@ -34,6 +34,7 @@ class PlayerSelection(BaseModel):
     id: int
 
 class SubmitTeamRequest(BaseModel):
+    team_name:str
     players: List[PlayerSelection]
 
 class PlayerDisplay(BaseModel):
