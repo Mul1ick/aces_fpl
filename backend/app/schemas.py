@@ -32,6 +32,10 @@ class PlayerOut(BaseModel):
 
 class PlayerSelection(BaseModel):
     id: int
+    position:str
+    is_captain: bool = False
+    is_vice_captain: bool = False
+    is_benched: bool = False
 
 class SubmitTeamRequest(BaseModel):
     team_name:str

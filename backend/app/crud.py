@@ -1,7 +1,9 @@
+import random
 from sqlalchemy.orm import Session
 from app import models, schemas, auth
 from sqlalchemy.orm import Session, joinedload
 from app.models import FantasyTeam, UserTeam, Player
+from fastapi import HTTPException
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
@@ -25,23 +27,64 @@ def get_user_by_id(db: Session, user_id: str):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
 def save_user_team(db: Session, user_id: str, gameweek_id: int, team_name: str, players: list[dict]):
-    # Find if the user already has a fantasy team
-    db_fantasy_team = db.query(FantasyTeam).filter(FantasyTeam.user_id == user_id).first()
 
+    
+ 
+    # --- This part for saving the fantasy team name stays the same ---
+    db_fantasy_team = db.query(FantasyTeam).filter(FantasyTeam.user_id == user_id).first()
     if db_fantasy_team:
-        # If they do, just update the name
         db_fantasy_team.name = team_name
     else:
-        # If not, create a new one
         db_fantasy_team = FantasyTeam(name=team_name, user_id=user_id)
         db.add(db_fantasy_team)
+
+    # --- Delete the user's old team for this gameweek to avoid duplicates ---
+    db.query(UserTeam).filter(
+        UserTeam.user_id == user_id,
+        UserTeam.gameweek_id == gameweek_id
+    ).delete()
+
+    # --- NEW LOGIC: Randomly assign roles to the 11 players ---
+    player_ids = [p["id"] for p in players]
+    if len(player_ids) != 11:
+        raise HTTPException(status_code=400, detail="A full squad of 11 players is required.")
+    player_objects = db.query(Player).filter(Player.id.in_(player_ids)).all()
+
+    goalkeepers = [p for p in player_objects if p.position == 'GK']
+    outfielders = [p for p in player_objects if p.position != 'GK']
+
+    if len(goalkeepers) != 2:
+        raise HTTPException(status_code=400, detail="You must select exactly two goalkeepers.")
+
+    # 1. Randomly bench one goalkeeper
+    benched_gk = random.choice(goalkeepers)
+    starting_gk = [gk for gk in goalkeepers if gk != benched_gk][0]
+
+    # 2. Randomly bench two outfield players
+    benched_outfielders = random.sample(outfielders, 2)
+    starting_outfielders = [p for p in outfielders if p not in benched_outfielders]
+
+    # Combine the benched player IDs
+    benched_ids = [p.id for p in benched_outfielders] + [benched_gk.id]
     
-    # This part for saving the 11 players remains the same
-    for player in players:
+    # Combine the starting player objects for captaincy selection
+    starters = starting_outfielders + [starting_gk]
+    starter_ids = [p.id for p in starters]
+
+    # 3. Select captain and vice-captain from the 8 starters
+    captain_id = random.choice(starter_ids)
+    remaining_starters = [pid for pid in starter_ids if pid != captain_id]
+    vice_captain_id = random.choice(remaining_starters)
+
+    # --- (Insert new team logic remains the same) ---
+    for player_id in player_ids:
         entry = UserTeam(
             user_id=user_id,
             gameweek_id=gameweek_id,
-            player_id=player["id"]
+            player_id=player_id,
+            is_captain=(player_id == captain_id),
+            is_vice_captain=(player_id == vice_captain_id),
+            is_benched=(player_id in benched_ids)
         )
         db.add(entry)
         

@@ -109,14 +109,14 @@ const handleConfirmSquad = async (teamName: string) => {
 
   console.log("📦 [Submit] Current squad state before formatting:", squad);
 
-  const players = Object.entries(squad).flatMap(([position, playerArray]) =>
-    playerArray
-      .filter(p => p !== null)
-      .map(p => {
-        console.log(`🔁 [Submit] Mapping player ${p.name} => { id: ${p.id}, position: ${position} }`);
-        return { id: p.id, position };
-      })
-  );
+  const players = Object.values(squad).flat().filter(p => p !== null).map(p => ({
+    id: p.id,
+    position: p.pos,
+    is_captain: p.is_captain || false,      // Add this
+    is_vice_captain: p.is_vice_captain || false, // Add this
+    is_benched: p.is_benched || false       // Add this
+  }));
+
 
   const payload = {
     team_name: teamName,
