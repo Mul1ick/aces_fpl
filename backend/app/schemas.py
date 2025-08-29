@@ -44,6 +44,7 @@ class PlayerDisplay(BaseModel):
     is_captain: bool
     is_vice_captain: bool
     team: TeamOut  # already defined
+    is_benched:bool
 
     model_config = ConfigDict(from_attributes=True)
 

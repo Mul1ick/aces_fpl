@@ -81,15 +81,11 @@ const Team: React.FC = () => {
       });
 
       // Divide players correctly
-      const starting = allPlayers
-        .filter(player => !player.is_benched)
-        .map(transformPlayer);
-
-      const bench = allPlayers
-        .filter(player => player.is_benched)
-        .map(transformPlayer);
+      const starting = data.starting.map(transformPlayer);
+      const bench = data.bench.map(transformPlayer);
 
       setSquad({ starting, bench });
+
     })
     .catch(err => {
       console.error("Failed to fetch team:", err);

@@ -21,7 +21,8 @@ def submit_team(
         db=db,
         user_id=current_user.id,
         gameweek_id=gameweek_id,
-        players=[p.dict() for p in team.players]
+        players=[p.dict() for p in team.players],
+        team_name = team.team_name
     )
 
     return {"message": "Team submitted successfully"}

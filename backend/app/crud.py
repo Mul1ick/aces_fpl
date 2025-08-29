@@ -61,11 +61,14 @@ def get_user_team_full(db: Session, user_id: str):
             "is_captain": entry.is_captain,
             "is_vice_captain": entry.is_vice_captain,
             "team": entry.player.team,
+            "is_benched":entry.is_benched
         }
 
-    sorted_entries = sorted(user_team_entries, key=lambda x: x.player.position)
-    starting = [to_display(p) for p in sorted_entries[:11]]
-    bench = [to_display(p) for p in sorted_entries[11:]]
+    all_players = [to_display(p) for p in user_team_entries]
+    
+    starting = [p for p in all_players if not p["is_benched"]]
+    bench = [p for p in all_players if p["is_benched"]]
+
 
     return {
         "team_name": team.name,
