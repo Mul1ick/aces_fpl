@@ -3,11 +3,14 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 from app.database import get_db
-from app import crud, models
+from app import crud
 import os
 from dotenv import load_dotenv
+from prisma import Prisma
+from prisma import models as PrismaModels
+
+
 
 # ----------------- LOAD ENV ------------------
 load_dotenv()
@@ -35,7 +38,10 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return encoded_jwt
 
 # ----------------- GET CURRENT USER DEPENDENCY ------------------
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), 
+    db: Prisma = Depends(get_db) # Use Prisma client, not SQLAlchemy Session
+) -> PrismaModels.User: # Return the Prisma User model type
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -44,13 +50,14 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")  # This is the user_id stored during login
+        user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
-    user = crud.get_user_by_id(db, user_id)
+    # Use 'await' to call the async crud function
+    user = await crud.get_user_by_id(db, user_id)
     if user is None:
         raise credentials_exception
 

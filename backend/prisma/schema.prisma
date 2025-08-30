@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-py"
+  enable_experimental_decimal = true
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  hashed_password String
+  role            String        @default("user")
+  is_active       Boolean       @default(false)
+  fantasy_team    FantasyTeam?
+  user_teams      UserTeam[]
+
+  @@map("users")
+}
+
+model Team {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  short_name String   @unique @db.VarChar(3)
+  players    Player[]
+
+  @@map("teams")
+}
+
+model Player {
+  id          Int      @id @default(autoincrement())
+  full_name   String
+  position    String
+  price       Decimal  @db.Decimal(5, 2)
+  team_id     Int
+  team        Team     @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  user_teams  UserTeam[]
+
+  @@map("players")
+}
+
+model Gameweek {
+  id          Int      @id @default(autoincrement())
+  gw_number   Int      @unique
+  deadline    DateTime @db.Timestamptz(6)
+  user_teams  UserTeam[]
+
+  @@map("gameweeks")
+}
+
+model FantasyTeam {
+  id      Int    @id @default(autoincrement())
+  name    String
+  user_id String @unique
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("fantasy_teams")
+}
+
+model UserTeam {
+  id              Int      @id @default(autoincrement())
+  user_id         String
+  gameweek_id     Int
+  player_id       Int
+  is_captain      Boolean  @default(false)
+  is_vice_captain Boolean  @default(false)
+  is_benched      Boolean  @default(false)
+  
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
+  player   Player   @relation(fields: [player_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, gameweek_id, player_id])
+  @@map("user_teams")
+}

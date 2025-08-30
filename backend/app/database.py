@@ -1,19 +1,18 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import os
-from dotenv import load_dotenv
+from prisma import Prisma
 
-load_dotenv()
+# This creates a single, reusable client instance
+db_client = Prisma()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-def get_db():
-    db: Session = SessionLocal()
+async def get_db():
+    """
+    Dependency that connects and disconnects the Prisma client
+    for each request.
+    """
+    if not db_client.is_connected():
+        await db_client.connect()
+    
     try:
-        yield db
+        yield db_client
     finally:
-        db.close()
+        if db_client.is_connected():
+            await db_client.disconnect()

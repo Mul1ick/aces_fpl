@@ -3,14 +3,12 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth_routes, user_routes
-from app.database import engine
 from app import models
 from app.config import CORS_ORIGINS
 from app.routes import player_routes
 from app.routes import team
 from app.routes import gameweek_routes
 
-models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
