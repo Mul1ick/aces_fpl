@@ -26,8 +26,8 @@ interface Player {
   name: string;
   team: string;
   pos: string;
-  fixture: string;
-  points: number;
+  fixture?: string;
+  points?: number;
   isCaptain?: boolean;
   isVice?: boolean;
 }
@@ -35,15 +35,22 @@ interface Player {
 interface PlayerCardProps {
   player: Player;
   isBench?: boolean;
+  displayMode?: 'points' | 'fixture'; // New prop to control display
 }
 
 // --- PLAYER CARD COMPONENT ---
-const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false }) => {
+const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displayMode = 'points' }) => {
   const jerseySrc = TEAM_JERSEYS[player.team] || tshirtWhite;
-  const displayPoints = player.isCaptain ? player.points * 2 : player.isVice ? Math.floor(player.points * 1.5) : player.points;
+
+  // Calculate points, handling potential undefined values
+  const displayPoints = player.isCaptain 
+    ? (player.points ?? 0) * 2 
+    : player.isVice 
+    ? Math.floor((player.points ?? 0) * 1.5) 
+    : player.points;
 
   return (
-    <motion.div 
+    <motion.div
       className="flex flex-col items-center text-center relative"
       style={{ width: isBench ? '70px' : '85px' }}
       whileHover={{ scale: 1.1, zIndex: 10 }}
@@ -54,9 +61,9 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false }) => {
       <div className="w-full overflow-hidden shadow-lg border border-white/10 flex flex-col" style={{ height: isBench ? '90px' : '115px' }}>
         {/* Jersey Section */}
         <div className="relative h-[65%]">
-          <img 
-            src={jerseySrc} 
-            alt={`${player.team} jersey`} 
+          <img
+            src={jerseySrc}
+            alt={`${player.team} jersey`}
             className="w-full h-full object-cover"
           />
           {(player.isCaptain || player.isVice) && (
@@ -68,16 +75,21 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false }) => {
             </div>
           )}
         </div>
-        
+
         {/* Info Section */}
         <div className="h-[35%] flex flex-col">
           {/* Player Name */}
           <div className="flex-1 bg-white text-black flex items-center justify-center px-1">
               <p className="font-bold truncate" style={{ fontSize: isBench ? '9px' : '11px' }}>{player.name}</p>
           </div>
-          {/* Points */}
-          <div className="flex-1 bg-[#23003F] text-white font-bold flex items-center justify-center">
-            <p style={{ fontSize: isBench ? '11px' : '12px' }}>{displayPoints}</p>
+          {/* Fixture or Points - Conditionally rendered */}
+          <div className={cn(
+            "flex-1 font-bold flex items-center justify-center",
+            displayMode === 'points' ? 'bg-[#23003F] text-white' : 'bg-white text-black'
+          )}>
+            <p style={{ fontSize: isBench ? '11px' : '12px' }}>
+              {displayMode === 'points' ? displayPoints : (player.fixture || ' - ')}
+            </p>
           </div>
         </div>
       </div>
@@ -86,3 +98,4 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false }) => {
 };
 
 export default PlayerCard;
+
