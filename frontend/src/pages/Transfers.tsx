@@ -7,6 +7,7 @@ import { TransferPitchView } from '@/components/transfers/TransferPitchView';
 import { PlayerSelectionList, PlayerSelectionModal } from '@/components/transfers/PlayerSelection';
 import { EnterSquadModal } from '@/components/transfers/EnterSquadModal';
 import { Button } from '@/components/ui/button';
+import { TeamResponse, Player } from "@/types";
 
 // --- CONFIGURATION ---
 const initialSquad = {
@@ -19,11 +20,61 @@ const initialSquad = {
 // --- MAIN TRANSFERS PAGE ---
 const Transfers: React.FC = () => {
   const [squad, setSquad] = useState(initialSquad);
+  const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isPlayerSelectionOpen, setIsPlayerSelectionOpen] = useState(false);
   const [isEnterSquadModalOpen, setIsEnterSquadModalOpen] = useState(false);
   const [positionToFill, setPositionToFill] = useState<{ position: string; index: number } | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+  const token = localStorage.getItem("access_token");
+
+  const fetchAndSetTeam = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/teams/team", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // If the user has no team, the API will return a 404, which is okay.
+      if (!response.ok) {
+        setIsLoading(false);
+        return; // Keep the initial empty squad
+      }
+
+      const data: TeamResponse = await response.json();
+      
+      // Helper function to transform the API data into the squad object structure
+      const transformApiDataToSquad = (players: Player[]) => {
+        const newSquad = JSON.parse(JSON.stringify(initialSquad));
+        players.forEach(p => {
+          // Find the first empty slot for the player's position
+          const index = newSquad[p.position].findIndex(slot => slot === null);
+          if (index !== -1) {
+            newSquad[p.position][index] = p;
+          }
+        });
+        return newSquad;
+      };
+
+      const allPlayers = [...data.starting, ...data.bench];
+      const populatedSquad = transformApiDataToSquad(allPlayers);
+      setSquad(populatedSquad);
+
+    } catch (error) {
+      console.error("Failed to fetch team:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchAndSetTeam();
+}, []);
+
+
+
 
   // Show a notification and clear it after a few seconds
   const showNotification = (message: string, type: 'success' | 'error') => {
@@ -137,6 +188,10 @@ const Transfers: React.FC = () => {
     const remainingBank = 102.0 - totalCost;
     return { playersSelected: selectedCount, bank: remainingBank };
   }, [squad]);
+
+  if (isLoading) {
+    return <div className="p-4 text-center">Loading your squad...</div>;
+}
 
   return (
     <div className="w-full min-h-screen bg-white font-sans">
