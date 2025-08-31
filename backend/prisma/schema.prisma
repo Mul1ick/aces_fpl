@@ -14,6 +14,7 @@ model User {
   hashed_password String
   role            String        @default("user")
   is_active       Boolean       @default(false)
+  full_name       String?   
   fantasy_team    FantasyTeam?
   user_teams      UserTeam[]
   user_gameweek_scores UserGameweekScore[]

@@ -93,13 +93,15 @@ async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: 
 async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     team = await db.fantasyteam.find_unique(where={'user_id': user_id})
     if not team:
-        raise Exception("Team not found for this user")
+        return {"team_name": "", "starting": [], "bench": []}
 
     print(f"✅ LOG: Searching for team with user_id='{user_id}' and gameweek_id={gameweek_id}")
     user_team_entries = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id},
         include={'player': {'include': {'team': True}}}
     )
+    if not user_team_entries:
+        return {"team_name": team.name, "starting": [], "bench": []}
     print(f"✅ LOG: Found {len(user_team_entries)} entries in the database.")
 
     def to_display(entry):

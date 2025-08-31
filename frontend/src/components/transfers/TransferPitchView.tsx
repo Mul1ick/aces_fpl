@@ -27,8 +27,8 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove }) => {
     }
     const transformPlayerForCard = (player) => ({
         id: player.id,
-        name: player.full_name,
-        team: player.team.name,
+        name: player.name,
+        team: player.team_name,
         pos: player.position,
         points: 0, // Placeholder
         isCaptain: player.is_captain,

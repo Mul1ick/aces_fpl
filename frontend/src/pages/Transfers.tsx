@@ -30,6 +30,8 @@ const Transfers: React.FC = () => {
   useEffect(() => {
   const token = localStorage.getItem("access_token");
 
+    
+
   const fetchAndSetTeam = async () => {
     try {
       const response = await fetch("http://localhost:8000/teams/team", {
@@ -46,18 +48,23 @@ const Transfers: React.FC = () => {
 
       const data: TeamResponse = await response.json();
       
+      const normalizePos = (p: any) => {
+  const key = String(p?.pos ?? p?.position ?? '').toUpperCase();
+  return { ...p, pos: key };
+};
       // Helper function to transform the API data into the squad object structure
-      const transformApiDataToSquad = (players: Player[]) => {
-        const newSquad = JSON.parse(JSON.stringify(initialSquad));
-        players.forEach(p => {
-          // Find the first empty slot for the player's position
-          const index = newSquad[p.position].findIndex(slot => slot === null);
-          if (index !== -1) {
-            newSquad[p.position][index] = p;
-          }
-        });
-        return newSquad;
-      };
+      const transformApiDataToSquad = (players: any[]) => {
+  const newSquad = JSON.parse(JSON.stringify(initialSquad));
+  players.forEach(raw => {
+    const p = normalizePos(raw);
+    if (!newSquad[p.pos]) return;                 // skip unknown positions
+    const idx = newSquad[p.pos].findIndex((s: any) => s === null);
+    if (idx !== -1) newSquad[p.pos][idx] = p;     // place normalized player
+  });
+  return newSquad;
+};
+
+      
 
       const allPlayers = [...data.starting, ...data.bench];
       const populatedSquad = transformApiDataToSquad(allPlayers);
@@ -90,37 +97,61 @@ const Transfers: React.FC = () => {
   };
 
   const handlePlayerSelect = (player: any) => {
-    setIsPlayerSelectionOpen(false); // Close mobile modal if open
+  setIsPlayerSelectionOpen(false); // Close mobile modal if open
 
-    // If a specific slot was clicked, fill it
-    if (positionToFill) {
-      setSquad(currentSquad => {
-        const newSquad = { ...currentSquad };
-        const positionArray = [...newSquad[positionToFill.position]];
-        positionArray[positionToFill.index] = player;
-        newSquad[positionToFill.position] = positionArray;
-        return newSquad;
-      });
-      setPositionToFill(null);
-      return;
-    }
+  // Normalize position key coming from different sources
+  const rawPos =
+    player?.pos ??
+    player?.position ??
+    player?.Pos ??
+    player?.POSITION ??
+    null;
 
-    // Otherwise, find the first available slot for the player's position
-    const positionArray = squad[player.pos];
-    const emptySlotIndex = positionArray.findIndex(slot => slot === null);
+  const posKey = typeof rawPos === "string" ? rawPos.toUpperCase() : null;
 
-    if (emptySlotIndex !== -1) {
-      setSquad(currentSquad => {
-        const newSquad = { ...currentSquad };
-        const newPositionArray = [...newSquad[player.pos]];
-        newPositionArray[emptySlotIndex] = player;
-        newSquad[player.pos] = newPositionArray;
-        return newSquad;
-      });
-    } else {
-      showNotification(`All ${player.pos} slots are already full.`, 'error');
-    }
-  };
+  // Validate the target bucket (GK/DEF/MID/FWD) exists in squad
+  if (!posKey || !Object.prototype.hasOwnProperty.call(squad, posKey)) {
+    console.error("🚫 Unknown player position:", { player, posKey, squad });
+    // showNotification("Couldn't determine the player's position.", "error");
+    return;
+  }
+
+  // If user tapped a specific slot earlier, fill that exact slot
+  if (positionToFill) {
+    setSquad((current) => {
+      const next = { ...current };
+      const arr = [...next[positionToFill.position]];
+      arr[positionToFill.index] = player;
+      next[positionToFill.position] = arr;
+      return next;
+    });
+    setPositionToFill(null);
+    return;
+  }
+
+  // Otherwise, find the first empty slot for the player's position
+  const positionArray = squad[posKey];
+  if (!Array.isArray(positionArray)) {
+    console.error("🚫 Squad bucket is not an array:", posKey, positionArray);
+    // showNotification(`Invalid squad bucket for ${posKey}.`, "error");
+    return;
+  }
+
+  const emptySlotIndex = positionArray.findIndex((slot) => slot === null);
+
+  if (emptySlotIndex !== -1) {
+    setSquad((current) => {
+      const next = { ...current };
+      const arr = [...next[posKey]];
+      arr[emptySlotIndex] = player;
+      next[posKey] = arr;
+      return next;
+    });
+  } else {
+    // showNotification(`All ${posKey} slots are already full.`, "error");
+    console.warn(`All ${posKey} slots are already full.`);
+  }
+};
 
   const handlePlayerRemove = (position: string, index: number) => {
     setSquad(currentSquad => {
