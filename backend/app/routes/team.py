@@ -5,6 +5,7 @@ from app.auth import get_current_user
 from prisma import Prisma
 from prisma import models as PrismaModels # Import Prisma's generated models
 
+
 router = APIRouter()
 
 @router.post("/submit-team")
@@ -16,6 +17,7 @@ async def submit_team(
 ):
     current_gameweek = await crud.get_current_gameweek(db)
 
+    
     await crud.save_user_team(
         db=db,
         user_id=str(current_user.id), # Use str() for safety
@@ -33,6 +35,7 @@ async def get_team(
     current_user: PrismaModels.User = Depends(get_current_user)
 ):
     current_gameweek = await crud.get_current_gameweek(db)
+    print(f"✅ LOG: Current Gameweek ID is {current_gameweek.id}")
     
     try:
         result = await crud.get_user_team_full(db, str(current_user.id), current_gameweek.id)

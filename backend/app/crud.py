@@ -95,10 +95,12 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     if not team:
         raise Exception("Team not found for this user")
 
+    print(f"✅ LOG: Searching for team with user_id='{user_id}' and gameweek_id={gameweek_id}")
     user_team_entries = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id},
         include={'player': {'include': {'team': True}}}
     )
+    print(f"✅ LOG: Found {len(user_team_entries)} entries in the database.")
 
     def to_display(entry):
         return {
@@ -122,3 +124,27 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
         "starting": starting,
         "bench": bench
     }
+
+# In backend/app/crud.py
+
+async def get_leaderboard(db: Prisma):
+    scores = await db.usergameweekscore.group_by(
+        by=['user_id'],
+        sum={'total_points': True},
+        order={'_sum': {'total_points': 'desc'}}
+    )
+
+    leaderboard = []
+    for rank, score in enumerate(scores, 1):
+        user_details = await db.user.find_unique(
+            where={'id': score['user_id']},
+            include={'fantasy_team': True}
+        )
+        if user_details and user_details.fantasy_team:
+            leaderboard.append({
+                "rank": rank,
+                "team_name": user_details.fantasy_team.name,
+                "manager_email": user_details.email,
+                "total_points": score['_sum']['total_points'] or 0
+            })
+    return leaderboard

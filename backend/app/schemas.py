@@ -57,3 +57,8 @@ class GetTeamResponse(BaseModel):
     team_name: str
     starting: List[PlayerDisplay]
     bench: List[PlayerDisplay]
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    team_name: str
+    total_points: int

@@ -60,7 +60,7 @@ const Team: React.FC = () => {
       }
 
       const data = await res.json();
-
+      console.log("1. Raw data from API:", data); 
       if (!data.starting || !data.bench) {
         throw new Error("Malformed team data");
       }
@@ -72,18 +72,21 @@ const Team: React.FC = () => {
       const transformPlayer = (player) => ({
         id: player.id,
         name: player.full_name,
-        team: player.team.short_name,
+        team: player.team.name,
         pos: player.position,
         fixture: '—',
         points: 0,
         isCaptain: player.is_captain,
         isVice: player.is_vice_captain,
+        is_benched:player.is_benched,
       });
 
       // Divide players correctly
       const starting = data.starting.map(transformPlayer);
       const bench = data.bench.map(transformPlayer);
 
+      console.log("2. Processed 'starting' array:", starting);
+      console.log("3. Processed 'bench' array:", bench);
       setSquad({ starting, bench });
 
     })

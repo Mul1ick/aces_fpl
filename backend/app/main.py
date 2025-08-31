@@ -8,6 +8,7 @@ from app.config import CORS_ORIGINS
 from app.routes import player_routes
 from app.routes import team
 from app.routes import gameweek_routes
+from app.routes import leaderboard_routes
 
 
 app = FastAPI()
@@ -25,6 +26,8 @@ app.include_router(user_routes.router, prefix="/users", tags=["Users"])
 app.include_router(player_routes.router)
 app.include_router(team.router,prefix="/teams", tags=["Teams"])
 app.include_router(gameweek_routes.router, tags=["Gameweeks"])
+app.include_router(leaderboard_routes.router)
+
 
 @app.get("/")
 def root():

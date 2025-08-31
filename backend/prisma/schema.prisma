@@ -16,6 +16,7 @@ model User {
   is_active       Boolean       @default(false)
   fantasy_team    FantasyTeam?
   user_teams      UserTeam[]
+  user_gameweek_scores UserGameweekScore[]
 
   @@map("users")
 }
@@ -37,6 +38,7 @@ model Player {
   team_id     Int
   team        Team     @relation(fields: [team_id], references: [id], onDelete: Cascade)
   user_teams  UserTeam[]
+  gameweek_player_stats GameweekPlayerStats[]
 
   @@map("players")
 }
@@ -46,6 +48,8 @@ model Gameweek {
   gw_number   Int      @unique
   deadline    DateTime @db.Timestamptz(6)
   user_teams  UserTeam[]
+  gameweek_player_stats GameweekPlayerStats[] // <-- ADD THIS
+  user_gameweek_scores  UserGameweekScore[]
 
   @@map("gameweeks")
 }
@@ -74,4 +78,30 @@ model UserTeam {
 
   @@unique([user_id, gameweek_id, player_id])
   @@map("user_teams")
+}
+
+model GameweekPlayerStats {
+  id          Int      @id @default(autoincrement())
+  gameweek_id Int
+  player_id   Int
+  points      Int
+
+  gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
+  player   Player   @relation(fields: [player_id], references: [id], onDelete: Cascade)
+
+  @@unique([gameweek_id, player_id])
+  @@map("gameweek_player_stats")
+}
+
+model UserGameweekScore {
+  id           Int    @id @default(autoincrement())
+  user_id      String
+  gameweek_id  Int
+  total_points Int
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, gameweek_id])
+  @@map("user_gameweek_scores")
 }
