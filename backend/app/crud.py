@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from prisma import Prisma
 from app import schemas, auth
+from typing import Dict, List
 
 # --- USER FUNCTIONS ---
 
@@ -96,15 +97,28 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
         return {"team_name": "", "starting": [], "bench": []}
 
     print(f"✅ LOG: Searching for team with user_id='{user_id}' and gameweek_id={gameweek_id}")
+    
     user_team_entries = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id},
-        include={'player': {'include': {'team': True}}}
+        include={'player': {'include': {'team': True}}},
+        order={'player_id': 'asc'}
     )
+
+    player_ids: List[int] = [e.player_id for e in user_team_entries]
+    # IMPORTANT: attribute name depends on how prisma-client-py generates it from your model name.
+    # Because your Prisma model is `GameweekPlayerStats` (with @@map("gameweek_player_stats")),
+    # prisma-client-py usually exposes it as `db.gameweekplayerstats`.
+    stats = await db.gameweekplayerstats.find_many(
+        where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
+    )
+    pts_map: Dict[int, int] = {s.player_id: s.points for s in stats}
+
     if not user_team_entries:
         return {"team_name": team.name, "starting": [], "bench": []}
     print(f"✅ LOG: Found {len(user_team_entries)} entries in the database.")
 
     def to_display(entry):
+        club = entry.player.team
         return {
             "id": entry.player.id,
             "full_name": entry.player.full_name,
@@ -112,8 +126,13 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
             "price": entry.player.price,
             "is_captain": entry.is_captain,
             "is_vice_captain": entry.is_vice_captain,
-            "team": entry.player.team,
-            "is_benched": entry.is_benched
+            'team': {
+                'id': club.id,
+                'name': club.name,
+                'short_name': club.short_name,
+            },
+            "is_benched": entry.is_benched,
+            'points': pts_map.get(entry.player.id, 0),
         }
 
     all_players = [to_display(p) for p in user_team_entries]

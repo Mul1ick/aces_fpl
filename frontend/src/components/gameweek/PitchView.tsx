@@ -28,7 +28,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                 name: p.full_name,
                 pos: p.position,
                 team: p.team.name,
-                points: 0, // Placeholder
+                points: playersByPos.points ?? 0, // Placeholder
                 isCaptain: p.is_captain,
                 isVice: p.is_vice_captain
               }} />
