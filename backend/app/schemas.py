@@ -50,6 +50,7 @@ class PlayerDisplay(BaseModel):
     is_vice_captain: bool
     team: TeamOut  # already defined
     is_benched:bool
+    points: int
 
     model_config = ConfigDict(from_attributes=True)
 
