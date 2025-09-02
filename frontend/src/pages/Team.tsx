@@ -44,6 +44,7 @@ const Team: React.FC = () => {
   const [squad, setSquad] = useState({ starting: [], bench: [] });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [detailedPlayer, setDetailedPlayer] = useState(null);
+  
 
 
   useEffect(() => {
@@ -74,7 +75,7 @@ const Team: React.FC = () => {
         name: player.full_name,
         team: player.team.name,
         pos: player.position,
-        fixture: '—',
+        fixture: player.fixture_str,
         points: 0,
         isCaptain: player.is_captain,
         isVice: player.is_vice_captain,
@@ -192,7 +193,7 @@ const Team: React.FC = () => {
                   onClick={() => handlePlayerClick(p, false)} 
                   className={cn("cursor-pointer rounded-md transition-all", selectedPlayer?.id === p.id && "ring-2 ring-accent-teal ring-offset-2 ring-offset-transparent")}
                 >
-                  <PlayerCard player={p} />
+                  <PlayerCard player={p} displayMode='fixture'/>
                 </div>
               ))}
             </div>
@@ -207,7 +208,7 @@ const Team: React.FC = () => {
                 onClick={() => handlePlayerClick(player, true)} 
                 className={cn("cursor-pointer rounded-md transition-all", selectedPlayer?.id === player.id && "ring-2 ring-accent-teal ring-offset-2 ring-offset-transparent")}
               >
-                <PlayerCard player={player} isBench={true} />
+                <PlayerCard player={player} isBench={true} displayMode='fixture' />
               </div>
             ))}
           </div>

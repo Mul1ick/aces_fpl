@@ -91,6 +91,7 @@ class PlayerDisplay(BaseModel):
     team: TeamOut
     is_benched:bool
     points: int
+    fixture_str: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 class GetTeamResponse(BaseModel):

@@ -2,8 +2,14 @@ from dotenv import load_dotenv
 load_dotenv() 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes
+from app.routes import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes,fixture_routes
 from app.config import CORS_ORIGINS
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,  # or DEBUG if you want the detailed logs
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+)
 
 app = FastAPI(
     title="Aces FPL Backend API",
@@ -29,6 +35,7 @@ app.include_router(player_routes.router)
 app.include_router(team.router, prefix="/teams", tags=["Teams"])
 app.include_router(gameweek_routes.router, tags=["Gameweeks"])
 app.include_router(leaderboard_routes.router)
+app.include_router(fixture_routes.router, tags=["Fixtures"])
 
 # Secure routes for the Admin Portal
 app.include_router(admin_routes.router) # Prefix is already defined in admin_routes.py

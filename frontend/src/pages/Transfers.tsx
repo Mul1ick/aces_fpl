@@ -26,6 +26,7 @@ const Transfers: React.FC = () => {
   const [isEnterSquadModalOpen, setIsEnterSquadModalOpen] = useState(false);
   const [positionToFill, setPositionToFill] = useState<{ position: string; index: number } | null>(null);
   const navigate = useNavigate();
+  const [teamFixtureMap, setTeamFixtureMap] = useState<Record<number, string>>({});
 
   useEffect(() => {
   const token = localStorage.getItem("access_token");
@@ -47,7 +48,7 @@ const Transfers: React.FC = () => {
       }
 
       const data: TeamResponse = await response.json();
-      
+
       const normalizePos = (p: any) => {
   const key = String(p?.pos ?? p?.position ?? '').toUpperCase();
   return { ...p, pos: key };
@@ -251,6 +252,7 @@ const Transfers: React.FC = () => {
             squad={squad}
             onSlotClick={handleSlotClick}
             onPlayerRemove={handlePlayerRemove}
+            teamFixtureMap={teamFixtureMap}
           />
 
           <div className="p-4 grid grid-cols-3 gap-4 border-t">

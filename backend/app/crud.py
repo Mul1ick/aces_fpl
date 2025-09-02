@@ -4,7 +4,10 @@ from fastapi import HTTPException
 from prisma import Prisma
 from app import schemas, auth
 from typing import Dict, List, Optional
+import logging
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 # --- USER FUNCTIONS ---
 
@@ -106,13 +109,22 @@ async def get_dashboard_stats(db: Prisma):
 
 async def get_current_gameweek(db: Prisma):
     now_utc = datetime.now(timezone.utc)
+
+    # try next upcoming
     current_gw = await db.gameweek.find_first(
         where={'deadline': {'gt': now_utc}},
         order={'deadline': 'asc'}
     )
-    if not current_gw:
-        current_gw = await db.gameweek.find_first(order={'deadline': 'desc'})
-    return current_gw
+    if current_gw:
+        return current_gw
+
+    # else try most recent past
+    last_gw = await db.gameweek.find_first(order={'deadline': 'desc'})
+    if last_gw:
+        return last_gw
+
+    # nothing configured => explicit 404 with a clear message
+    raise HTTPException(status_code=404, detail="No gameweeks configured in the database.")
 
 
 # --- TEAM FUNCTIONS ---
@@ -167,25 +179,77 @@ async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: 
     await db.userteam.create_many(data=team_to_create)
 
 async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
-    team = await db.fantasyteam.find_unique(where={'user_id': user_id})
-    if not team:
+    logger.info(f"Fetching team for user_id={user_id}, gameweek_id={gameweek_id}")
+
+    # 0) Ensure team exists and auto-carry forward
+    await carry_forward_team(db, user_id, gameweek_id)
+    fantasy_team = await db.fantasyteam.find_unique(where={'user_id': user_id})
+    if not fantasy_team:
+        logger.warning("No fantasy team found for user.")
         return {"team_name": "", "starting": [], "bench": []}
 
-    user_team_entries = await db.userteam.find_many(
+    # 1) Load current user team entries + player + club
+    entries = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id},
         include={'player': {'include': {'team': True}}},
         order={'player_id': 'asc'}
     )
+    logger.info(f"User team entries fetched: {len(entries)}")
+    if not entries:
+        return {"team_name": fantasy_team.name, "starting": [], "bench": []}
 
-    player_ids: List[int] = [e.player_id for e in user_team_entries]
+    # 2) Points for current GW
+    player_ids: List[int] = [e.player_id for e in entries]
     stats = await db.gameweekplayerstats.find_many(
         where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
     )
+    logger.info(f"Stats fetched for {len(stats)} players")
     pts_map: Dict[int, int] = {s.player_id: s.points for s in stats}
 
-    if not user_team_entries:
-        return {"team_name": team.name, "starting": [], "bench": []}
+    # 3) Find NEXT gameweek (by gw_number, safer than id+1)
+    cur_gw = await db.gameweek.find_unique(where={'id': gameweek_id})
+    logger.info(f"Current GW: {cur_gw.gw_number if cur_gw else None}")
+    next_gw: Optional = None
+    if cur_gw:
+        next_gw = await db.gameweek.find_unique(where={'gw_number': cur_gw.gw_number + 1})
+    logger.info(f"Next GW: {next_gw.gw_number if next_gw else None}")
 
+    # 4) Build team_id -> fixture_str map for next GW
+    fixture_map: Dict[int, str] = {}
+    if next_gw:
+        # Which club IDs do we care about?
+        team_ids = list({e.player.team_id for e in entries})
+        logger.info(f"Looking for fixtures for team_ids={team_ids}")
+
+        # Get all fixtures in next GW involving any of those teams
+        fixtures = await db.fixture.find_many(
+            where={
+                'gameweek_id': next_gw.id,
+                'OR': [
+                    {'home_team_id': {'in': team_ids}},
+                    {'away_team_id': {'in': team_ids}},
+                ]
+            },
+            include={'home': True, 'away': True}
+        )
+        logger.info(f"Found {len(fixtures)} fixtures for next GW")
+
+        # Format helper: "OPP (H/A) • Sat 30 Aug 20:00"
+        def fmt(kickoff: datetime, opp_short: str, venue: str) -> str:
+            # Adjust formatting as you prefer
+            return f"{opp_short} ({venue}) "
+
+        # Build map for both home and away teams
+        for f in fixtures:
+            logger.debug(f"Fixture: {f.home.short_name} vs {f.away.short_name} @ {f.kickoff}")
+            if f.home_team_id in team_ids:
+                fixture_map[f.home_team_id] = fmt(f.kickoff, f.away.short_name, 'H')
+            if f.away_team_id in team_ids:
+                fixture_map[f.away_team_id] = fmt(f.kickoff, f.home.short_name, 'A')
+
+    logger.info(f"Fixture map built: {fixture_map}")
+
+    # 5) Shape response objects
     def to_display(entry):
         club = entry.player.team
         return {
@@ -195,25 +259,29 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
             "price": entry.player.price,
             "is_captain": entry.is_captain,
             "is_vice_captain": entry.is_vice_captain,
-            'team': {
-                'id': club.id,
-                'name': club.name,
-                'short_name': club.short_name,
+            "team": {
+                "id": club.id,
+                "name": club.name,
+                "short_name": club.short_name,
             },
             "is_benched": entry.is_benched,
-            'points': pts_map.get(entry.player.id, 0),
+            "points": pts_map.get(entry.player.id, 0),
+            # 👇 NEW: this is what your frontend reads
+            "fixture_str": fixture_map.get(club.id, "—"),
         }
 
-    all_players = [to_display(p) for p in user_team_entries]
-    
+    all_players = [to_display(e) for e in entries]
     starting = [p for p in all_players if not p["is_benched"]]
     bench = [p for p in all_players if p["is_benched"]]
 
     return {
-        "team_name": team.name,
+        "team_name": fantasy_team.name,
         "starting": starting,
         "bench": bench
     }
+
+
+
 
 async def get_leaderboard(db: Prisma):
     scores = await db.usergameweekscore.group_by(
@@ -236,4 +304,53 @@ async def get_leaderboard(db: Prisma):
                 "total_points": score['_sum']['total_points'] or 0
             })
     return leaderboard
+
+async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
+    # 1. Check if the user already has a team for this GW
+    existing = await db.userteam.find_first(
+        where={'user_id': user_id, 'gameweek_id': new_gameweek_id}
+    )
+    if existing:
+        return  # Already exists, no need to copy
+
+    # 2. Find the latest gameweek before this one
+    prev_entry = await db.userteam.find_first(
+        where={'user_id': user_id, 'gameweek_id': {'lt': new_gameweek_id}},
+        order={'gameweek_id': 'desc'}
+    )
+    if not prev_entry:
+        return  # User has no previous team (maybe new user)
+
+    prev_gw_id = prev_entry.gameweek_id
+    prev_team: List = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': prev_gw_id}
+    )
+
+    if not prev_team:
+        return
+
+    # 3. Copy forward into new gameweek
+    team_to_create = [
+        {
+            'user_id': user_id,
+            'gameweek_id': new_gameweek_id,
+            'player_id': entry.player_id,
+            'is_captain': entry.is_captain,
+            'is_vice_captain': entry.is_vice_captain,
+            'is_benched': entry.is_benched,
+        }
+        for entry in prev_team
+    ]
+    cap_count = sum(1 for e in prev_team if e.is_captain)
+    vice_count = sum(1 for e in prev_team if e.is_vice_captain)
+    if cap_count != 1 or vice_count != 1:
+        starters = [e for e in prev_team if not e.is_benched]
+        if starters:
+            for e in prev_team:
+                e.is_captain = False
+                e.is_vice_captain = False
+            starters[0].is_captain = True
+            if len(starters) > 1:
+                starters[1].is_vice_captain = True
+    await db.userteam.create_many(data=team_to_create)
 
