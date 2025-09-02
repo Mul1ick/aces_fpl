@@ -14,9 +14,9 @@ from prisma import models as PrismaModels
 
 # ----------------- LOAD ENV ------------------
 load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY", "a_super_secret_key_for_development")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # Token valid for 1 day
 
 # ----------------- PASSWORD HASHING ------------------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -39,9 +39,9 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 
 # ----------------- GET CURRENT USER DEPENDENCY ------------------
 async def get_current_user(
-    token: str = Depends(oauth2_scheme), 
-    db: Prisma = Depends(get_db) # Use Prisma client, not SQLAlchemy Session
-) -> PrismaModels.User: # Return the Prisma User model type
+    token: str = Depends(oauth2_scheme),
+    db: Prisma = Depends(get_db)
+) -> PrismaModels.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -56,9 +56,23 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    # Use 'await' to call the async crud function
     user = await crud.get_user_by_id(db, user_id)
     if user is None:
         raise credentials_exception
 
     return user
+
+
+# --- NEW --- Admin Security Dependency
+async def get_current_admin_user(current_user: PrismaModels.User = Depends(get_current_user)) -> PrismaModels.User:
+    """
+    A dependency that builds on get_current_user but also checks
+    if the user has the 'admin' role. This will be used to protect all admin routes.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user does not have adequate permissions"
+        )
+    return current_user
+

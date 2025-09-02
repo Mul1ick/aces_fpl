@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from prisma import Prisma
 from app import schemas, auth
-from typing import Dict, List
+from typing import Dict, List, Optional
+from uuid import UUID
 
 # --- USER FUNCTIONS ---
 
@@ -11,19 +12,94 @@ async def get_user_by_email(db: Prisma, email: str):
     return await db.user.find_unique(where={"email": email})
 
 async def get_user_by_id(db: Prisma, user_id: str):
-    return await db.user.find_unique(where={"id": user_id})
+    try:
+        uuid_obj = UUID(user_id)
+        return await db.user.find_unique(where={"id": str(uuid_obj)})
+    except (ValueError, TypeError):
+        return None
 
 async def create_user(db: Prisma, user: schemas.UserCreate):
     hashed_pw = auth.hash_password(user.password)
     new_user = await db.user.create(
-        data={'email': user.email, 'hashed_password': hashed_pw}
+        data={
+            'email': user.email, 
+            'hashed_password': hashed_pw,
+            'full_name': user.email.split('@')[0]
+        }
     )
     return new_user
+
+# --- ADMIN USER FUNCTIONS ---
+
+async def get_pending_users(db: Prisma):
+    return await db.user.find_many(where={'is_active': False})
+
+async def get_all_users(db: Prisma, page: int, per_page: int, search: Optional[str] = None, role: Optional[str] = None):
+    skip = (page - 1) * per_page
+    
+    # --- UPDATED --- Build the where clause dynamically
+    where_clause = {}
+    if search:
+        where_clause['OR'] = [
+            {'email': {'contains': search, 'mode': 'insensitive'}},
+            {'full_name': {'contains': search, 'mode': 'insensitive'}},
+        ]
+    
+    if role:
+        where_clause['role'] = role
+
+    total_users = await db.user.count(where=where_clause)
+    users = await db.user.find_many(
+        where=where_clause,
+        skip=skip,
+        take=per_page,
+    )
+    
+    return {
+        "items": users,
+        "total": total_users,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total_users + per_page - 1) // per_page if per_page > 0 else 0
+    }
 
 async def approve_user(db: Prisma, user_id: str):
     return await db.user.update(
         where={'id': user_id},
         data={'is_active': True}
+    )
+
+async def update_user_role(db: Prisma, user_id: str, role: str):
+    return await db.user.update(
+        where={'id': user_id},
+        data={'role': role}
+    )
+
+async def bulk_approve_users(db: Prisma, user_ids: List[UUID]):
+    user_id_strs = [str(uid) for uid in user_ids]
+    return await db.user.update_many(
+        where={'id': {'in': user_id_strs}},
+        data={'is_active': True}
+    )
+
+# --- (The rest of your existing crud.py file remains unchanged) ---
+
+# --- ADMIN DASHBOARD FUNCTIONS ---
+
+async def get_dashboard_stats(db: Prisma):
+    pending_users_count = await db.user.count(where={'is_active': False})
+    total_users_count = await db.user.count()
+    total_players_count = await db.player.count()
+    current_gw = await get_current_gameweek(db)
+    
+    recent_activities = [] # Placeholder for now
+
+    return schemas.DashboardStats(
+        pending_users=pending_users_count,
+        total_users=total_users_count,
+        total_players=total_players_count,
+        current_gameweek=current_gw,
+        recent_activities=recent_activities
     )
 
 # --- GAMEWEEK FUNCTION ---
@@ -36,9 +112,8 @@ async def get_current_gameweek(db: Prisma):
     )
     if not current_gw:
         current_gw = await db.gameweek.find_first(order={'deadline': 'desc'})
-    if not current_gw:
-        raise HTTPException(status_code=404, detail="No gameweeks found.")
     return current_gw
+
 
 # --- TEAM FUNCTIONS ---
 
@@ -96,8 +171,6 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     if not team:
         return {"team_name": "", "starting": [], "bench": []}
 
-    print(f"✅ LOG: Searching for team with user_id='{user_id}' and gameweek_id={gameweek_id}")
-    
     user_team_entries = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id},
         include={'player': {'include': {'team': True}}},
@@ -105,9 +178,6 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     )
 
     player_ids: List[int] = [e.player_id for e in user_team_entries]
-    # IMPORTANT: attribute name depends on how prisma-client-py generates it from your model name.
-    # Because your Prisma model is `GameweekPlayerStats` (with @@map("gameweek_player_stats")),
-    # prisma-client-py usually exposes it as `db.gameweekplayerstats`.
     stats = await db.gameweekplayerstats.find_many(
         where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
     )
@@ -115,7 +185,6 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
 
     if not user_team_entries:
         return {"team_name": team.name, "starting": [], "bench": []}
-    print(f"✅ LOG: Found {len(user_team_entries)} entries in the database.")
 
     def to_display(entry):
         club = entry.player.team
@@ -146,8 +215,6 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
         "bench": bench
     }
 
-# In backend/app/crud.py
-
 async def get_leaderboard(db: Prisma):
     scores = await db.usergameweekscore.group_by(
         by=['user_id'],
@@ -169,3 +236,4 @@ async def get_leaderboard(db: Prisma):
                 "total_points": score['_sum']['total_points'] or 0
             })
     return leaderboard
+
