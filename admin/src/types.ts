@@ -1,0 +1,143 @@
+// Core Types for Aces FPL Admin Portal
+
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  full_name: string;
+  role: 'user' | 'admin';
+  is_active: boolean;
+  created_at: string;
+  last_login?: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  short_name: string;
+  logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+}
+
+export interface Player {
+  id: string;
+  name: string;
+  position: 'GK' | 'DEF' | 'MID' | 'FWD';
+  team_id: string;
+  team?: Team;
+  current_price: number;
+  total_points: number;
+  games_played: number;
+  minutes_played: number;
+  goals_scored: number;
+  assists: number;
+  clean_sheets: number;
+  goals_conceded: number;
+  own_goals: number;
+  penalties_saved: number;
+  penalties_missed: number;
+  yellow_cards: number;
+  red_cards: number;
+  saves: number;
+  bonus_points: number;
+  is_active: boolean;
+}
+
+export interface Fixture {
+  id: string;
+  gameweek_id: string;
+  home_team_id: string;
+  away_team_id: string;
+  home_team?: Team;
+  away_team?: Team;
+  kickoff_time: string;
+  finished: boolean;
+  home_score?: number;
+  away_score?: number;
+  stats_entered: boolean;
+}
+
+export interface Gameweek {
+  id: string;
+  name: string;
+  deadline_time: string;
+  is_current: boolean;
+  is_next: boolean;
+  finished: boolean;
+  data_checked: boolean;
+  transfers_made?: number;
+  most_selected?: string;
+  most_transferred_in?: string;
+  top_element?: string;
+  most_captained?: string;
+  most_vice_captained?: string;
+}
+
+export interface PlayerStats {
+  player_id: string;
+  fixture_id: string;
+  minutes_played: number;
+  goals_scored: number;
+  assists: number;
+  clean_sheets: number;
+  goals_conceded: number;
+  own_goals: number;
+  penalties_saved: number;
+  penalties_missed: number;
+  yellow_cards: number;
+  red_cards: number;
+  saves: number;
+  bonus_points: number;
+}
+
+export interface DashboardStats {
+  pending_users: number;
+  total_users: number;
+  total_players: number;
+  current_gameweek: Gameweek | null;
+  recent_activities: Activity[];
+}
+
+export interface Activity {
+  id: string;
+  type: 'user_registered' | 'user_approved' | 'gameweek_finalized' | 'stats_entered';
+  description: string;
+  timestamp: string;
+  user_id?: string;
+  gameweek_id?: string;
+}
+
+export interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  isLoading: boolean;
+}
+
+export interface APIResponse<T> {
+  data: T;
+  message?: string;
+  error?: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+}
+
+export interface PlayerFormData {
+  name: string;
+  position: Player['position'];
+  team_id: string;
+  current_price: number;
+}
+
+export interface UserUpdateData {
+  role?: 'user' | 'admin';
+  is_active?: boolean;
+}
