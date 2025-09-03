@@ -354,3 +354,118 @@ async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
                 starters[1].is_vice_captain = True
     await db.userteam.create_many(data=team_to_create)
 
+
+async def transfer_player(
+    db: Prisma,
+    user_id: str,
+    gameweek_id: int,
+    out_player_id: int,
+    in_player_id: int,
+):
+    # 0) basic checks
+    if out_player_id == in_player_id:
+        raise HTTPException(status_code=400, detail="Players are identical.")
+
+    # 1) ensure there is a record to replace
+    existing = await db.userteam.find_first(
+        where={
+            "user_id": user_id,
+            "gameweek_id": gameweek_id,
+            "player_id": out_player_id,
+        },
+        include={"player": True},
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Outgoing player not in your team for this GW.")
+
+    # 2) prevent duplicates
+    dup = await db.userteam.find_first(
+        where={
+            "user_id": user_id,
+            "gameweek_id": gameweek_id,
+            "player_id": in_player_id,
+        }
+    )
+    if dup:
+        raise HTTPException(status_code=400, detail="Incoming player is already in your team.")
+
+    # 3) validate incoming exists and matches position (keeps team valid)
+    incoming = await db.player.find_unique(where={"id": in_player_id})
+    if not incoming:
+        raise HTTPException(status_code=404, detail="Incoming player does not exist.")
+
+    if incoming.position != existing.player.position:
+        raise HTTPException(status_code=400, detail="Incoming player must match the same position as outgoing.")
+
+    # (Optional) enforce same real-club cap, budget, etc. here
+
+    # 4) copy flags from outgoing to incoming (captain/vice/bench)
+    is_captain = existing.is_captain
+    is_vice = existing.is_vice_captain
+    is_benched = existing.is_benched
+
+    # 5) do the swap
+    # delete out, insert in (simple + clear)
+    await db.userteam.delete_many(
+        where={
+            "user_id": user_id,
+            "gameweek_id": gameweek_id,
+            "player_id": out_player_id,
+        }
+    )
+
+    await db.userteam.create(
+        data={
+            "user_id": user_id,
+            "gameweek_id": gameweek_id,
+            "player_id": in_player_id,
+            "is_captain": is_captain,
+            "is_vice_captain": is_vice,
+            "is_benched": is_benched,
+        }
+    )
+
+    # 6) return updated team
+    return await get_user_team_full(db, user_id, gameweek_id)
+
+async def set_captain(db: Prisma, user_id: str, gameweek_id: int, player_id: int):
+    # make sure the player belongs to this user's team for this GW and isn't benched
+    ut = await db.userteam.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': player_id}
+    )
+    if not ut:
+        raise HTTPException(status_code=404, detail="Player not in your team for this gameweek.")
+    if ut.is_benched:
+        raise HTTPException(status_code=400, detail="Captain must be a starter (cannot be benched).")
+
+    # transaction: clear old captain, set new one
+    async with db.tx() as tx:
+        await tx.userteam.update_many(
+            where={'user_id': user_id, 'gameweek_id': gameweek_id, 'is_captain': True},
+            data={'is_captain': False}
+        )
+        await tx.userteam.update_many(
+            where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': player_id},
+            data={'is_captain': True}
+        )
+    return {"ok": True}
+
+async def set_vice_captain(db: Prisma, user_id: str, gameweek_id: int, player_id: int):
+    ut = await db.userteam.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': player_id}
+    )
+    if not ut:
+        raise HTTPException(status_code=404, detail="Player not in your team for this gameweek.")
+    if ut.is_benched:
+        raise HTTPException(status_code=400, detail="Vice-captain must be a starter (cannot be benched).")
+
+    async with db.tx() as tx:
+        await tx.userteam.update_many(
+            where={'user_id': user_id, 'gameweek_id': gameweek_id, 'is_vice_captain': True},
+            data={'is_vice_captain': False}
+        )
+        await tx.userteam.update_many(
+            where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': player_id},
+            data={'is_vice_captain': True}
+        )
+    return {"ok": True}

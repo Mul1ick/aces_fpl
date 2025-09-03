@@ -4,6 +4,7 @@ from app import schemas, crud
 from app.auth import get_current_user
 from prisma import Prisma
 from prisma import models as PrismaModels # Import Prisma's generated models
+from app.schemas import SetArmbandRequest
 
 
 router = APIRouter()
@@ -42,3 +43,36 @@ async def get_team(
         return result
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
+@router.post("/transfer", response_model=schemas.GetTeamResponse)
+async def transfer_player_route(
+    payload: schemas.TransferRequest,
+    db: Prisma = Depends(get_db),
+    current_user: PrismaModels.User = Depends(get_current_user),
+):
+    current_gw = await crud.get_current_gameweek(db)
+    updated = await crud.transfer_player(
+        db=db,
+        user_id=str(current_user.id),
+        gameweek_id=current_gw.id,
+        out_player_id=payload.out_player_id,
+        in_player_id=payload.in_player_id,
+    )
+    return updated
+
+
+
+@router.post("/armband")
+async def set_armband(
+    payload: SetArmbandRequest,
+    db: Prisma = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    current_gw = await crud.get_current_gameweek(db)
+
+    if payload.kind == "C":
+        await crud.set_captain(db, str(current_user.id), current_gw.id, payload.player_id)
+    else:
+        await crud.set_vice_captain(db, str(current_user.id), current_gw.id, payload.player_id)
+
+    return await crud.get_user_team_full(db, str(current_user.id), current_gw.id)

@@ -14,7 +14,7 @@ const PlayerSlot = ({ position, onClick }) => (
   </button>
 );
 
-export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove,teamFixtureMap }) => {
+export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove}) => {
     const [detailedPlayer, setDetailedPlayer] = useState(null);
 
     const handlePlayerClick = (player) => {
@@ -31,7 +31,7 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove,teamFixtu
         team: player.team_name,
         pos: player.position,
         points: player.points ?? 0, // Placeholder
-        fixture: player.fixture_str ?? teamFixtureMap?.[player.team_id] ?? '—',
+        fixture: player.fixture_str ?? '—',
         isCaptain: player.is_captain,
         isVice: player.is_vice_captain,
     });

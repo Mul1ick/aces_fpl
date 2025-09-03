@@ -97,6 +97,51 @@ const Team: React.FC = () => {
     });
 }, []);
 
+  // In Team.tsx (or wherever you keep this state)
+const setArmband = async (playerId: number, kind: 'C' | 'VC') => {
+  const token = localStorage.getItem("access_token");
+  try {
+    const res = await fetch("http://localhost:8000/teams/armband", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ player_id: playerId, kind }),
+    });
+
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+
+    const xform = (p: any) => ({
+      id: p.id,
+      name: p.full_name,
+      team: p.team.name,
+      pos: p.position,
+      fixture: p.fixture_str,
+      points: p.points ?? 0,
+      isCaptain: p.is_captain,
+      isVice: p.is_vice_captain,
+      is_benched: p.is_benched,
+    });
+
+    setSquad({
+      starting: (data.starting || []).map(xform),
+      bench: (data.bench || []).map(xform),
+    });
+    setDetailedPlayer(null);
+
+  } catch (e: any) {
+    console.error("Failed to set armband:", e);
+    alert(typeof e?.message === 'string' ? e.message : 'Failed to set armband');
+  }
+};
+
+
   const handlePlayerClick = (playerToSwap, isFromBench) => {
     if (!selectedPlayer) {
       // If no player is selected for a sub, open the detail card
@@ -225,7 +270,7 @@ const Team: React.FC = () => {
       </div>
 
       <AnimatePresence>
-        {detailedPlayer && <EditablePlayerCard player={detailedPlayer} onClose={() => setDetailedPlayer(null)} onSubstitute={handleSelectForSub} />}
+        {detailedPlayer && <EditablePlayerCard player={detailedPlayer} onClose={() => setDetailedPlayer(null)} onSubstitute={handleSelectForSub} onSetArmband={setArmband} />}
       </AnimatePresence>
     </div>
   );

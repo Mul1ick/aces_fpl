@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict,Field
 from uuid import UUID
 from typing import List, Optional, TypeVar, Generic
 from datetime import datetime
@@ -125,3 +125,10 @@ class DashboardStats(BaseModel):
     current_gameweek: Optional[Gameweek] = None
     recent_activities: List[Activity]
 
+class TransferRequest(BaseModel):
+    out_player_id: int
+    in_player_id: int
+
+class SetArmbandRequest(BaseModel):
+    player_id: int
+    kind: str = Field(pattern="^(C|VC)$")  # C = captain, VC = vice-captain

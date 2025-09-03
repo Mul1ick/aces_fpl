@@ -16,6 +16,7 @@ interface EditablePlayerCardProps {
   player: any;
   onClose: () => void;
   onSubstitute: (player: any) => void;
+onSetArmband: (playerId: number, kind: 'C' | 'VC') => void;
 }
 
 const StatRow = ({ label, value, rank }) => (
@@ -36,10 +37,12 @@ const FixtureRow = ({ gameweek, opponent, points }) => (
     </div>
 );
 
-export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, onClose, onSubstitute }) => {
+export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, onClose, onSubstitute,  onSetArmband }) => {
   if (!player) return null;
 
   const jerseySrc = TEAM_JERSEYS[player.team] || tshirtRed;
+  const isCaptain = !!player.isCaptain || !!player.is_captain;
+  const isVice    = !!player.isVice || !!player.is_vice_captain;
 
   return (
     <motion.div
@@ -93,12 +96,34 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
             </div>
 
             <div className="grid grid-cols-2 gap-2 mt-6">
-                <Button variant="outline"><Star className="w-4 h-4 mr-2"/>Captain</Button>
-                <Button variant="outline"><Star className="w-4 h-4 mr-2"/>Vice-Captain</Button>
-                <Button variant="outline" className="col-span-2"><User className="w-4 h-4 mr-2"/>Full Profile</Button>
-                <Button variant="destructive" className="col-span-2" onClick={() => onSubstitute(player)}>
-                    <ChevronsRight className="w-4 h-4 mr-2"/>Substitute
-                </Button>
+               <Button
+                variant="outline"
+                onClick={() => onSetArmband(player.id, 'C')}
+                disabled={isCaptain}
+              >
+                <Star className="w-4 h-4 mr-2" />
+                {isCaptain ? 'Captain (current)' : 'Captain'}
+              </Button>
+                <Button
+                variant="outline"
+                onClick={() => onSetArmband(player.id, 'VC')}
+                disabled={isVice}
+              >
+                <Star className="w-4 h-4 mr-2" />
+                {isVice ? 'Vice (current)' : 'Vice-Captain'}
+              </Button>
+               <Button variant="outline" className="col-span-2">
+                <User className="w-4 h-4 mr-2" />
+                Full Profile
+              </Button>
+                <Button
+                variant="destructive"
+                className="col-span-2"
+                onClick={() => onSubstitute(player)}
+              >
+                <ChevronsRight className="w-4 h-4 mr-2" />
+                Substitute
+              </Button>
             </div>
           </CardContent>
           <button onClick={onClose} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">

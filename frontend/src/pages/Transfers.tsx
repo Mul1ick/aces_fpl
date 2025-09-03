@@ -7,7 +7,7 @@ import { TransferPitchView } from '@/components/transfers/TransferPitchView';
 import { PlayerSelectionList, PlayerSelectionModal } from '@/components/transfers/PlayerSelection';
 import { EnterSquadModal } from '@/components/transfers/EnterSquadModal';
 import { Button } from '@/components/ui/button';
-import { TeamResponse, Player } from "@/types";
+import { TeamResponse } from "@/types";
 
 // --- CONFIGURATION ---
 const initialSquad = {
@@ -17,7 +17,6 @@ const initialSquad = {
   FWD: [null, null, null],
 };
 
-// --- MAIN TRANSFERS PAGE ---
 const Transfers: React.FC = () => {
   const [squad, setSquad] = useState(initialSquad);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,52 +24,53 @@ const Transfers: React.FC = () => {
   const [isPlayerSelectionOpen, setIsPlayerSelectionOpen] = useState(false);
   const [isEnterSquadModalOpen, setIsEnterSquadModalOpen] = useState(false);
   const [positionToFill, setPositionToFill] = useState<{ position: string; index: number } | null>(null);
-  const navigate = useNavigate();
-  const [teamFixtureMap, setTeamFixtureMap] = useState<Record<number, string>>({});
+  const [outgoing, setOutgoing] = useState<any | null>(null);
 
-  useEffect(() => {
+  // NEW: detect existing team
+  const [hasTeam, setHasTeam] = useState(false);
+  const [existingTeamName, setExistingTeamName] = useState<string>('');
+
+  const navigate = useNavigate();
+
   const token = localStorage.getItem("access_token");
 
-    
+  const normalizePos = (p: any) => {
+    const key = String(p?.pos ?? p?.position ?? '').toUpperCase();
+    return { ...p, pos: key };
+  };
+
+  const transformApiDataToSquad = (players: any[]) => {
+    const newSquad = JSON.parse(JSON.stringify(initialSquad));
+    players.forEach(raw => {
+      const p = normalizePos(raw);
+      if (!newSquad[p.pos]) return;
+      const idx = newSquad[p.pos].findIndex((s: any) => s === null);
+      if (idx !== -1) newSquad[p.pos][idx] = p;
+    });
+    return newSquad;
+  };
 
   const fetchAndSetTeam = async () => {
     try {
       const response = await fetch("http://localhost:8000/teams/team", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      // If the user has no team, the API will return a 404, which is okay.
       if (!response.ok) {
+        // No team yet
+        setHasTeam(false);
+        setExistingTeamName('');
         setIsLoading(false);
-        return; // Keep the initial empty squad
+        return;
       }
 
       const data: TeamResponse = await response.json();
-
-      const normalizePos = (p: any) => {
-  const key = String(p?.pos ?? p?.position ?? '').toUpperCase();
-  return { ...p, pos: key };
-};
-      // Helper function to transform the API data into the squad object structure
-      const transformApiDataToSquad = (players: any[]) => {
-  const newSquad = JSON.parse(JSON.stringify(initialSquad));
-  players.forEach(raw => {
-    const p = normalizePos(raw);
-    if (!newSquad[p.pos]) return;                 // skip unknown positions
-    const idx = newSquad[p.pos].findIndex((s: any) => s === null);
-    if (idx !== -1) newSquad[p.pos][idx] = p;     // place normalized player
-  });
-  return newSquad;
-};
-
-      
+      setHasTeam(true);
+      setExistingTeamName(data.team_name || '');
 
       const allPlayers = [...data.starting, ...data.bench];
       const populatedSquad = transformApiDataToSquad(allPlayers);
       setSquad(populatedSquad);
-
     } catch (error) {
       console.error("Failed to fetch team:", error);
     } finally {
@@ -78,13 +78,11 @@ const Transfers: React.FC = () => {
     }
   };
 
-  fetchAndSetTeam();
-}, []);
+  useEffect(() => {
+    fetchAndSetTeam();
+  }, []);
 
-
-
-
-  // Show a notification and clear it after a few seconds
+  // Notification helper
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
@@ -92,80 +90,101 @@ const Transfers: React.FC = () => {
 
   const handleSlotClick = (position: string, index: number) => {
     setPositionToFill({ position, index });
-    if (window.innerWidth < 1024) {
-        setIsPlayerSelectionOpen(true);
+    const playerInSlot = squad[position][index];
+    setOutgoing(playerInSlot || null);
+    if (window.innerWidth < 1024) setIsPlayerSelectionOpen(true);
+  };
+
+  const handlePlayerSelect = async (player: any) => {
+    setIsPlayerSelectionOpen(false);
+
+    const rawPos =
+      player?.pos ??
+      player?.position ??
+      player?.Pos ??
+      player?.POSITION ??
+      null;
+
+    const posKey = typeof rawPos === "string" ? rawPos.toUpperCase() : null;
+    if (!posKey || !Object.prototype.hasOwnProperty.call(squad, posKey)) {
+      console.error("🚫 Unknown player position:", { player, posKey, squad });
+      return;
+    }
+
+    if (positionToFill) {
+      const outPlayer = outgoing;
+
+      if (outPlayer) {
+        // You already have a transfer endpoint — keep using it if you want live DB updates
+        try {
+          const res = await fetch("http://localhost:8000/teams/transfer", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            },
+            body: JSON.stringify({
+              out_player_id: outPlayer.id,
+              in_player_id: player.id,
+            }),
+          });
+
+          if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err);
+          }
+
+          await fetchAndSetTeam();
+        } catch (e) {
+          console.error("Transfer failed:", e);
+        }
+      } else {
+        // Empty slot → client-side insert
+        setSquad((current) => {
+          const next = { ...current };
+          const arr = [...next[positionToFill.position]];
+          arr[positionToFill.index] = player;
+          next[positionToFill.position] = arr;
+          return next;
+        });
+      }
+
+      setPositionToFill(null);
+      setOutgoing(null);
+      return;
+    }
+
+    // First empty slot for pos
+    const positionArray = squad[posKey];
+    if (!Array.isArray(positionArray)) {
+      console.error("🚫 Squad bucket is not an array:", posKey, positionArray);
+      return;
+    }
+    const emptySlotIndex = positionArray.findIndex((slot) => slot === null);
+    if (emptySlotIndex !== -1) {
+      setSquad((current) => {
+        const next = { ...current };
+        const arr = [...next[posKey]];
+        arr[emptySlotIndex] = player;
+        next[posKey] = arr;
+        return next;
+      });
+    } else {
+      console.warn(`All ${posKey} slots are already full.`);
     }
   };
 
-  const handlePlayerSelect = (player: any) => {
-  setIsPlayerSelectionOpen(false); // Close mobile modal if open
-
-  // Normalize position key coming from different sources
-  const rawPos =
-    player?.pos ??
-    player?.position ??
-    player?.Pos ??
-    player?.POSITION ??
-    null;
-
-  const posKey = typeof rawPos === "string" ? rawPos.toUpperCase() : null;
-
-  // Validate the target bucket (GK/DEF/MID/FWD) exists in squad
-  if (!posKey || !Object.prototype.hasOwnProperty.call(squad, posKey)) {
-    console.error("🚫 Unknown player position:", { player, posKey, squad });
-    // showNotification("Couldn't determine the player's position.", "error");
-    return;
-  }
-
-  // If user tapped a specific slot earlier, fill that exact slot
-  if (positionToFill) {
-    setSquad((current) => {
-      const next = { ...current };
-      const arr = [...next[positionToFill.position]];
-      arr[positionToFill.index] = player;
-      next[positionToFill.position] = arr;
-      return next;
-    });
-    setPositionToFill(null);
-    return;
-  }
-
-  // Otherwise, find the first empty slot for the player's position
-  const positionArray = squad[posKey];
-  if (!Array.isArray(positionArray)) {
-    console.error("🚫 Squad bucket is not an array:", posKey, positionArray);
-    // showNotification(`Invalid squad bucket for ${posKey}.`, "error");
-    return;
-  }
-
-  const emptySlotIndex = positionArray.findIndex((slot) => slot === null);
-
-  if (emptySlotIndex !== -1) {
-    setSquad((current) => {
-      const next = { ...current };
-      const arr = [...next[posKey]];
-      arr[emptySlotIndex] = player;
-      next[posKey] = arr;
-      return next;
-    });
-  } else {
-    // showNotification(`All ${posKey} slots are already full.`, "error");
-    console.warn(`All ${posKey} slots are already full.`);
-  }
-};
-
   const handlePlayerRemove = (position: string, index: number) => {
     setSquad(currentSquad => {
-        const newSquad = { ...currentSquad };
-        const positionArray = [...newSquad[position]];
-        positionArray[index] = null; // Set the specific player slot back to null
-        newSquad[position] = positionArray;
-        return newSquad;
+      const newSquad = { ...currentSquad };
+      const positionArray = [...newSquad[position]];
+      positionArray[index] = null;
+      newSquad[position] = positionArray;
+      return newSquad;
     });
   };
 
   const handleAutoFill = () => {
-    // Placeholder for autofill logic
     showNotification('Autofill feature coming soon!', 'success');
   };
 
@@ -173,22 +192,21 @@ const Transfers: React.FC = () => {
     setSquad(initialSquad);
   };
 
-  const handleConfirmSquad = async (teamName: string) => {
-    const token = localStorage.getItem("access_token");
-
+  // CREATE/UPDATE submitter. If team exists, we reuse the server-stored name.
+  const submitSquad = async (teamName: string) => {
     const payload = {
       team_name: teamName,
       players: Object.entries(squad).flatMap(([position, playerArray]) =>
         playerArray
-          .filter(p => p !== null)
-          .map(p => ({ 
-            id: p.id, 
-            position: p.pos,
-            is_captain: false,
-            is_vice_captain: false,
-            is_benched: false
+          .filter((p: any) => p !== null)
+          .map((p: any) => ({
+            id: p.id,
+            position: p.pos ?? p.position,      // keep server happy
+            is_captain: !!p.is_captain,
+            is_vice_captain: !!p.is_vice_captain,
+            is_benched: !!p.is_benched,
           }))
-      )
+      ),
     };
 
     try {
@@ -206,24 +224,36 @@ const Transfers: React.FC = () => {
         throw new Error(error);
       }
 
-      const data = await response.json();
+      await response.json();
       navigate('/team');
     } catch (error) {
       console.error("Error submitting team:", error);
+      showNotification('Failed to save team', 'error');
     }
+  };
+
+  // When the user has *no* team yet → we open the modal and pass the chosen name here
+  const handleConfirmSquad = async (teamName: string) => {
+    await submitSquad(teamName);
+  };
+
+  // When the user *already has* a team → no modal; just save with the existing name
+  const handleSaveExistingTeam = async () => {
+    const nameToUse = existingTeamName || 'My Team';
+    await submitSquad(nameToUse);
   };
 
   const { playersSelected, bank } = useMemo(() => {
     const allPlayers = Object.values(squad).flat();
-    const selectedCount = allPlayers.filter(p => p !== null).length;
-    const totalCost = allPlayers.reduce((acc, p) => acc + (p?.price || 0), 0);
+    const selectedCount = allPlayers.filter((p: any) => p !== null).length;
+    const totalCost = allPlayers.reduce((acc: number, p: any) => acc + (p?.price || 0), 0);
     const remainingBank = 102.0 - totalCost;
     return { playersSelected: selectedCount, bank: remainingBank };
   }, [squad]);
 
   if (isLoading) {
     return <div className="p-4 text-center">Loading your squad...</div>;
-}
+  }
 
   return (
     <div className="w-full min-h-screen bg-white font-sans">
@@ -240,7 +270,7 @@ const Transfers: React.FC = () => {
         <div className="lg:col-span-6 flex flex-col h-screen">
           <div className="p-4 space-y-4">
             <TransfersHeroCard
-              teamName="Silly United"
+              teamName={hasTeam ? existingTeamName || 'Your Team' : 'Pick a Team Name'}
               managerName="Steven Carter"
               playersSelected={playersSelected}
               bank={bank}
@@ -252,17 +282,34 @@ const Transfers: React.FC = () => {
             squad={squad}
             onSlotClick={handleSlotClick}
             onPlayerRemove={handlePlayerRemove}
-            teamFixtureMap={teamFixtureMap}
           />
 
           <div className="p-4 grid grid-cols-3 gap-4 border-t">
             <Button variant="outline" onClick={handleAutoFill}>Autofill</Button>
             <Button variant="destructive" onClick={handleReset}>Reset</Button>
-            <Button onClick={() => setIsEnterSquadModalOpen(true)}>Enter Squad</Button>
+
+            {hasTeam ? (
+              <Button
+                onClick={handleSaveExistingTeam}
+                disabled={playersSelected !== 11}
+                title={playersSelected !== 11 ? 'Select 11 players to save' : 'Save Team'}
+              >
+                Save Team
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setIsEnterSquadModalOpen(true)}
+                disabled={playersSelected !== 11}
+                title={playersSelected !== 11 ? 'Select 11 players to continue' : 'Enter Squad'}
+              >
+                Enter Squad
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Mobile modal */}
       <PlayerSelectionModal
         isOpen={isPlayerSelectionOpen}
         onClose={() => setIsPlayerSelectionOpen(false)}
@@ -270,6 +317,8 @@ const Transfers: React.FC = () => {
         positionFilter={positionToFill?.position}
         squad={squad}
       />
+
+      {/* Only shown when no team yet */}
       <EnterSquadModal
         isOpen={isEnterSquadModalOpen}
         onClose={() => setIsEnterSquadModalOpen(false)}
@@ -280,4 +329,3 @@ const Transfers: React.FC = () => {
 };
 
 export default Transfers;
-
