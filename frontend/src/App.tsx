@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
-import MainLayout from "@/components/layout/MainLayout"; // Import the new layout component
+import MainLayout from "@/components/layout/MainLayout";
 import Splash from "./pages/Splash";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -14,6 +14,7 @@ import Transfers from "./pages/Transfers";
 import Gameweek from "./pages/Gameweek";
 import Leaderboard from "./pages/Leaderboard";
 import NotFound from "./pages/NotFound";
+import Fixtures from "./pages/Fixtures"; // Import the new Fixtures page
 
 const queryClient = new QueryClient();
 
@@ -73,6 +74,15 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                {/* --- ADDED FIXTURES ROUTE --- */}
+                <Route
+                  path="/fixtures"
+                  element={
+                    <ProtectedRoute>
+                      <Fixtures />
+                    </ProtectedRoute>
+                  }
+                />
               </Route>
 
               {/* --- Catch-all Not Found Route --- */}
@@ -86,3 +96,4 @@ const App = () => (
 );
 
 export default App;
+
