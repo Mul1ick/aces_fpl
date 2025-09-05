@@ -2,8 +2,9 @@ import random
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from prisma import Prisma
+from collections import Counter
 from app import schemas, auth
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional,Any
 import logging
 from uuid import UUID
 
@@ -355,6 +356,10 @@ async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
     await db.userteam.create_many(data=team_to_create)
 
 
+# app/crud.py
+
+from fastapi import HTTPException
+
 async def transfer_player(
     db: Prisma,
     user_id: str,
@@ -362,70 +367,71 @@ async def transfer_player(
     out_player_id: int,
     in_player_id: int,
 ):
-    # 0) basic checks
-    if out_player_id == in_player_id:
-        raise HTTPException(status_code=400, detail="Players are identical.")
-
-    # 1) ensure there is a record to replace
-    existing = await db.userteam.find_first(
+    # 1) Find the outgoing userteam row (includes its flags)
+    out_entry = await db.userteam.find_first(
         where={
-            "user_id": user_id,
-            "gameweek_id": gameweek_id,
-            "player_id": out_player_id,
+            'user_id': user_id,
+            'gameweek_id': gameweek_id,
+            'player_id': out_player_id,
         },
-        include={"player": True},
+        include={'player': True},
     )
-    if not existing:
-        raise HTTPException(status_code=404, detail="Outgoing player not in your team for this GW.")
+    if not out_entry:
+        raise HTTPException(status_code=404, detail="Outgoing player is not in your team for this GW.")
 
-    # 2) prevent duplicates
-    dup = await db.userteam.find_first(
+    # 2) Don't duplicate
+    already = await db.userteam.find_first(
         where={
-            "user_id": user_id,
-            "gameweek_id": gameweek_id,
-            "player_id": in_player_id,
+            'user_id': user_id,
+            'gameweek_id': gameweek_id,
+            'player_id': in_player_id,
         }
     )
-    if dup:
-        raise HTTPException(status_code=400, detail="Incoming player is already in your team.")
+    if already:
+        # Nothing to do; just return current team
+        return await get_user_team_full(db, user_id, gameweek_id)
 
-    # 3) validate incoming exists and matches position (keeps team valid)
-    incoming = await db.player.find_unique(where={"id": in_player_id})
-    if not incoming:
-        raise HTTPException(status_code=404, detail="Incoming player does not exist.")
+    # 3) (Optional) enforce same position to keep formation valid
+    in_player = await db.player.find_unique(where={'id': in_player_id})
+    if not in_player:
+        raise HTTPException(status_code=404, detail="Incoming player not found.")
+    if in_player.position != out_entry.player.position:
+        raise HTTPException(status_code=400, detail="Position mismatch for transfer.")
 
-    if incoming.position != existing.player.position:
-        raise HTTPException(status_code=400, detail="Incoming player must match the same position as outgoing.")
+    # 4) Carry over flags from the outgoing row
+    flags = {
+        'is_benched': out_entry.is_benched,
+        'is_captain': out_entry.is_captain,
+        'is_vice_captain': out_entry.is_vice_captain,
+    }
 
-    # (Optional) enforce same real-club cap, budget, etc. here
+    # 5) Atomic swap + log
+    async with db.tx() as tx:
+        await tx.userteam.delete_many(
+            where={
+                'user_id': user_id,
+                'gameweek_id': gameweek_id,
+                'player_id': out_player_id,
+            }
+        )
+        await tx.userteam.create(
+            data={
+                'user_id': user_id,
+                'gameweek_id': gameweek_id,
+                'player_id': in_player_id,
+                **flags,
+            }
+        )
+        # Transfer log
+        await tx.transfer_log.create(
+            data={
+                'user_id': user_id,
+                'gameweek_id': gameweek_id,
+                'out_player': out_player_id,
+                'in_player': in_player_id,
+            }
+        )
 
-    # 4) copy flags from outgoing to incoming (captain/vice/bench)
-    is_captain = existing.is_captain
-    is_vice = existing.is_vice_captain
-    is_benched = existing.is_benched
-
-    # 5) do the swap
-    # delete out, insert in (simple + clear)
-    await db.userteam.delete_many(
-        where={
-            "user_id": user_id,
-            "gameweek_id": gameweek_id,
-            "player_id": out_player_id,
-        }
-    )
-
-    await db.userteam.create(
-        data={
-            "user_id": user_id,
-            "gameweek_id": gameweek_id,
-            "player_id": in_player_id,
-            "is_captain": is_captain,
-            "is_vice_captain": is_vice,
-            "is_benched": is_benched,
-        }
-    )
-
-    # 6) return updated team
     return await get_user_team_full(db, user_id, gameweek_id)
 
 async def set_captain(db: Prisma, user_id: str, gameweek_id: int, player_id: int):
@@ -469,3 +475,199 @@ async def set_vice_captain(db: Prisma, user_id: str, gameweek_id: int, player_id
             data={'is_vice_captain': True}
         )
     return {"ok": True}
+
+
+
+async def get_transfer_stats(db: Prisma, gameweek_id: int):
+    # 1) Pull logs for this GW
+    logs = await db.transfer_log.find_many(
+        where={'gameweek_id': gameweek_id}
+    )
+
+    # 2) Count in/out
+    in_counts = Counter([l.in_player for l in logs if l.in_player is not None])
+    out_counts = Counter([l.out_player for l in logs if l.out_player is not None])
+
+    top_in = in_counts.most_common(5)
+    top_out = out_counts.most_common(5)
+
+    # 3) Fetch player + team details for all involved player_ids
+    player_ids = list({pid for pid, _ in top_in} | {pid for pid, _ in top_out})
+    players = await db.player.find_many(
+        where={'id': {'in': player_ids}},
+        include={'team': True}
+    )
+    pmap: Dict[int, any] = {p.id: p for p in players}
+
+    def to_rows(pairs: List[tuple[int, int]]):
+        rows = []
+        for pid, cnt in pairs:
+            p = pmap.get(pid)
+            if not p:
+                rows.append({'player_id': pid, 'count': cnt})
+                continue
+            rows.append({
+                'player_id': pid,
+                'count': cnt,
+                'full_name': p.full_name,
+                'position': p.position,
+                'team': {
+                    'id': p.team.id,
+                    'name': p.team.name,
+                    'short_name': p.team.short_name,
+                } if p.team else None
+            })
+        return rows
+
+    return {
+        'most_in': to_rows(top_in),
+        'most_out': to_rows(top_out),
+    }
+
+async def save_existing_team(
+    db: Prisma,
+    user_id: str,
+    gameweek_id: int,
+    new_players: List[Dict],
+):
+    """
+    Replace the user's team for the given GW with `new_players` and log transfers.
+    Each item in new_players must be a dict like:
+      {
+        "id": <int or str>,
+        "position": "GK"|"DEF"|"MID"|"FWD",          # optional if already known server-side
+        "is_captain": <bool>,
+        "is_vice_captain": <bool>,
+        "is_benched": <bool>,
+      }
+    Invariants enforced:
+      - Exactly 11 players total
+      - Exactly 2 GK total
+      - Exactly 1 GK is benched (=> starting XI has 1 GK)
+      - Exactly 3 players benched
+      - Exactly 1 captain, 1 vice-captain
+      - Captain != Vice, neither is benched
+      - (Optional UI rule) 3 DEF, 3 MID, 3 FWD total (kept to match your current UI buckets)
+    """
+
+    # --- Fetch existing to compute diff BEFORE we delete anything ---
+    existing = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id}
+    )
+    existing_ids = {e.player_id for e in existing}
+
+    # --- Normalize / basic guards ---
+    if not isinstance(new_players, list) or len(new_players) == 0:
+        raise HTTPException(400, "Players payload is empty.")
+
+    try:
+        incoming_ids = [int(p['id']) for p in new_players if p and 'id' in p]
+    except Exception:
+        raise HTTPException(400, "All players must include a valid integer 'id'.")
+
+    if len(incoming_ids) != 11:
+        raise HTTPException(400, f"Exactly 11 players are required (got {len(incoming_ids)}).")
+    if len(set(incoming_ids)) != 11:
+        raise HTTPException(400, "Duplicate players detected in payload.")
+
+    # Map quick lookup for flags
+    def b(v): return bool(v)  # normalize truthy/falsey to bool
+    attrs_map: Dict[int, Dict] = {int(p['id']): p for p in new_players if p and 'id' in p}
+
+    # Build new snapshot rows
+    to_create = []
+    for pid in incoming_ids:
+        p = attrs_map[pid]
+        to_create.append({
+            'user_id': user_id,
+            'gameweek_id': gameweek_id,
+            'player_id': pid,
+            'is_captain': b(p.get('is_captain', False)),
+            'is_vice_captain': b(p.get('is_vice_captain', False)),
+            'is_benched': b(p.get('is_benched', False)),
+        })
+
+    # --- Validate flags & composition BEFORE writing ---
+    captains = [t for t in to_create if t['is_captain']]
+    vices    = [t for t in to_create if t['is_vice_captain']]
+    benched  = [t for t in to_create if t['is_benched']]
+    starters = [t for t in to_create if not t['is_benched']]
+
+    if len(benched) != 3:
+        raise HTTPException(400, f"Exactly 3 players must be benched (got {len(benched)}).")
+    if len(captains) != 1:
+        raise HTTPException(400, "Exactly 1 captain is required.")
+    if len(vices) != 1:
+        raise HTTPException(400, "Exactly 1 vice-captain is required.")
+    if captains[0]['player_id'] == vices[0]['player_id']:
+        raise HTTPException(400, "Captain and vice-captain must be different players.")
+    if any(t['player_id'] == captains[0]['player_id'] for t in benched) or \
+       any(t['player_id'] == vices[0]['player_id'] for t in benched):
+        raise HTTPException(400, "Captain and vice-captain cannot be benched.")
+
+    # Pull server-side positions to validate counts (don’t trust client)
+    players_meta = await db.player.find_many(where={'id': {'in': incoming_ids}})
+    if len(players_meta) != 11:
+        raise HTTPException(400, "Some player IDs do not exist.")
+
+    gks  = [p.id for p in players_meta if p.position == 'GK']
+    defs = [p.id for p in players_meta if p.position == 'DEF']
+    mids = [p.id for p in players_meta if p.position == 'MID']
+    fwds = [p.id for p in players_meta if p.position == 'FWD']
+
+    if len(gks) != 2:
+        raise HTTPException(400, f"Exactly 2 goalkeepers are required (got {len(gks)}).")
+
+    # Exactly 1 GK benched (=> 1 GK starter)
+    benched_ids = {t['player_id'] for t in benched}
+    benched_gks = [pid for pid in gks if pid in benched_ids]
+    if len(benched_gks) != 1:
+        raise HTTPException(400, f"Exactly 1 goalkeeper must be benched (got {len(benched_gks)}).")
+
+    starter_ids = {t['player_id'] for t in starters}
+    starting_gks = [pid for pid in gks if pid in starter_ids]
+    if len(starting_gks) != 1:
+        raise HTTPException(400, f"Starting XI must include exactly 1 goalkeeper (got {len(starting_gks)}).")
+
+    # (Optional) enforce your UI buckets: 3 DEF, 3 MID, 3 FWD
+    if not (len(defs) == 3 and len(mids) == 3 and len(fwds) == 3):
+        raise HTTPException(400, "Team must have 3 DEF, 3 MID, and 3 FWD.")
+
+    # Compute transfer logs diff
+    incoming_set = set(incoming_ids)
+    removed_ids = existing_ids - incoming_set
+    added_ids   = incoming_set - existing_ids
+
+    # --- Commit atomically ---
+    async with db.tx() as tx:
+        # Clear current team for this GW
+        await tx.userteam.delete_many(
+            where={'user_id': user_id, 'gameweek_id': gameweek_id}
+        )
+
+        # Insert validated snapshot
+        await tx.userteam.create_many(data=to_create)
+
+        # Log outgoing players
+        for out_id in removed_ids:
+            await tx.transfer_log.create(
+                data={
+                    'user_id': user_id,
+                    'gameweek_id': gameweek_id,
+                    'out_player': int(out_id),
+                    'in_player': None,
+                }
+            )
+        # Log incoming players
+        for in_id in added_ids:
+            await tx.transfer_log.create(
+                data={
+                    'user_id': user_id,
+                    'gameweek_id': gameweek_id,
+                    'out_player': None,
+                    'in_player': int(in_id),
+                }
+            )
+
+    # Return refreshed payload the frontend expects
+    return await get_user_team_full(db, user_id, gameweek_id)

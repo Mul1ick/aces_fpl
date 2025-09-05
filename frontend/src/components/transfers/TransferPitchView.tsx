@@ -14,7 +14,15 @@ const PlayerSlot = ({ position, onClick }) => (
   </button>
 );
 
-export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove}) => {
+interface TransferPitchViewProps {
+  squad: any;
+  onSlotClick: (pos: string, index: number) => void;
+  onPlayerRemove: (pos: string, index: number) => void;
+  onStartTransfer?: (player: any, pos: string, index: number) => void; // NEW
+}
+
+
+export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove,onStartTransfer,}: TransferPitchViewProps) => {
     const [detailedPlayer, setDetailedPlayer] = useState(null);
 
     const handlePlayerClick = (player) => {
@@ -31,9 +39,9 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove}) => {
         team: player.team_name,
         pos: player.position,
         points: player.points ?? 0, // Placeholder
-        fixture: player.fixture_str ?? '—',
-        isCaptain: player.is_captain,
-        isVice: player.is_vice_captain,
+        fixture: player.fixture ?? player.fixture_str ?? '—',
+  isCaptain: player.is_captain ?? player.isCaptain,
+  isVice: player.is_vice_captain ?? player.isVice,
     });
 
 
@@ -89,6 +97,15 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove}) => {
                         }
                     }
                 }}
+                onTransfer={(p) => {
+    if (!p) return;
+    const posKey = String(p.pos ?? p.position ?? '').toUpperCase();
+    const idx = squad[posKey]?.findIndex((x:any) => x && x.id === p.id) ?? -1;
+    if (idx >= 0) {
+      setDetailedPlayer(null);
+      onStartTransfer?.(p, posKey, idx); // bubble to Transfers.tsx
+    }
+  }}
             />
         </>
     );

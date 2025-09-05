@@ -132,3 +132,6 @@ class TransferRequest(BaseModel):
 class SetArmbandRequest(BaseModel):
     player_id: int
     kind: str = Field(pattern="^(C|VC)$")  # C = captain, VC = vice-captain
+
+class SaveTeamPayload(BaseModel):
+    players: list[dict]

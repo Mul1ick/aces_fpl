@@ -4,7 +4,7 @@ from app import schemas, crud
 from app.auth import get_current_user
 from prisma import Prisma
 from prisma import models as PrismaModels # Import Prisma's generated models
-from app.schemas import SetArmbandRequest
+from app.schemas import SetArmbandRequest,SaveTeamPayload
 
 
 router = APIRouter()
@@ -76,3 +76,20 @@ async def set_armband(
         await crud.set_vice_captain(db, str(current_user.id), current_gw.id, payload.player_id)
 
     return await crud.get_user_team_full(db, str(current_user.id), current_gw.id)
+
+@router.post("/save-team")
+async def save_team(payload: SaveTeamPayload,
+                    db: Prisma = Depends(get_db),
+                    user=Depends(get_current_user)):
+    # figure out current gw (use your existing helper)
+    gw = await crud.get_current_gameweek(db)
+    if not gw:
+        raise HTTPException(404, "No gameweek")
+
+    updated = await crud.save_existing_team(
+        db=db,
+        user_id=str(user.id),
+        gameweek_id=gw.id,
+        new_players=payload.players
+    )
+    return updated

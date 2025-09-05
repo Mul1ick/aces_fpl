@@ -18,6 +18,7 @@ model User {
   fantasy_team    FantasyTeam?
   user_teams      UserTeam[]
   user_gameweek_scores UserGameweekScore[]
+  transfers      transfer_log[]
 
   @@map("users")
 }
@@ -42,6 +43,8 @@ model Player {
   team        Team     @relation(fields: [team_id], references: [id], onDelete: Cascade)
   user_teams  UserTeam[]
   gameweek_player_stats GameweekPlayerStats[]
+  transfersIn  transfer_log[] @relation("TransfersIn")
+  transfersOut transfer_log[] @relation("TransfersOut")
 
   @@map("players")
 }
@@ -129,4 +132,26 @@ model Fixture {
   @@index([home_team_id])
   @@index([away_team_id])
   @@map("fixtures")
+}
+
+model transfer_log {
+  id          Int      @id @default(autoincrement())
+  user_id     String
+  out_player  Int?     // can be null if it's only an inbound transfer
+  in_player   Int?     // can be null if it's only an outbound transfer
+  gameweek_id Int
+  created_at  DateTime @default(now())
+
+  user      User      @relation(fields: [user_id], references: [id])
+
+  // make these OPTIONAL because the FK scalars are optional
+  out_rel   Player?   @relation("TransfersOut", fields: [out_player], references: [id])
+  in_rel    Player?   @relation("TransfersIn",  fields: [in_player],  references: [id])
+  
+  
+  @@index([gameweek_id])
+  @@index([in_player])
+  @@index([out_player])
+  @@index([created_at])
+  @@map("transfer_log")
 }

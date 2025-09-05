@@ -22,7 +22,16 @@ const TEAM_JERSEYS = {
   'Umaag Foundation Trust': tshirtGreen,
 };
 
-const PlayerDetailModalContent = ({ player, onRemove }) => {
+const getPos = (p: any) => String(p?.pos ?? p?.position ?? '').toUpperCase();
+const getName = (p: any) => p?.name ?? p?.full_name ?? '';
+const getClub = (p: any) => p?.club ?? p?.team?.name ?? p?.team_name ?? '';
+
+const PlayerDetailModalContent = ({ player, onRemove,onTransfer,   onClose,   }: {
+  player: any;
+  onRemove: () => void;
+  onTransfer?: (player: any) => void;
+  onClose: () => void;
+}) => {
     const jerseySrc = TEAM_JERSEYS[player.club] || tshirtWhite;
     const form = [ { gw: 1, opp: 'BUR', pts: 9 }, { gw: 2, opp: 'MCI', pts: 9 }, { gw: 3, opp: 'CHE', pts: 2 }, { gw: 4, opp: 'TOT', pts: 6 }, { gw: 5, opp: 'MUN', pts: 7 }, ];
     const fixtures = [ { gw: 6, opp: 'BOU (H)', fdr: 3 }, { gw: 7, opp: 'WHU (A)', fdr: 2 }, { gw: 8, opp: 'BHA (A)', fdr: 3 }, ];
@@ -62,6 +71,18 @@ const PlayerDetailModalContent = ({ player, onRemove }) => {
                 </div>
             </CardContent>
             <div className="p-4 border-t">
+                <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            onTransfer?.(player); // start transfer flow
+            onClose();            // close modal immediately
+          }}
+          title="Transfer this player"
+        >
+          Transfer
+        </Button>
+         
                 <Button variant="destructive" className="w-full" onClick={() => onRemove()}>Remove</Button>
             </div>
         </>
@@ -69,7 +90,17 @@ const PlayerDetailModalContent = ({ player, onRemove }) => {
 }
 
 
-export const PlayerDetailModal = ({ player, onClose, onRemove }) => {
+export const PlayerDetailModal = ({
+  player,
+  onClose,
+  onRemove,
+  onTransfer, // NEW
+}: {
+  player: any | null;
+  onClose: () => void;
+  onRemove: () => void;
+  onTransfer?: (player: any) => void; // NEW
+}) => {
     if (!player) return null;
 
     return (
@@ -91,7 +122,8 @@ export const PlayerDetailModal = ({ player, onClose, onRemove }) => {
                     className="bg-white h-full w-full lg:w-[30%] flex flex-col"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <PlayerDetailModalContent player={player} onRemove={onRemove} />
+                    <PlayerDetailModalContent player={player} onRemove={onRemove}               onTransfer={onTransfer} // pass through
+              onClose={onClose}  />
                     <Button variant="ghost" size="icon" onClick={onClose} className="absolute top-4 right-4 text-white lg:hidden">
                         <X className="w-5 h-5" />
                     </Button>
