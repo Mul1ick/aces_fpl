@@ -35,8 +35,7 @@ app.include_router(player_routes.router)
 app.include_router(team.router, prefix="/teams", tags=["Teams"])
 app.include_router(gameweek_routes.router, tags=["Gameweeks"])
 app.include_router(leaderboard_routes.router)
-app.include_router(fixture_routes.router, tags=["Fixtures"])
-
+app.include_router(fixture_routes.router)
 # Secure routes for the Admin Portal
 app.include_router(admin_routes.router) # Prefix is already defined in admin_routes.py
 

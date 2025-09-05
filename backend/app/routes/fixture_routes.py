@@ -4,7 +4,7 @@ from prisma import Prisma
 from app.database import get_db
 from app.crud import get_current_gameweek
 
-router = APIRouter()
+router = APIRouter(prefix="/fixtures", tags=["fixtures"])
 
 @router.get("/fixtures/next-map")
 async def next_fixture_map(db: Prisma = Depends(get_db)):
@@ -33,3 +33,19 @@ async def next_fixture_map(db: Prisma = Depends(get_db)):
         out[f.home_team_id] = f"{f.away.short_name} (H) • {dow} {day} {mon} {time_str}"
         out[f.away_team_id] = f"{f.home.short_name} (A) • {dow} {day} {mon} {time_str}"
     return out
+
+
+@router.get("/")
+async def list_fixtures(
+    db: Prisma = Depends(get_db),
+    gameweek_id: int | None = None
+):
+    where = {}
+    if gameweek_id:
+        where["gameweek_id"] = gameweek_id
+    fixtures = await db.fixture.find_many(
+        where=where,
+        include={"home": True, "away": True},
+        order={"kickoff": "asc"}
+    )
+    return fixtures
