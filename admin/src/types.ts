@@ -12,21 +12,26 @@ export interface User {
 }
 
 export interface Team {
-  id: string;
+  id: number;
   name: string;
   short_name: string;
-  logo_url?: string;
+  logo_url?: string; // Added for team logos
+  next_fixture?: string; // Added for next fixture
   primary_color?: string;
   secondary_color?: string;
 }
 
+// Player Status Type
+export type PlayerStatus = 'available' | 'injured' | 'suspended' | 'unavailable';
+
 export interface Player {
-  id: string;
-  name: string;
+  id: number;
+  full_name: string;
   position: 'GK' | 'DEF' | 'MID' | 'FWD';
-  team_id: string;
-  team?: Team;
-  current_price: number;
+  team_id: number;
+  team: Team;
+  price: number;
+  status: PlayerStatus;
   total_points: number;
   games_played: number;
   minutes_played: number;
@@ -41,7 +46,6 @@ export interface Player {
   red_cards: number;
   saves: number;
   bonus_points: number;
-  is_active: boolean;
 }
 
 export interface Fixture {
@@ -131,10 +135,11 @@ export interface PaginatedResponse<T> {
 }
 
 export interface PlayerFormData {
-  name: string;
+  full_name: string;
   position: Player['position'];
-  team_id: string;
-  current_price: number;
+  team_id: number;
+  price: number;
+  status: PlayerStatus;
 }
 
 export interface UserUpdateData {
