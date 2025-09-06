@@ -8,3 +8,4 @@ async def get_db():
     if not db_client.is_connected():
         await db_client.connect()
     yield db_client
+

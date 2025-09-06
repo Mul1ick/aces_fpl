@@ -40,6 +40,9 @@ async def get_team(
     
     try:
         result = await crud.get_user_team_full(db, str(current_user.id), current_gameweek.id)
+        if not result:   # 👈 add this block
+            raise HTTPException(status_code=404, detail="Team not found")
+        
         return result
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
