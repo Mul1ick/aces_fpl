@@ -9,6 +9,7 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { PlayersPage } from "@/pages/PlayersPage";
+import { TeamsPage } from "@/pages/TeamsPage";
 import { GameweekPage } from "@/pages/GameweekPage";
 import NotFound from "./pages/NotFound";
 
@@ -55,7 +56,7 @@ const App = () => (
               <Route path="users/pending" element={<UsersPage />} />
               <Route path="users/admins" element={<UsersPage />} />
               <Route path="data/players" element={<PlayersPage />} />
-              <Route path="data/teams" element={<PlayersPage />} />
+              <Route path="data/teams" element={<TeamsPage />} />
               <Route path="gameweek" element={<GameweekPage />} />
               <Route path="settings" element={<GameweekPage />} />
               <Route path="*" element={<NotFound />} />
@@ -68,3 +69,4 @@ const App = () => (
 );
 
 export default App;
+
