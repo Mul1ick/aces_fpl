@@ -19,6 +19,7 @@ export interface Team {
   next_fixture?: string; // Added for next fixture
   primary_color?: string;
   secondary_color?: string;
+  player_count?: number;
 }
 
 // Player Status Type

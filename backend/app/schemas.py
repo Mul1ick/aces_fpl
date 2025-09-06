@@ -154,3 +154,6 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     user: UserOut
 
+
+class TeamOutWithCount(TeamOut):
+    player_count: int

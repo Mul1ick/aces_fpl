@@ -18,63 +18,33 @@ export function DashboardPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchDashboardStats = async () => {
-      if (!token) return;
+  const fetchDashboardStats = async () => {
+    const t = token || localStorage.getItem("admin_token");  // ✅ fallback to saved admin token
+    if (!t) {
+      console.warn("[DashboardPage] No admin token found");
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        setIsLoading(true);
-        const data = await dashboardAPI.getStats(token);
-        setStats(data);
-      } catch (error) {
-        console.error('Failed to fetch dashboard stats:', error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load dashboard data. Using sample data for demo.",
-        });
-        
-        // Fallback sample data for demo
-        setStats({
-          pending_users: 12,
-          total_users: 1247,
-          total_players: 650,
-          current_gameweek: {
-            id: 'gw1',
-            name: 'Gameweek 1',
-            deadline_time: '2024-08-16T11:30:00Z',
-            is_current: true,
-            is_next: false,
-            finished: false,
-            data_checked: false,
-          },
-          recent_activities: [
-            {
-              id: '1',
-              type: 'user_registered',
-              description: 'New user John Smith registered',
-              timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-            },
-            {
-              id: '2',
-              type: 'user_approved',
-              description: 'Approved 5 pending users',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-            },
-            {
-              id: '3',
-              type: 'stats_entered',
-              description: 'Stats entered for Manchester United vs Liverpool',
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-            },
-          ],
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    try {
+      setIsLoading(true);
+      const data = await dashboardAPI.getStats(t);
+      setStats(data);
+    } catch (error) {
+      console.error("[DashboardPage] Failed to fetch dashboard stats:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load dashboard data. Using sample data for demo.",
+      });
+      // ... keep your sample fallback
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchDashboardStats();
-  }, [token, toast]);
+  fetchDashboardStats();
+}, [token, toast]);
 
   if (isLoading) {
     return (

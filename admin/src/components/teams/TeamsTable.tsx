@@ -10,15 +10,15 @@ import {
 import { TeamActions } from './TeamActions';
 import type { Team } from '@/types';
 
-interface TeamsTableProps {
-  teams: Team[];
-  playerCounts?: { [key: number]: number }; // Made prop optional
-  onEditTeam: (team: Team) => void;
-  onDeleteTeam: (team: Team) => void;
-}
+ interface TeamsTableProps {
+   teams: Team[];
+   onEditTeam: (team: Team) => void;
+   onDeleteTeam: (team: Team) => void;
+ }
 
 // Added a default empty object {} for playerCounts to prevent crashes
-export function TeamsTable({ teams, playerCounts = {}, onEditTeam, onDeleteTeam }: TeamsTableProps) {
+export function TeamsTable({ teams, onEditTeam, onDeleteTeam }: TeamsTableProps) {
+
   // Function to safely construct the logo path
   const getLogoPath = (logoUrl: string | undefined) => {
     if (!logoUrl) {
@@ -58,7 +58,7 @@ export function TeamsTable({ teams, playerCounts = {}, onEditTeam, onDeleteTeam 
             </TableCell>
             <TableCell className="font-medium">{team.name}</TableCell>
             <TableCell className="text-center font-mono text-muted-foreground">{team.short_name}</TableCell>
-            <TableCell className="text-center">{playerCounts[team.id] || 0}</TableCell>
+            <TableCell className="text-center">{(team as any).player_count ?? 0}</TableCell>
             <TableCell>{team.next_fixture || 'N/A'}</TableCell>
             <TableCell className="text-right">
               <TeamActions

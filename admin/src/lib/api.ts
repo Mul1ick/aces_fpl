@@ -107,8 +107,21 @@ export const authAPI = {
 
 // Dashboard API calls
 export const dashboardAPI = {
-  async getStats(token: string): Promise<DashboardStats> {
-    return apiRequest('/admin/dashboard/stats', { method: 'GET' }, token);
+  async getStats(token: string) {
+    const url = `${API_BASE_URL}/admin/dashboard/stats`;
+    console.log("[dashboardAPI] Fetching:", url);
+
+    const res = await fetch(url, {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch dashboard stats (${res.status})`);
+    }
+    return res.json();
   },
 };
 

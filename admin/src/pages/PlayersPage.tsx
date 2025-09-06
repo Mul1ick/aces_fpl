@@ -22,6 +22,7 @@ type SortConfig = {
 
 export function PlayersPage() {
 
+  const authToken = localStorage.getItem("admin_token");
   const { token } = useAuth();
 const { toast } = useToast();
 
@@ -49,42 +50,28 @@ const [error, setError] = useState<string|null>(null);
 
 
   const loadTeams = useCallback(async () => {
-  if (!token) return;
+  if (!authToken) { setError("Not authenticated"); setIsLoading(false); return; }
   try {
     setError(null);
-    const res = await teamAPI.getTeams(token);
+    const res = await teamAPI.getTeams(authToken);
     setTeams(res);
-  } catch (e: any) {
-    setError(e.message || 'Failed to load teams');
-  }
-}, [token]);
+  } catch (e:any) { setError(e.message || "Failed to load teams"); }
+}, [authToken]);
+
   
 
 const loadPlayers = useCallback(async () => {
-  if (!token) return;
+  if (!authToken) { setError("Not authenticated"); setIsLoading(false); return; }
   try {
     setIsLoading(true);
     setError(null);
-
-    const teamParam   = filters.teamId !== 'all' ? String(filters.teamId) : '';
-    const posParam    = filters.position !== 'all' ? filters.position : '';
-    const statusParam = filters.status  !== 'all' ? filters.status  : '';
-
-    const res = await playerAPI.getPlayers(
-      token,
-      filters.search || '',
-      teamParam,
-      posParam,
-    );
-
-    // If API returns an array -> set directly; if paginated -> use .items
+    const teamParam = filters.teamId !== 'all' ? String(filters.teamId) : '';
+    const posParam  = filters.position !== 'all' ? filters.position : '';
+    const res = await playerAPI.getPlayers(authToken, filters.search || '', teamParam, posParam);
     setPlayers(res);
-  } catch (e: any) {
-    setError(e.message || 'Failed to load players');
-  } finally {
-    setIsLoading(false);
-  }
-}, [token, filters]);
+  } catch (e:any) { setError(e.message || "Failed to load players"); }
+  finally { setIsLoading(false); }
+}, [authToken, filters]);
 
 
   // Simulate fetching data on component mount

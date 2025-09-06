@@ -24,7 +24,7 @@ export function UsersPage() {
     currentPage: 1,
     totalPages: 1,
   });
-  
+  const getAdminToken = () => token || localStorage.getItem("admin_token");
   const { token } = useAuth();
   const { toast } = useToast();
 
@@ -43,7 +43,11 @@ export function UsersPage() {
   };
 
   const fetchUsers = useCallback(async () => {
-    if (!token) return;
+    const t = token || localStorage.getItem("admin_token");
+if (!t) {
+  console.warn("[UsersPage] No admin token found — not fetching");
+  return;
+}
 
     try {
       setIsLoading(true);
@@ -54,11 +58,11 @@ export function UsersPage() {
       const roleFilter = viewMode === 'admins' ? 'admin' : undefined;
 
       if (viewMode === 'pending') {
-        response = await userAPI.getPendingUsers(token);
+        response = await userAPI.getPendingUsers(t);
         setUsers(response);
         setPagination({ currentPage: 1, totalPages: 1 });
       } else {
-        response = await userAPI.getAllUsers(token, pagination.currentPage, searchQuery, roleFilter);
+        response = await userAPI.getAllUsers(t, pagination.currentPage, searchQuery, roleFilter);
         setUsers(response.items);
         setPagination({
           currentPage: response.page,
@@ -86,20 +90,22 @@ export function UsersPage() {
   // --- Action Handlers ---
 
   const handleApproveUser = async (userId: string) => {
-    if (!token) return;
-    try {
-        await userAPI.approveUser(userId, token);
-        toast({ title: "Success", description: "User has been approved." });
-        fetchUsers();
-    } catch (error) {
-        toast({ variant: "destructive", title: "Error", description: "Failed to approve user." });
-    }
-  };
+  const t = getAdminToken();
+  if (!t) return;
+  try {
+    await userAPI.approveUser(userId, t);
+    toast({ title: "Success", description: "User has been approved." });
+    fetchUsers();
+  } catch (error) {
+    toast({ variant: "destructive", title: "Error", description: "Failed to approve user." });
+  }
+};
   
   const handleUpdateRole = async (userId: string, role: 'admin' | 'user') => {
-     if (!token) return;
+    const t = getAdminToken();
+     if (!t) return;
     try {
-        await userAPI.updateUserRole(userId, { role }, token);
+        await userAPI.updateUserRole(userId, { role }, t);
         toast({ title: "Success", description: "User role has been updated." });
         fetchUsers();
     } catch (error) {
@@ -108,9 +114,10 @@ export function UsersPage() {
   };
   
   const handleBulkApprove = async () => {
-    if (!token || selectedUserIds.size === 0) return;
+    const t = getAdminToken();
+    if (!t || selectedUserIds.size === 0) return;
     try {
-        await userAPI.bulkApproveUsers(Array.from(selectedUserIds), token);
+        await userAPI.bulkApproveUsers(Array.from(selectedUserIds), t);
         toast({ title: "Success", description: `${selectedUserIds.size} users have been approved.` });
         fetchUsers();
     } catch (error) {
