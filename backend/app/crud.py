@@ -671,3 +671,10 @@ async def save_existing_team(
 
     # Return refreshed payload the frontend expects
     return await get_user_team_full(db, user_id, gameweek_id)
+
+async def user_has_team(db: Prisma, user_id: str) -> bool:
+    # OPTION A: if your fantasy team model is named "FantasyTeam"
+    team = await db.fantasyteam.find_first(where={"user_id": user_id})
+    # OPTION B: if it’s named "Team" and represents the user’s fantasy team
+    # team = await db.team.find_first(where={"user_id": user_id})
+    return team is not None

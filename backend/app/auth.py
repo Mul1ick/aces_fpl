@@ -76,3 +76,23 @@ async def get_current_admin_user(current_user: PrismaModels.User = Depends(get_c
         )
     return current_user
 
+# ----------------- AUTHENTICATE USER ------------------
+async def authenticate_user(db: Prisma, email: str, password: str):
+    """
+    Return the user if credentials are valid, else None.
+    Works with either `hashed_password` or `password_hash` field names.
+    """
+    user = await crud.get_user_by_email(db, email)
+    if not user:
+        return None
+
+    # Try common hash field names
+    hashed = getattr(user, "hashed_password", None) or getattr(user, "password_hash", None)
+    if not hashed:
+        return None
+
+    if not verify_password(password, hashed):
+        return None
+
+    return user
+

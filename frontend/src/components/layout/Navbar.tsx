@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
 import acesLogo from '@/assets/aces-logo.png';
 
-const navLinks = [
+// Links for existing users
+const regularNavLinks = [
   { name: 'Status', path: '/dashboard' },
   { name: 'Pick Team', path: '/team' },
   { name: 'Transfers', path: '/transfers' },
@@ -14,10 +15,19 @@ const navLinks = [
   { name: 'Help', path: '/help' },
 ];
 
+// Simplified links for new users
+const newUserNavLinks = [
+  { name: 'Select Team', path: '/transfers' },
+  { name: 'Help', path: '/help' },
+];
+
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { logout } = useAuth(); // Get the logout function from your context
+  const { user, logout } = useAuth(); // Get user from auth
   const navigate = useNavigate();
+
+  // Dynamically choose which set of links to display
+  const navLinks = user?.has_team ? regularNavLinks : newUserNavLinks;
 
   const handleSignOut = () => {
     logout();
@@ -110,7 +120,7 @@ const Navbar: React.FC = () => {
                       {link.name}
                     </NavLink>
                   ))}
-                   <button
+                  <button
                     onClick={() => {
                       handleSignOut();
                       setIsMenuOpen(false);

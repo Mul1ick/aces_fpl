@@ -4,6 +4,7 @@ from app import schemas, crud, auth
 from app.database import get_db
 from typing import List, Optional
 from uuid import UUID
+import asyncio
 
 router = APIRouter(
     prefix="/admin",
@@ -26,10 +27,25 @@ async def get_dashboard_stats(db: Prisma = Depends(get_db)):
 
 @router.get("/users/pending", response_model=List[schemas.UserOut])
 async def get_pending_users(db: Prisma = Depends(get_db)):
-    """
-    Get a list of all users awaiting approval.
-    """
-    return await crud.get_pending_users(db)
+    users = await crud.get_pending_users(db)  # returns List[PrismaModels.User]
+
+    # compute has_team for each user
+    flags = await asyncio.gather(
+        *[crud.user_has_team(db, str(u.id)) for u in users]
+    )
+
+    # return objects that match UserOut EXACTLY
+    return [
+        {
+            "id": str(u.id),
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": u.role,
+            "is_active": bool(u.is_active),
+            "has_team": flags[i],
+        }
+        for i, u in enumerate(users)
+    ]
 
 @router.get("/users", response_model=schemas.PaginatedResponse[schemas.UserOut])
 async def get_all_users(
@@ -37,7 +53,7 @@ async def get_all_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
-    role: Optional[str] = Query(None) # --- NEW --- Add role filter
+    role: Optional[str] = Query(None), # --- NEW --- Add role filter
 ):
     """
     Get a paginated list of all users, with optional search and role filtering.

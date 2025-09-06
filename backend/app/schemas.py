@@ -6,6 +6,10 @@ from datetime import datetime
 # --- Generic Type for Paginated Response ---
 T = TypeVar('T')
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
 class PaginatedResponse(BaseModel, Generic[T]):
     items: List[T]
     total: int
@@ -25,6 +29,7 @@ class UserOut(UserBase):
     id: UUID
     is_active: bool
     role: str
+    has_team: bool
     # created_at is no longer required by the API response
     
     class Config:
@@ -143,3 +148,9 @@ class PlayerUpdate(BaseModel):
     price: Optional[float] = None
     status: Optional[Literal['available','injured','suspended']] = None
     is_hidden: Optional[bool] = None   # only if you use this admin-only flag
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+

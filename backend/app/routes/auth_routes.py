@@ -5,6 +5,8 @@ from app.database import get_db
 from app.auth import create_access_token
 from prisma import Prisma
 from prisma import models as PrismaModels
+from app.auth import get_current_user
+
 
 router = APIRouter()
 
@@ -12,32 +14,46 @@ router = APIRouter()
 async def signup(user: schemas.UserCreate, db: Prisma = Depends(get_db)):
     if await crud.get_user_by_email(db, user.email):
         raise HTTPException(status_code=400, detail="Email already registered")
-    return await crud.create_user(db, user)
+    u = await crud.create_user(db, user)
+    return {
+        "id": str(u.id),
+        "email": u.email,
+        "full_name": u.full_name,
+        "role": u.role,
+        "has_team": False,   # new users have no team yet
+        "is_active": bool(u.is_active)
+    }
 
-@router.post("/login", response_model=schemas.Token)
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), 
-    db: Prisma = Depends(get_db)
-):
-    user = await crud.get_user_by_email(db, form_data.username)
-    
-    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+@router.post("/login", response_model=schemas.LoginResponse)
+async def login(form: OAuth2PasswordRequestForm = Depends(), db: Prisma = Depends(get_db)):
+    user = await auth.authenticate_user(db, form.username, form.password)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account pending approval")
 
-    access_token = create_access_token(data={"sub": str(user.id)})
+    access_token =  auth.create_access_token({"sub": str(user.id), "role": user.role})
+    has_team = await crud.user_has_team(db, str(user.id))
 
     return {
-        "access_token": access_token, 
+        "access_token": access_token,
         "token_type": "bearer",
-        "user": user  # Return the full user object
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+            "has_team": has_team,  # 👈
+            "is_active": bool(user.is_active)
+        },
     }
 
 @router.get("/me", response_model=schemas.UserOut)
-async def read_users_me(current_user: PrismaModels.User = Depends(auth.get_current_user)):
-    """
-    Get current user's profile.
-    """
-    return current_user
-
+async def me(db: Prisma = Depends(get_db), current_user = Depends(get_current_user)):
+    has_team = await crud.user_has_team(db, str(current_user.id))
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "role": current_user.role,
+        "has_team": has_team,  # 👈
+        "is_active": bool(current_user.is_active)
+    }
