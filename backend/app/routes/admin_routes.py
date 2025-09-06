@@ -204,3 +204,57 @@ async def admin_list_teams(db: Prisma = Depends(get_db)):
 
     print("[/admin/teams] sample_counts:", [(r["id"], r["player_count"]) for r in result[:5]])
     return result
+
+
+@router.get("/gameweeks/current", response_model=schemas.GameweekOutWithFixtures)
+async def admin_get_current_gameweek(db: Prisma = Depends(get_db)):
+    gw = await crud.get_current_gameweek(db)
+    if not gw:
+        raise HTTPException(status_code=404, detail="No gameweeks configured.")
+
+    # ❌ no select=
+    fixtures = await db.fixture.find_many(
+        where={"gameweek_id": gw.id},
+        order={"id": "asc"},
+    )
+
+    # collect team ids
+    team_ids = {f.home_team_id for f in fixtures} | {f.away_team_id for f in fixtures}
+
+    # ❌ no select=
+    teams = await db.team.find_many(
+        where={"id": {"in": list(team_ids)}},
+    )
+    team_map = {t.id: t for t in teams}
+
+    # build response
+    return {
+        "id": gw.id,
+        "gw_number": gw.gw_number,
+        "deadline": gw.deadline,
+        "fixtures": [
+            {
+                "id": f.id,
+                "gameweek_id": f.gameweek_id,
+                "home_team_id": f.home_team_id,
+                "away_team_id": f.away_team_id,
+                "home_score": getattr(f, "home_score", None),
+                "away_score": getattr(f, "away_score", None),
+                "stats_entered": getattr(f, "stats_entered", False),
+                "home_team": {
+                    "id": team_map[f.home_team_id].id,
+                    "name": team_map[f.home_team_id].name,
+                    "short_name": team_map[f.home_team_id].short_name,
+                    # add logo_url if your Team model has it
+                    # "logo_url": getattr(team_map[f.home_team_id], "logo_url", None),
+                },
+                "away_team": {
+                    "id": team_map[f.away_team_id].id,
+                    "name": team_map[f.away_team_id].name,
+                    "short_name": team_map[f.away_team_id].short_name,
+                    # "logo_url": getattr(team_map[f.away_team_id], "logo_url", None),
+                },
+            }
+            for f in fixtures
+        ],
+    }

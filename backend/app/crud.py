@@ -111,21 +111,28 @@ async def get_dashboard_stats(db: Prisma):
 async def get_current_gameweek(db: Prisma):
     now_utc = datetime.now(timezone.utc)
 
-    # try next upcoming
-    current_gw = await db.gameweek.find_first(
+    # try next upcoming (future deadline)
+    gw = await db.gameweek.find_first(
         where={'deadline': {'gt': now_utc}},
         order={'deadline': 'asc'}
     )
-    if current_gw:
-        return current_gw
+    if not gw:
+        # fallback: most recent past
+        gw = await db.gameweek.find_first(order={'deadline': 'desc'})
+        if not gw:
+            raise HTTPException(status_code=404, detail="No gameweeks configured in the database.")
 
-    # else try most recent past
-    last_gw = await db.gameweek.find_first(order={'deadline': 'desc'})
-    if last_gw:
-        return last_gw
-
-    # nothing configured => explicit 404 with a clear message
-    raise HTTPException(status_code=404, detail="No gameweeks configured in the database.")
+    # 🔑 build the API schema your frontend expects
+    return schemas.Gameweek(
+        id=gw.id,
+        gw_number=gw.gw_number,
+        deadline=gw.deadline,
+        name=f"Gameweek {gw.gw_number}",
+        finished=gw.deadline < now_utc,
+        is_current=gw.deadline > now_utc,  # adjust if you track `is_current` in DB
+        is_next=False,                     # adjust if you track `is_next` in DB
+        data_checked=False,                # placeholder, update if stored in DB
+    )
 
 
 # --- TEAM FUNCTIONS ---

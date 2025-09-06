@@ -218,6 +218,10 @@ export const gameweekAPI = {
     return apiRequest('/admin/gameweeks', { method: 'GET' }, token);
   },
 
+  async getCurrentGameweek(token: string): Promise<Gameweek> {
+    return apiRequest('/admin/gameweeks/current', { method: 'GET' }, token);
+  },
+
   async getFixtures(gameweekId: string, token: string): Promise<Fixture[]> {
     return apiRequest(`/admin/gameweeks/${gameweekId}/fixtures`, { method: 'GET' }, token);
   },

@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, ShieldQuestion } from 'lucide-react';
 import type { Team, Player, PlayerStatus } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { gameweekAPI } from '@/lib/api';
+import { useEffect } from 'react';
 
 // --- DUMMY DATA ---
 
@@ -57,12 +60,44 @@ const DUMMY_PLAYERS: Player[] = [
 
 
 export function GameweekPage() {
-  const [gameweek, setGameweek] = useState(DUMMY_GAMEWEEK);
-  const [fixtures, setFixtures] = useState(DUMMY_FIXTURES);
-  const [selectedFixture, setSelectedFixture] = useState<typeof DUMMY_FIXTURES[0] | null>(null);
-  const [isConfirming, setConfirming] = useState< 'calculate' | 'finalize' | null>(null);
-
+  const { token } = useAuth();
   const { toast } = useToast();
+
+  const [gameweek, setGameweek] = useState<any>(null);
+  const [fixtures, setFixtures] = useState<any[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [selectedFixture, setSelectedFixture] = useState<any | null>(null);
+  const [isConfirming, setConfirming] = useState<'calculate' | 'finalize' | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const t = token || localStorage.getItem("admin_token");
+    if (!t) return;
+
+    (async () => {
+      try {
+        setIsLoading(true);
+        const data = await gameweekAPI.getCurrentGameweek(t);  // backend endpoint
+        setGameweek({
+    id: data.id,
+    name: `Gameweek ${data.gw_number}`,
+    deadline_time:
+      typeof data.deadline === 'string'
+        ? data.deadline
+        : new Date(data.deadline).toISOString(),
+    status: 'Live',
+  });
+
+        setFixtures(data.fixtures || []);
+      } catch (err) {
+        console.error("[GameweekPage] Failed to load:", err);
+        toast({ variant: "destructive", title: "Error", description: "Failed to load gameweek." });
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [token, toast]);
+  
 
   const allStatsEntered = useMemo(() => fixtures.every(f => f.stats_entered), [fixtures]);
 
@@ -96,6 +131,7 @@ export function GameweekPage() {
   }, [toast]);
 
   const MainActionButton = () => {
+    if (!gameweek) return null;
     if (gameweek.status === 'Live') {
       return (
         <Button size="lg" disabled={!allStatsEntered} onClick={() => setConfirming('calculate')}>
@@ -124,13 +160,13 @@ export function GameweekPage() {
         onOpenStatsModal={handleOpenStatsModal}
       />
       
-      {gameweek.status !== 'Finalized' && (
-        <Card className="admin-card-shadow">
-          <CardContent className="p-6 flex items-center justify-center">
-            <MainActionButton />
-          </CardContent>
-        </Card>
-      )}
+      {gameweek && gameweek.status !== 'Finalized' && (
+  <Card className="admin-card-shadow">
+    <CardContent className="p-6 flex items-center justify-center">
+      <MainActionButton />
+    </CardContent>
+  </Card>
+)}
 
       <StatsEntryModal
         isOpen={!!selectedFixture}

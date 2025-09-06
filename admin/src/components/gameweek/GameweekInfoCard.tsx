@@ -18,6 +18,11 @@ interface GameweekInfoCardProps {
 }
 
 export function GameweekInfoCard({ gameweek }: GameweekInfoCardProps) {
+  if (!gameweek) {
+  return <p className="text-muted-foreground">No gameweek loaded</p>;
+}
+
+
   const getStatusVariant = (status: GameweekStatus) => {
     switch (status) {
       case 'Live':
