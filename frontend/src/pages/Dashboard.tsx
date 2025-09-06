@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
-import NewUserDashboard from "./NewUserDashboard";
+import NewUserDashboard from "./NewUserDashboard"; // Import the new component
 
 // Import your existing dashboard components
 import { GameweekHeroCard } from "@/components/dashboard/GameweekHeroCard";
@@ -10,7 +10,6 @@ import { GameweekStatusCard } from "@/components/dashboard/GameweekStatusCard";
 import { TransfersCard } from "@/components/dashboard/TransfersCard";
 import { TeamOfTheWeekCard } from "@/components/dashboard/TeamOfTheWeekCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PointsHistoryCard } from "@/components/dashboard/PointsHistoryCard"; // Import PointsHistoryCard
 
 type TransferStatItem = {
   player_id: number;
@@ -33,8 +32,7 @@ type TransferStatsResponse =
       };
       [k: string]: any;
     };
-
-// --- DUMMY DATA ---
+    
 const teamOfTheWeek = {
   manager: 'John Smith',
   points: 95,
@@ -54,12 +52,6 @@ const teamOfTheWeek = {
       { id: 11, name: 'Son', club: 'TOT', pos: 'MID', points: 14 },
   ]
 };
-
-const pointsHistory = [
-    { gw: 1, points: 73, rank: "1.2m" },
-    { gw: 2, points: 65, rank: "980k" },
-    { gw: 3, points: 81, rank: "550k" },
-];
 
 
 const Dashboard: React.FC = () => {
@@ -93,6 +85,7 @@ const Dashboard: React.FC = () => {
   }));
 
   useEffect(() => {
+    // We only fetch data if the user has a team
     if (user?.has_team) {
       const token = localStorage.getItem("access_token");
       const URL = "http://localhost:8000/transfers/stats";
@@ -120,14 +113,17 @@ const Dashboard: React.FC = () => {
     }
   }, [user]);
 
+  // Show a loading state while checking auth
   if (isLoading) {
     return <div className="min-h-screen bg-pl-purple flex items-center justify-center text-pl-white">Loading...</div>;
   }
   
+  // Conditionally render the new user dashboard
   if (user && user.has_team === false) {
     return <NewUserDashboard />;
   }
   
+  // Your Existing Dashboard Code
   return (
     <div className="bg-white min-h-screen text-black">
         <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
@@ -135,38 +131,31 @@ const Dashboard: React.FC = () => {
                variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 lg:grid-cols-3 lg:gap-8 space-y-8 lg:space-y-0"
+              className="grid grid-cols-1 lg:grid-cols-2 lg:gap-8 space-y-8 lg:space-y-0"
             >
               {/* Left Column */}
-              <div className="space-y-8 lg:col-span-2">
+              <div className="space-y-8">
                 <motion.div variants={itemVariants}>
                   <GameweekHeroCard user={user} />
                 </motion.div>
                 <motion.div variants={itemVariants}>
-                    <Card className="h-full border-gray-200">
-                        <CardHeader>
-                            <CardTitle className="text-2xl">Gameweek Status</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-8">
-                            <GameweekStatusCard />
-                            <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
-                        </CardContent>
-                    </Card>
+                  <ManagerHubCard />
                 </motion.div>
               </div>
 
               {/* Right Column */}
-              <div className="space-y-8">
-                <motion.div variants={itemVariants}>
-                    <ManagerHubCard />
-                </motion.div>
-                <motion.div variants={itemVariants}>
-                    <TeamOfTheWeekCard team={teamOfTheWeek} />
-                </motion.div>
-                <motion.div variants={itemVariants}>
-                    <PointsHistoryCard history={pointsHistory} />
-                </motion.div>
-              </div>
+              <motion.div variants={itemVariants}>
+                <Card className="h-full border-gray-200">
+                    <CardHeader>
+                         <CardTitle className="text-2xl">Gameweek Status</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                         <GameweekStatusCard />
+                        <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
+                        <TeamOfTheWeekCard team={teamOfTheWeek} />
+                    </CardContent>
+                </Card>
+              </motion.div>
             </motion.div>
           </div>
       </div>
