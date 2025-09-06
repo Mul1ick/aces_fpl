@@ -22,6 +22,7 @@ const config: Config = {
           teal: "#00FFCC",
           purple: "#9333EA",
           blue: "#2563EB",
+          pink: "#E90052", // Added this official FPL pink color
         },
 
         // Borders & shadows

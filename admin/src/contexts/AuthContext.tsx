@@ -1,80 +1,135 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authAPI } from '@/lib/api';
-import type { AuthContextType, User } from '@/types';
-import { useToast } from '@/hooks/use-toast';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { API } from "@/lib/api"; // Use the correct path alias
+
+interface User {
+  id: string;
+  email: string;
+  full_name?: string;
+  teamName?: string;
+  has_team?: boolean;
+}
+
+interface AuthResult {
+  success: boolean;
+  message?: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  signup: (name: string, email: string, password: string) => Promise<AuthResult>;
+  logout: () => void;
+  pendingApproval: boolean;
+  setPendingApproval: (isPending: boolean) => void;
+  refreshUserStatus: () => Promise<void>;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
+  const [pendingApproval, setPendingApproval] = useState(false);
+  
+  const fetchAndSetUser = async (token: string) => {
+    try {
+        const response = await fetch(`${API.BASE_URL}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error("Token invalid");
+        const userData = await response.json();
+        setUser(userData);
+        localStorage.setItem("aces_fpl_user", JSON.stringify(userData));
+    } catch (error) {
+        console.error("Auth check failed:", error);
+        localStorage.removeItem("aces_fpl_user");
+        localStorage.removeItem("access_token");
+        setUser(null);
+    }
+  };
 
   useEffect(() => {
-    // Check for existing token on mount
-    const storedToken = localStorage.getItem('admin_token');
-    if (storedToken) {
-      setToken(storedToken);
-      // Verify token and get user data
-      authAPI.getCurrentUser(storedToken)
-        .then((userData) => {
-          if (userData.role !== 'admin') {
-            throw new Error('Insufficient permissions');
-          }
-          setUser(userData);
-        })
-        .catch(() => {
-          // Token is invalid or user is not admin
-          localStorage.removeItem('admin_token');
-          setToken(null);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
+    const checkAuth = async () => {
+      setIsLoading(true);
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        await fetchAndSetUser(token);
+      }
       setIsLoading(false);
-    }
+    };
+    checkAuth();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<AuthResult> => {
+    setIsLoading(true);
+    setPendingApproval(false);
     try {
-      setIsLoading(true);
-      const response = await authAPI.login(email, password);
-      
-      // Check if user is admin
-      if (response.user.role !== 'admin') {
-        toast({
-          variant: "destructive",
-          title: "Access Denied",
-          description: "You don't have admin permissions to access this portal.",
-        });
-        return false;
+      const body = new URLSearchParams();
+      body.append('username', email);
+      body.append('password', password);
+
+      const response = await fetch(API.endpoints.login, {
+        method: "POST",
+        body: body,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          setPendingApproval(true);
+          return { success: false, message: data.detail || "Account pending approval." };
+        }
+        throw new Error(data.detail || "Login failed");
       }
 
-      const accessToken = response.access_token;
-      setToken(accessToken);
-      setUser(response.user);
-      localStorage.setItem('admin_token', accessToken);
-
-      toast({
-        title: "Login Successful",
-        description: `Welcome back, ${response.user.full_name}!`,
-      });
-
-      return true;
+      const loggedInUser: User = data.user;
+      localStorage.setItem("access_token", data.access_token);
+      setUser(loggedInUser);
+      localStorage.setItem("aces_fpl_user", JSON.stringify(loggedInUser));
+      return { success: true };
     } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: error instanceof Error ? error.message : "Invalid credentials",
+      return { success: false, message: error instanceof Error ? error.message : "An unknown error occurred." };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signup = async (
+    name: string,
+    email: string,
+    password: string
+  ): Promise<AuthResult> => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(API.endpoints.signup, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, full_name: name }),
       });
-      return false;
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Signup failed");
+      }
+      
+      setPendingApproval(true);
+      return { success: true };
+
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : "An unknown error occurred." };
     } finally {
       setIsLoading(false);
     }
@@ -82,33 +137,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = () => {
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('admin_token');
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out.",
-    });
+    setPendingApproval(false);
+    localStorage.removeItem("aces_fpl_user");
+    localStorage.removeItem("access_token");
+  };
+
+  const refreshUserStatus = async () => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+        await fetchAndSetUser(token);
+    }
   };
 
   const value: AuthContextType = {
     user,
-    token,
-    login,
-    logout,
+    isAuthenticated: !!user,
     isLoading,
+    login,
+    signup,
+    logout,
+    pendingApproval,
+    setPendingApproval,
+    refreshUserStatus,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};

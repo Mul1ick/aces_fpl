@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Mail, Lock, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/fpl-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/fpl-card";
@@ -10,12 +10,10 @@ import acesLogo from "@/assets/aces-logo.png";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, signup, isAuthenticated, pendingApproval } = useAuth();
+  const { login, signup, isAuthenticated, pendingApproval, setPendingApproval } = useAuth();
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -38,8 +36,8 @@ const Login: React.FC = () => {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }));
+    if (errors[field] || errors.general) {
+      setErrors(prev => ({ ...prev, [field]: "", general: "" }));
     }
   };
 
@@ -62,19 +60,24 @@ const Login: React.FC = () => {
     if (!validateForm()) return;
 
     setLoading(true);
-    try {
-      if (authMode === "signup") {
-        await signup(formData.name, formData.email, formData.password);
-      } else {
-        const success = await login(formData.email, formData.password);
-        if (success) navigate("/dashboard");
-        else setErrors({ general: "Invalid email or password" });
-      }
-    } catch (error) {
-      setErrors({ general: "Something went wrong. Please try again." });
-    } finally {
-      setLoading(false);
+    setErrors({});
+    
+    let result;
+    if (authMode === "signup") {
+      result = await signup(formData.name, formData.email, formData.password);
+    } else {
+      result = await login(formData.email, formData.password);
     }
+
+    if (result.success) {
+      if (authMode === "login") {
+        navigate("/dashboard");
+      }
+    } else {
+      setErrors({ general: result.message || "An error occurred. Please try again." });
+    }
+    
+    setLoading(false);
   };
 
   if (pendingApproval) {
@@ -99,8 +102,11 @@ const Login: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-pl-white/80">
-                Your account is pending admin approval. You'll receive an email once approved.
+                Your account is pending admin approval. You will be able to log in once your account has been activated.
               </p>
+              <Button variant="hero" onClick={() => setPendingApproval(false)}>
+                Back to Login
+              </Button>
             </CardContent>
           </Card>
         </motion.div>
@@ -124,7 +130,10 @@ const Login: React.FC = () => {
               <PillToggle
                 options={authOptions}
                 value={authMode}
-                onValueChange={(value) => setAuthMode(value as "login" | "signup")}
+                onValueChange={(value) => {
+                  setAuthMode(value as "login" | "signup");
+                  setErrors({});
+                }}
               />
             </div>
             <CardTitle className="text-pl-white">
@@ -138,8 +147,11 @@ const Login: React.FC = () => {
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }}>
                   <div className="space-y-2">
                     <label className="text-caption text-pl-white/80">Full Name</label>
-                    <input type="text" value={formData.name} onChange={(e) => handleInputChange("name", e.target.value)} className="w-full h-12 px-4 glass rounded-xl border border-pl-border text-pl-white placeholder:text-pl-white/40 focus:border-pl-green focus:ring-2 focus:ring-pl-green/20 transition-all" placeholder="Enter your full name" />
-                    {errors.name && <p className="text-caption text-pl-pink">{errors.name}</p>}
+                     <div className="relative">
+                       <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-pl-white/40" />
+                       <input type="text" value={formData.name} onChange={(e) => handleInputChange("name", e.target.value)} className="w-full h-12 pl-10 pr-4 glass rounded-xl border border-pl-border text-pl-white placeholder:text-pl-white/40 focus:border-pl-green focus:ring-2 focus:ring-pl-green/20 transition-all" placeholder="Enter your full name" />
+                    </div>
+                    {errors.name && <p className="text-caption text-accent-pink">{errors.name}</p>}
                   </div>
                 </motion.div>
               )}
@@ -150,17 +162,16 @@ const Login: React.FC = () => {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-pl-white/40" />
                   <input type="email" value={formData.email} onChange={(e) => handleInputChange("email", e.target.value)} className="w-full h-12 pl-10 pr-4 glass rounded-xl border border-pl-border text-pl-white placeholder:text-pl-white/40 focus:border-pl-green focus:ring-2 focus:ring-pl-green/20 transition-all" placeholder="Enter your email" />
                 </div>
-                {errors.email && <p className="text-caption text-pl-pink">{errors.email}</p>}
+                {errors.email && <p className="text-caption text-accent-pink">{errors.email}</p>}
               </div>
 
               <div className="space-y-2">
                 <label className="text-caption text-pl-white/80">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-pl-white/40" />
-                  <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => handleInputChange("password", e.target.value)} className="w-full h-12 pl-10 pr-12 glass rounded-xl border border-pl-border text-pl-white placeholder:text-pl-white/40 focus:border-pl-green focus:ring-2 focus:ring-pl-green/20 transition-all" placeholder="Enter your password" />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-pl-white/40 hover:text-pl-white"><Eye className="size-4" /></button>
+                  <input type="password" value={formData.password} onChange={(e) => handleInputChange("password", e.target.value)} className="w-full h-12 pl-10 pr-4 glass rounded-xl border border-pl-border text-pl-white placeholder:text-pl-white/40 focus:border-pl-green focus:ring-2 focus:ring-pl-green/20 transition-all" placeholder="Enter your password" />
                 </div>
-                {errors.password && <p className="text-caption text-pl-pink">{errors.password}</p>}
+                {errors.password && <p className="text-caption text-accent-pink">{errors.password}</p>}
               </div>
 
               {authMode === "signup" && (
@@ -169,15 +180,32 @@ const Login: React.FC = () => {
                     <label className="text-caption text-pl-white/80">Confirm Password</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-pl-white/40" />
-                      <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => handleInputChange("confirmPassword", e.target.value)} className="w-full h-12 pl-10 pr-12 glass rounded-xl border border-pl-border text-pl-white placeholder:text-pl-white/40 focus:border-pl-green focus:ring-2 focus:ring-pl-green/20 transition-all" placeholder="Confirm your password" />
-                      <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-pl-white/40 hover:text-pl-white"><Eye className="size-4" /></button>
+                      <input type="password" value={formData.confirmPassword} onChange={(e) => handleInputChange("confirmPassword", e.target.value)} className="w-full h-12 pl-10 pr-4 glass rounded-xl border border-pl-border text-pl-white placeholder:text-pl-white/40 focus:border-pl-green focus:ring-2 focus:ring-pl-green/20 transition-all" placeholder="Confirm your password" />
                     </div>
-                    {errors.confirmPassword && <p className="text-caption text-pl-pink">{errors.confirmPassword}</p>}
+                    {errors.confirmPassword && <p className="text-caption text-accent-pink">{errors.confirmPassword}</p>}
                   </div>
                 </motion.div>
               )}
+              
+              {authMode === 'login' && (
+                 <div className="text-center pt-1">
+                   <button
+                     type="button"
+                     onClick={() => alert('Forgot password functionality coming soon!')}
+                     className="text-caption font-semibold text-pl-white/60 transition-colors hover:text-pl-white"
+                   >
+                     Forgot Password?
+                   </button>
+                 </div>
+              )}
 
-              <Button type="submit" variant="hero" size="lg" fullWidth pill loading={loading} className="mt-8">
+              {errors.general && 
+                <div className="text-center p-2 bg-accent-pink rounded-xl">
+                    <p className="text-caption text-text-white font-semibold">{errors.general}</p>
+                </div>
+              }
+
+              <Button type="submit" variant="hero" size="lg" fullWidth pill loading={loading} className="!mt-8">
                 {authMode === "login" ? "Sign In" : "Create Account"}
               </Button>
             </form>

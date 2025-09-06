@@ -1,8 +1,9 @@
-import React, { useState,useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import NewUserDashboard from "./NewUserDashboard"; // Import the new component
 
-// Import the new components
+// Import your existing dashboard components
 import { GameweekHeroCard } from "@/components/dashboard/GameweekHeroCard";
 import { ManagerHubCard } from "@/components/dashboard/ManagerHubCard";
 import { GameweekStatusCard } from "@/components/dashboard/GameweekStatusCard";
@@ -13,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 type TransferStatItem = {
   player_id: number;
   count: number;
-  // if your backend enriches rows:
   full_name?: string;
   position?: string;
   team?: { short_name?: string; name?: string };
@@ -21,32 +21,18 @@ type TransferStatItem = {
 
 type TransferStatsResponse =
   | {
-      // shape if you call a dedicated route like /transfers/stats
       gameweek_id?: number;
       most_in: TransferStatItem[];
       most_out: TransferStatItem[];
     }
   | {
-      // shape if you call /admin/dashboard and it embeds stats
       transfer_stats: {
         most_in: TransferStatItem[];
         most_out: TransferStatItem[];
       };
       [k: string]: any;
     };
-
-// Mock Data
-// const transfersIn = [ 
-//     {rank: 1, name: "Salah", club: "LIV", pos: "MID", transfers: "250,123"}, 
-//     {rank: 2, name: "Son", club: "TOT", pos: "MID", transfers: "210,456"}, 
-//     {rank: 3, name: "Watkins", club: "AVL", pos: "FWD", transfers: "180,789"}
-// ];
-// const transfersOut = [ 
-//     {rank: 1, name: "Mbeumo", club: "BRE", pos: "MID", transfers: "190,543"}, 
-//     {rank: 2, name: "Diaby", club: "AVL", pos: "MID", transfers: "175,123"}, 
-//     {rank: 3, name: "Saka", club: "ARS", pos: "MID", transfers: "150,987"}
-// ];
-
+    
 const teamOfTheWeek = {
   manager: 'John Smith',
   points: 95,
@@ -69,17 +55,15 @@ const teamOfTheWeek = {
 
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [transfersIn, setTransfersIn] = useState<
-  { rank: number; name: string; club: string; pos: string; transfers: string }[]
->([]);
-const [transfersOut, setTransfersOut] = useState<
-  { rank: number; name: string; club: string; pos: string; transfers: string }[]
->([]);
-const [xferLoading, setXferLoading] = useState(true);
-const [xferError, setXferError] = useState<string | null>(null);
-  const [userStatus] = useState<"new_user" | "pre_deadline" | "post_deadline">("pre_deadline"); 
-  const gameweekDeadline = new Date("2025-08-22T23:00:00");
+    { rank: number; name: string; club: string; pos: string; transfers: string }[]
+  >([]);
+  const [transfersOut, setTransfersOut] = useState<
+    { rank: number; name: string; club: string; pos: string; transfers: string }[]
+  >([]);
+  const [xferLoading, setXferLoading] = useState(true);
+  const [xferError, setXferError] = useState<string | null>(null);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -90,7 +74,7 @@ const [xferError, setXferError] = useState<string | null>(null);
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
   };
-
+  
   const mapApiToCardRows = (rows: TransferStatItem[]) =>
   rows.map((row, idx) => ({
     rank: idx + 1,
@@ -101,48 +85,50 @@ const [xferError, setXferError] = useState<string | null>(null);
   }));
 
   useEffect(() => {
-  const token = localStorage.getItem("access_token");
+    // We only fetch data if the user has a team
+    if (user?.has_team) {
+      const token = localStorage.getItem("access_token");
+      const URL = "http://localhost:8000/transfers/stats";
 
-  // Pick ONE of these depending on how you exposed it on the backend:
-  const URL = "http://localhost:8000/transfers/stats";       // if you created a dedicated stats route
-  // const URL = "http://localhost:8000/admin/dashboard";    // if you return `transfer_stats` inside dashboard
-
-  (async () => {
-    try {
-      setXferLoading(true);
-      setXferError(null);
-
-      const res = await fetch(URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
-
-      const data: TransferStatsResponse = await res.json();
-
-      // handle both response shapes
-      const mostIn =
-        "transfer_stats" in data ? data.transfer_stats.most_in : data.most_in;
-      const mostOut =
-        "transfer_stats" in data ? data.transfer_stats.most_out : data.most_out;
-
-      setTransfersIn(mapApiToCardRows(mostIn ?? []));
-      setTransfersOut(mapApiToCardRows(mostOut ?? []));
-    } catch (e: any) {
-      console.error(e);
-      setXferError(typeof e?.message === "string" ? e.message : "Failed to load transfer stats");
-      setTransfersIn([]);
-      setTransfersOut([]);
-    } finally {
-      setXferLoading(false);
+      (async () => {
+        try {
+          setXferLoading(true);
+          setXferError(null);
+          const res = await fetch(URL, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data: TransferStatsResponse = await res.json();
+          const mostIn = "transfer_stats" in data ? data.transfer_stats.most_in : data.most_in;
+          const mostOut = "transfer_stats" in data ? data.transfer_stats.most_out : data.most_out;
+          setTransfersIn(mapApiToCardRows(mostIn ?? []));
+          setTransfersOut(mapApiToCardRows(mostOut ?? []));
+        } catch (e: any) {
+          console.error(e);
+          setXferError(typeof e?.message === "string" ? e.message : "Failed to load transfer stats");
+        } finally {
+          setXferLoading(false);
+        }
+      })();
     }
-  })();
-}, []);
+  }, [user]);
 
+  // Show a loading state while checking auth
+  if (isLoading) {
+    return <div className="min-h-screen bg-pl-purple flex items-center justify-center text-pl-white">Loading...</div>;
+  }
+  
+  // Conditionally render the new user dashboard
+  if (user && user.has_team === false) {
+    return <NewUserDashboard />;
+  }
+  
+  // Your Existing Dashboard Code
   return (
     <div className="bg-white min-h-screen text-black">
         <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
             <motion.div
-              variants={containerVariants}
+               variants={containerVariants}
               initial="hidden"
               animate="visible"
               className="grid grid-cols-1 lg:grid-cols-2 lg:gap-8 space-y-8 lg:space-y-0"
@@ -150,7 +136,7 @@ const [xferError, setXferError] = useState<string | null>(null);
               {/* Left Column */}
               <div className="space-y-8">
                 <motion.div variants={itemVariants}>
-                  <GameweekHeroCard user={user} userStatus={userStatus} gameweekDeadline={gameweekDeadline} />
+                  <GameweekHeroCard user={user} />
                 </motion.div>
                 <motion.div variants={itemVariants}>
                   <ManagerHubCard />
@@ -161,12 +147,11 @@ const [xferError, setXferError] = useState<string | null>(null);
               <motion.div variants={itemVariants}>
                 <Card className="h-full border-gray-200">
                     <CardHeader>
-                        <CardTitle className="text-2xl">Gameweek Status</CardTitle>
+                         <CardTitle className="text-2xl">Gameweek Status</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-8">
-                        <GameweekStatusCard />
-                        <TransfersCard transfersIn={transfersIn}
-  transfersOut={transfersOut} />
+                         <GameweekStatusCard />
+                        <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
                         <TeamOfTheWeekCard team={teamOfTheWeek} />
                     </CardContent>
                 </Card>
@@ -176,5 +161,4 @@ const [xferError, setXferError] = useState<string | null>(null);
       </div>
   );
 };
-
 export default Dashboard;
