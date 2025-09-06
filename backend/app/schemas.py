@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict,Field
 from uuid import UUID
-from typing import List, Optional, TypeVar, Generic
+from typing import List, Optional, TypeVar, Generic,Literal
 from datetime import datetime
 
 # --- Generic Type for Paginated Response ---
@@ -135,3 +135,11 @@ class SetArmbandRequest(BaseModel):
 
 class SaveTeamPayload(BaseModel):
     players: list[dict]
+
+class PlayerUpdate(BaseModel):
+    full_name: Optional[str] = None
+    position: Optional[Literal['GK','DEF','MID','FWD']] = None
+    team_id: Optional[int] = None
+    price: Optional[float] = None
+    status: Optional[Literal['available','injured','suspended']] = None
+    is_hidden: Optional[bool] = None   # only if you use this admin-only flag

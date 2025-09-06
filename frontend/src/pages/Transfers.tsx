@@ -168,7 +168,10 @@ const fetchAndSetTeam = async (opts?: { resetBaseline?: boolean }) => {
     }
 
     const data: TeamResponse = await response.json();
-    setHasTeam(true);
+    const playerCount =
+  (data?.starting?.length ?? 0) + (data?.bench?.length ?? 0);
+
+    setHasTeam(playerCount > 0);
     setExistingTeamName(data.team_name || '');
 
     const allPlayers = [...data.starting, ...data.bench];
@@ -363,6 +366,7 @@ setNotification({ message: "Team saved!", type: "success" });
     //   ),
     // };
     const players = buildPlayersPayloadFromSquad(squad);
+    const payload = { team_name: teamName, players };
 
     try {
       const response = await fetch("http://localhost:8000/teams/submit-team", {

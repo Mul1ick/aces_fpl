@@ -74,3 +74,67 @@ async def update_user_role(user_id: str, request: schemas.UserUpdateRole, db: Pr
         raise HTTPException(status_code=404, detail="User not found")
     return await crud.update_user_role(db, user_id, request.role)
 
+@router.get("/teams", response_model=List[schemas.TeamOut])
+async def admin_list_teams(db: Prisma = Depends(get_db)):
+    # Adjust field names to your schema (e.g., "short_name")
+    return await db.team.find_many(order={"name": "asc"})
+
+
+# --- PLAYER MANAGEMENT ---
+@router.get("/players", response_model=List[schemas.PlayerOut])
+async def admin_list_players(
+    db: Prisma = Depends(get_db),
+    q: Optional[str] = Query(None, description="Search by name/team"),
+    team: Optional[int] = Query(None, description="Team ID"),
+    position: Optional[str] = Query(None, description="GK/DEF/MID/FWD"),
+    status: Optional[str] = Query(None, description="available/injured/suspended"),
+):
+    where: dict = {}
+    if q:
+        # Adjust to your Prisma schema; this does name OR team.name search
+        where["OR"] = [
+            {"full_name": {"contains": q, "mode": "insensitive"}},
+            {"team": {"name": {"contains": q, "mode": "insensitive"}}},
+        ]
+    if team is not None:
+        where["team_id"] = team
+    if position:
+        where["position"] = position
+    if status and status != "all":
+        where["status"] = status
+
+    return await db.player.find_many(
+        where=where,
+        include={"team": True},          # so frontend can read player.team.short_name
+        order={"full_name": "asc"},
+    )
+
+@router.post("/players", response_model=schemas.PlayerOut)
+async def admin_create_player(
+    payload: schemas.PlayerCreate,       # use your existing create schema
+    db: Prisma = Depends(get_db),
+):
+    return await db.player.create(data=payload.model_dump())
+
+@router.put("/players/{player_id}", response_model=schemas.PlayerOut)
+async def admin_update_player(
+    player_id: int,
+    payload: schemas.PlayerUpdate,
+    db: Prisma = Depends(get_db),
+):
+    exists = await db.player.find_unique(where={"id": player_id})
+    if not exists:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    data = payload.model_dump(exclude_unset=True, exclude_none=True)
+    return await db.player.update(where={"id": player_id}, data=data)
+
+@router.delete("/players/{player_id}", status_code=204)
+async def admin_delete_player(
+    player_id: int,
+    db: Prisma = Depends(get_db),
+):
+    exists = await db.player.find_unique(where={"id": player_id})
+    if not exists:
+        raise HTTPException(status_code=404, detail="Player not found")
+    await db.player.delete(where={"id": player_id})
