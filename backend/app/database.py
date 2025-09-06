@@ -4,15 +4,7 @@ from prisma import Prisma
 db_client = Prisma()
 
 async def get_db():
-    """
-    Dependency that connects and disconnects the Prisma client
-    for each request.
-    """
+    # ensure connected once, then just yield
     if not db_client.is_connected():
         await db_client.connect()
-    
-    try:
-        yield db_client
-    finally:
-        if db_client.is_connected():
-            await db_client.disconnect()
+    yield db_client
