@@ -10,6 +10,7 @@ interface GameweekHeroCardProps {
 
 export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
   const navigate = useNavigate();
+  const currentGameweek = 1; // This should be dynamic in a real application
 
   return (
     <Card className="border-none p-6 text-white rounded-2xl shadow-lg bg-[linear-gradient(to_top_right,_#00c6ff,_#2196f3,_#6a11cb)]">
@@ -27,7 +28,7 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
         {/* Divider and Gameweek Label */}
         <div className="flex items-center justify-center space-x-4">
             <div className="flex-grow border-t border-white/20"></div>
-            <p className="text-sm font-semibold text-white/80">Gameweek 1</p>
+            <p className="text-sm font-semibold text-white/80">Gameweek {currentGameweek}</p>
             <div className="flex-grow border-t border-white/20"></div>
         </div>
 
@@ -40,7 +41,7 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
           
           <motion.div 
             whileHover={{ scale: 1.1 }}
-            onClick={() => navigate("/gameweek/15")} // Corrected Navigation
+            onClick={() => navigate(`/gameweek/${currentGameweek}`)} // Corrected Navigation
             className="cursor-pointer"
           >
             <motion.p 
@@ -58,7 +59,7 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
           </motion.div>
 
           <div 
-            onClick={() => navigate("/gameweek/15/top")} // This can link to a top player's gameweek page
+            onClick={() => navigate(`/gameweek/${currentGameweek}/top`)} // This can link to a top player's gameweek page
             className="cursor-pointer flex flex-col items-center"
           >
             <p className="text-3xl font-bold tabular-nums">95</p>

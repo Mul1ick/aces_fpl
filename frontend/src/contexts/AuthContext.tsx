@@ -1,11 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { API } from "../lib/api";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { API } from "@/lib/api"; // Correct the import path
 
 interface User {
   id: string;
   email: string;
   full_name?: string;
   teamName?: string;
+  has_team?: boolean;
 }
 
 interface AuthResult {
@@ -22,6 +23,7 @@ interface AuthContextType {
   logout: () => void;
   pendingApproval: boolean;
   setPendingApproval: (isPending: boolean) => void;
+  refreshUserStatus: () => Promise<void>; // Add the missing function
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,30 +36,38 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingApproval, setPendingApproval] = useState(false);
 
+  const fetchAndSetUser = async (token: string) => {
+    try {
+      const response = await fetch(`${API.BASE_URL}/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Token invalid");
+      const userData = await response.json();
+      setUser(userData);
+      localStorage.setItem("aces_fpl_user", JSON.stringify(userData));
+    } catch (error) {
+      console.error("Auth check failed:", error);
+      localStorage.removeItem("aces_fpl_user");
+      localStorage.removeItem("access_token");
+      setUser(null);
+    }
+  };
+
   useEffect(() => {
     const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem("access_token");
-        if (token) {
-          const storedUser = localStorage.getItem("aces_fpl_user");
-          if (storedUser) {
-            setUser(JSON.parse(storedUser));
-          }
-        }
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        localStorage.removeItem("aces_fpl_user");
-        localStorage.removeItem("access_token");
-      } finally {
-        setIsLoading(false);
+      setIsLoading(true);
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        await fetchAndSetUser(token);
       }
+      setIsLoading(false);
     };
     checkAuth();
   }, []);
@@ -97,12 +107,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const signup = async (
-    name: string,
-    email: string,
-    password: string
-  ): Promise<AuthResult> => {
-    setIsLoading(true);
+  const signup = async (name: string, email: string, password: string): Promise<AuthResult> => {
+     setIsLoading(true);
     try {
       const response = await fetch(API.endpoints.signup, {
         method: "POST",
@@ -132,6 +138,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.removeItem("access_token");
   };
 
+  const refreshUserStatus = async () => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+        await fetchAndSetUser(token);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
@@ -140,7 +153,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     signup,
     logout,
     pendingApproval,
-    setPendingApproval
+    setPendingApproval,
+    refreshUserStatus,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

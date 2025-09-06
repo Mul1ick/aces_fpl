@@ -18,32 +18,32 @@ interface TransferPitchViewProps {
   squad: any;
   onSlotClick: (pos: string, index: number) => void;
   onPlayerRemove: (pos: string, index: number) => void;
-  onStartTransfer?: (player: any, pos: string, index: number) => void; // NEW
+  onStartTransfer?: (player: any, pos: string, index: number) => void;
 }
 
-
-export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove,onStartTransfer,}: TransferPitchViewProps) => {
+export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartTransfer }: TransferPitchViewProps) => {
     const [detailedPlayer, setDetailedPlayer] = useState(null);
 
-    const handlePlayerClick = (player) => {
+    const handlePlayerClick = (player: any) => {
         setDetailedPlayer(player);
     };
 
-    const handleRemove = (pos, index) => {
+    const handleRemove = (pos: string, index: number) => {
         onPlayerRemove(pos, index);
         setDetailedPlayer(null);
-    }
-    const transformPlayerForCard = (player) => ({
+    };
+    
+    // This helper function prepares the data for the PlayerCard
+    const transformPlayerForCard = (player: any) => ({
         id: player.id,
         name: player.full_name ?? player.name,
-        team: player.team_name,
+        team: player.team?.name, // Safely access team name
         pos: player.position,
-        points: player.points ?? 0, // Placeholder
-        fixture: player.fixture ?? player.fixture_str ?? '—',
-  isCaptain: player.is_captain ?? player.isCaptain,
-  isVice: player.is_vice_captain ?? player.isVice,
+        fixture: player.fixture_str ?? '—',
+        // --- FIX: Always set captaincy to false on this page ---
+        isCaptain: false,
+        isVice: false,
     });
-
 
     return (
         <>
@@ -58,7 +58,7 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove,onStartTr
             >
                 {Object.keys(squad).map((pos) => (
                 <div key={pos} className="flex justify-center items-center gap-x-4">
-                    {squad[pos].map((player, index) =>
+                    {squad[pos].map((player: any, index: number) =>
                     player ? (
                         <div
                             key={player.id}
@@ -70,7 +70,7 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove,onStartTr
                             </div>
                             <button
                                 onClick={(e) => {
-                                    e.stopPropagation(); // Prevent modal from opening
+                                    e.stopPropagation();
                                     onPlayerRemove(pos, index);
                                 }}
                                 className="absolute top-1 right-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all hidden lg:flex items-center justify-center w-5 h-5"
@@ -91,21 +91,21 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove,onStartTr
                 onRemove={() => {
                     if (detailedPlayer) {
                         const playerPos = detailedPlayer.pos;
-                        const playerIndex = squad[playerPos].findIndex(p => p && p.id === detailedPlayer.id);
+                        const playerIndex = squad[playerPos].findIndex((p: any) => p && p.id === detailedPlayer.id);
                         if(playerIndex !== -1) {
                             handleRemove(playerPos, playerIndex);
                         }
                     }
                 }}
                 onTransfer={(p) => {
-    if (!p) return;
-    const posKey = String(p.pos ?? p.position ?? '').toUpperCase();
-    const idx = squad[posKey]?.findIndex((x:any) => x && x.id === p.id) ?? -1;
-    if (idx >= 0) {
-      setDetailedPlayer(null);
-      onStartTransfer?.(p, posKey, idx); // bubble to Transfers.tsx
-    }
-  }}
+                    if (!p) return;
+                    const posKey = String(p.pos ?? p.position ?? '').toUpperCase();
+                    const idx = squad[posKey]?.findIndex((x:any) => x && x.id === p.id) ?? -1;
+                    if (idx >= 0) {
+                      setDetailedPlayer(null);
+                      onStartTransfer?.(p, posKey, idx);
+                    }
+                }}
             />
         </>
     );
