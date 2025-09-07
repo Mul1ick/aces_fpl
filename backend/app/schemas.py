@@ -30,6 +30,9 @@ class UserOut(UserBase):
     is_active: bool
     role: str
     has_team: bool
+    free_transfers: int  # <-- ADD THIS
+    played_first_gameweek: bool # <-- ADD THIS
+
     # created_at is no longer required by the API response
     
     class Config:
@@ -190,3 +193,12 @@ class GameweekOutWithFixtures(BaseModel):
     deadline: datetime
     fixtures: List[FixtureOut] = []
     model_config = ConfigDict(from_attributes=True)
+
+class PlayerSelection(BaseModel):
+    id: int
+    is_captain: bool = False
+    is_vice_captain: bool = False
+    is_benched: bool = False
+
+class SaveTeamPayload(BaseModel):
+    players: List[PlayerSelection]

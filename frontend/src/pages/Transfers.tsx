@@ -296,6 +296,7 @@ const Transfers: React.FC = () => {
               playersSelected={playersSelected}
               bank={bank}
               notification={notification}
+              user={user}
             />
           </div>
           <TransferPitchView

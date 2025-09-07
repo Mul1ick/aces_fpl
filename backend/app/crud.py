@@ -374,6 +374,16 @@ async def transfer_player(
     out_player_id: int,
     in_player_id: int,
 ):
+    user = await db.user.find_unique(where={'id': user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # If the user has played their first gameweek, check their transfer count
+    if user.played_first_gameweek:
+        if user.free_transfers < 1:
+            raise HTTPException(status_code=400, detail="You have no free transfers remaining.")
+    # If played_first_gameweek is false, they have unlimited transfers, so we proceed.
+
     # 1) Find the outgoing userteam row (includes its flags)
     out_entry = await db.userteam.find_first(
         where={
@@ -438,6 +448,11 @@ async def transfer_player(
                 'in_player': in_player_id,
             }
         )
+        if user.played_first_gameweek:
+            await tx.user.update(
+                where={'id': user_id},
+                data={'free_transfers': {'decrement': 1}}
+            )
 
     return await get_user_team_full(db, user_id, gameweek_id)
 
@@ -685,3 +700,52 @@ async def user_has_team(db: Prisma, user_id: str) -> bool:
     # OPTION B: if it’s named "Team" and represents the user’s fantasy team
     # team = await db.team.find_first(where={"user_id": user_id})
     return team is not None
+
+async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
+    """
+    To be run after a gameweek deadline.
+    - Sets 'played_first_gameweek' for users whose first gameweek was this one.
+    - Adds 1 free transfer to every user who has already played, capped at 2.
+    """
+    # 1. Find all users who had a team in the completed gameweek
+    users_in_completed_gw = await db.userteam.find_many(
+        where={'gameweek_id': completed_gw_id},
+        distinct=['user_id']
+    )
+    user_ids_in_gw = {u.user_id for u in users_in_completed_gw}
+
+    if not user_ids_in_gw:
+        return "No users played this gameweek. Nothing to update."
+
+    # 2. For each of those users, find their very first gameweek entry
+    first_gameweek_entries = await db.userteam.group_by(
+        by=['user_id'],
+        min={'gameweek_id': True},
+        where={'user_id': {'in': list(user_ids_in_gw)}}
+    )
+
+    # 3. Identify users whose first gameweek was the one that just completed
+    new_players_to_flag = [
+        entry['user_id'] for entry in first_gameweek_entries
+        if entry['_min']['gameweek_id'] == completed_gw_id
+    ]
+
+    async with db.tx() as transaction:
+        # 4. Set played_first_gameweek = true ONLY for those new players
+        if new_players_to_flag:
+            await transaction.user.update_many(
+                where={'id': {'in': new_players_to_flag}},
+                data={'played_first_gameweek': True}
+            )
+
+        # 5. Add 1 free transfer to ALL users who have already played (flag is true)
+        # This now correctly includes long-time players and the new players we just flagged.
+        await transaction.query_raw(
+            """
+            UPDATE "users"
+            SET free_transfers = LEAST(free_transfers + 1, 2)
+            WHERE played_first_gameweek = true
+            """
+        )
+    
+    return f"Rollover tasks complete for GW {completed_gw_id}."

@@ -9,6 +9,12 @@ interface TransfersHeroCardProps {
   playersSelected: number;
   bank: number;
   notification: { message: string; type: 'success' | 'error' } | null;
+  user: { // Define the shape of the user prop
+    teamName?: string;
+    full_name?: string;
+    free_transfers: number;
+    played_first_gameweek: boolean;
+  } | null;
 }
 
 export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
@@ -16,8 +22,13 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   managerName,
   playersSelected,
   bank,
-  notification
+  notification,
+  user
 }) => {
+  const transfersText = user?.played_first_gameweek === false 
+    ? "Unlimited" 
+    : user?.free_transfers;
+
   return (
     <Card className="overflow-hidden">
       <div className="p-4">
@@ -41,6 +52,10 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
             <div className="text-right">
               <p className="font-bold text-lg">{playersSelected} / 11</p>
               <p className="text-sm text-gray-500">Players selected</p>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-lg">{transfersText}</p>
+              <p className="text-sm text-gray-500">Free Transfers</p>
             </div>
             <div className="text-right">
               <p className="font-bold text-lg">£{bank.toFixed(1)}m</p>

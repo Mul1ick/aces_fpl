@@ -81,10 +81,11 @@ async def set_armband(
     return await crud.get_user_team_full(db, str(current_user.id), current_gw.id)
 
 @router.post("/save-team")
-async def save_team(payload: SaveTeamPayload,
-                    db: Prisma = Depends(get_db),
-                    user=Depends(get_current_user)):
-    # figure out current gw (use your existing helper)
+async def save_team(
+    payload: schemas.SaveTeamPayload,
+    db: Prisma = Depends(get_db),
+    user=Depends(get_current_user)
+):
     gw = await crud.get_current_gameweek(db)
     if not gw:
         raise HTTPException(404, "No gameweek")
@@ -93,6 +94,7 @@ async def save_team(payload: SaveTeamPayload,
         db=db,
         user_id=str(user.id),
         gameweek_id=gw.id,
-        new_players=payload.players
+        # CORRECTED: Convert Pydantic models to dictionaries
+        new_players=[p.dict() for p in payload.players]
     )
     return updated

@@ -7,6 +7,9 @@ interface User {
   full_name?: string;
   teamName?: string;
   has_team?: boolean;
+  free_transfers: number;
+  played_first_gameweek: boolean;
+
 }
 
 interface AuthResult {

@@ -9,11 +9,13 @@ import { cn } from '@/lib/utils';
 import { TeamResponse } from "@/types";
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 // --- ASSET IMPORTS ---
 import pitchBackground from '@/assets/images/pitch.svg';
 
 const Team: React.FC = () => {
+  const { toast } = useToast();
   const [squad, setSquad] = useState<{ starting: any[], bench: any[] }>({ starting: [], bench: [] });
   const [initialSquadState, setInitialSquadState] = useState<string>('');
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
@@ -61,77 +63,69 @@ const Team: React.FC = () => {
     return JSON.stringify(squad) !== initialSquadState;
   }, [squad, initialSquadState]);
   
-  const handlePlayerClick = (playerToSwap: any, isFromBench: boolean) => {
-    if (!selectedPlayer) {
-      setDetailedPlayer(playerToSwap);
-      return;
-    }
-
-    if (selectedPlayer.isFromBench === isFromBench) {
-      setSelectedPlayer({ ...playerToSwap, isFromBench });
-      return;
-    }
-
-    const pitchPlayer = selectedPlayer.isFromBench ? playerToSwap : selectedPlayer;
-    const benchPlayer = selectedPlayer.isFromBench ? selectedPlayer : playerToSwap;
-
-    // --- VALIDATION LOGIC ---
-    let newStarters = squad.starting.filter(p => p.id !== pitchPlayer.id).concat(benchPlayer);
-    const goalkeepers = newStarters.filter(p => p.pos === 'GK').length;
-    const defenders = newStarters.filter(p => p.pos === 'DEF').length;
-
-    if (goalkeepers !== 1) {
-      alert("Invalid substitution. You must have exactly one goalkeeper.");
-      setSelectedPlayer(null);
-      return;
-    }
-    if (defenders < 2) {
-      alert("Invalid substitution. You must have at least two defenders.");
-      setSelectedPlayer(null);
-      return;
-    }
-
-    // --- CAPTAINCY RE-ASSIGNMENT LOGIC ---
-    if (pitchPlayer.isCaptain) {
-        const viceCaptain = squad.starting.find(p => p.isVice);
-        if (viceCaptain) {
-            newStarters = newStarters.map(p => p.id === viceCaptain.id ? { ...p, isCaptain: true, isVice: false } : p);
-            const newViceCaptainCandidate = newStarters.find(p => p.id !== viceCaptain.id);
-            if (newViceCaptainCandidate) {
-                newStarters = newStarters.map(p => p.id === newViceCaptainCandidate.id ? { ...p, isVice: true } : p);
-            }
+const handlePlayerClick = (clickedPlayer: any) => {
+    // If a player is already selected for substitution, this click is the swap target
+    if (selectedPlayer) {
+        if (selectedPlayer.id === clickedPlayer.id || selectedPlayer.is_benched === clickedPlayer.is_benched) {
+            setSelectedPlayer(null); // Deselect
+            return;
         }
-    } else if (pitchPlayer.isVice) {
-        const captain = squad.starting.find(p => p.isCaptain);
-        const newViceCaptainCandidate = newStarters.find(p => p.id !== captain?.id);
-        if (newViceCaptainCandidate) {
-            newStarters = newStarters.map(p => p.id === newViceCaptainCandidate.id ? { ...p, isVice: true } : p);
+
+        const starter = selectedPlayer.is_benched ? clickedPlayer : selectedPlayer;
+        const benched = selectedPlayer.is_benched ? selectedPlayer : clickedPlayer;
+
+        // --- VALIDATION LOGIC ---
+        const tempStartingXI = squad.starting.filter(p => p.id !== starter.id).concat(benched);
+        const goalkeepers = tempStartingXI.filter(p => p.pos === 'GK').length;
+        if (goalkeepers !== 1) {
+            toast({ variant: "destructive", title: "Invalid Substitution", description: "Your starting team must have exactly one goalkeeper." });
+            setSelectedPlayer(null);
+            return;
         }
+        
+        // --- NEW LOGIC: Direct Captaincy Swap ---
+        let newStarterPlayer = { ...benched, is_benched: false, isCaptain: false, isVice: false };
+        let newBenchedPlayer = { ...starter, is_benched: true, isCaptain: false, isVice: false };
+
+        // If the player going to the bench was the captain...
+        if (starter.isCaptain) {
+            // ...make the player coming from the bench the new captain.
+            newStarterPlayer.isCaptain = true;
+        }
+        // If the player going to the bench was the vice-captain...
+        if (starter.isVice) {
+            // ...make the player coming from the bench the new vice-captain.
+            newStarterPlayer.isVice = true;
+        }
+        
+        // --- PERFORM THE SWAP ---
+        setSquad(currentSquad => {
+            const updatedStarting = currentSquad.starting.filter(p => p.id !== starter.id).concat(newStarterPlayer);
+            const updatedBench = currentSquad.bench.filter(p => p.id !== benched.id).concat(newBenchedPlayer);
+            
+            return { starting: updatedStarting, bench: updatedBench };
+        });
+
+        setSelectedPlayer(null); // Reset selection
+    } else {
+        // If no player is selected, this click opens the detail modal
+        setDetailedPlayer(clickedPlayer);
     }
-
-    // --- PERFORM SWAP ---
-    const cleanBenchPlayer = { ...pitchPlayer, isCaptain: false, isVice: false };
-    const cleanPitchPlayer = { ...benchPlayer, isCaptain: false, isVice: false };
-
-    const finalStarters = newStarters.map(p => p.id === benchPlayer.id ? cleanPitchPlayer : p);
-    const finalBench = squad.bench.map(p => p.id === benchPlayer.id ? cleanBenchPlayer : p);
-
-    setSquad({ starting: finalStarters, bench: finalBench });
-    setSelectedPlayer(null);
-  };
+};
   
   const handleSelectForSub = (playerToSub: any) => {
+    // Find the full player object from the current squad to get its benched status
     const isBenched = squad.bench.some(p => p.id === playerToSub.id);
-    setSelectedPlayer({ ...playerToSub, isFromBench: isBenched });
-    setDetailedPlayer(null);
+    setSelectedPlayer({ ...playerToSub, is_benched: isBenched });
+    setDetailedPlayer(null); // Close the detail card to allow the next selection
   };
   
   const setArmband = async (playerId: number, kind: 'C' | 'VC') => { /* ...existing function... */ };
 
-  const handleSaveTeam = () => {
-    setInitialSquadState(JSON.stringify(squad));
-    setIsSavedModalOpen(true);
-  };
+  // const handleSaveTeam = () => {
+  //   setInitialSquadState(JSON.stringify(squad));
+  //   setIsSavedModalOpen(true);
+  // };
 
   const handleReset = () => {
     if (initialSquadState) {
@@ -149,6 +143,65 @@ const Team: React.FC = () => {
     MID: squad.starting.filter(p => p.pos === 'MID'),
     FWD: squad.starting.filter(p => p.pos === 'FWD'),
   };
+
+
+  const handleSaveTeam = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!isDirty || !token) return;
+
+    const payload = {
+        players: [...squad.starting, ...squad.bench].map(p => ({
+            id: p.id,
+            position: p.pos,
+            // CORRECT MAPPING:
+            // backend_key: frontend_property
+            is_captain: p.isCaptain,
+            is_vice_captain: p.isVice,
+            is_benched: p.is_benched,
+        }))
+    };
+
+    try {
+        const response = await fetch("http://localhost:8000/teams/save-team", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Failed to save team.");
+        }
+        
+        const updatedSquadData: TeamResponse = await response.json();
+        
+        // You'll need to transform the backend response back to your frontend format
+        const transformBackendResponse = (players) => players.map(p => ({
+            id: p.id,
+            name: p.full_name,
+            team: p.team.name,
+            pos: p.position,
+            fixture: p.fixture_str,
+            points: p.points,
+            isCaptain: p.is_captain,
+            isVice: p.is_vice_captain,
+            is_benched: p.is_benched,
+        }));
+        
+        const newSquadState = { 
+            starting: transformBackendResponse(updatedSquadData.starting), 
+            bench: transformBackendResponse(updatedSquadData.bench) 
+        };
+        
+        setSquad(newSquadState);
+        setInitialSquadState(JSON.stringify(newSquadState));
+        toast({ title: "Success!", description: "Your team changes have been saved." });
+
+    } catch (error) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+};
+
 
   return (
     <div className="w-full min-h-screen bg-white flex flex-col lg:h-screen lg:flex-row font-sans">
@@ -205,12 +258,12 @@ const Team: React.FC = () => {
 
         <div className="p-4 text-center bg-white border-t-2 border-gray-200">
             <Button 
-                onClick={handleSaveTeam} 
-                disabled={!isDirty}
-                className="bg-dashboard-gradient text-white font-bold text-lg px-8 py-6 rounded-lg shadow-lg disabled:opacity-50"
-            >
-                Save Your Team
-            </Button>
+        onClick={handleSaveTeam} 
+        disabled={!isDirty}
+        className="bg-accent-pink text-white font-bold text-lg px-8 py-6 rounded-lg shadow-lg disabled:opacity-50"
+    >
+        Save Changes
+    </Button>
         </div>
 
         <div className="p-4">

@@ -21,7 +21,10 @@ async def signup(user: schemas.UserCreate, db: Prisma = Depends(get_db)):
         "full_name": u.full_name,
         "role": u.role,
         "has_team": False,   # new users have no team yet
-        "is_active": bool(u.is_active)
+        "is_active": bool(u.is_active),
+        "free_transfers": u.free_transfers, # <-- ADD THIS
+        "played_first_gameweek": u.played_first_gameweek # <-- ADD THIS
+        
     }
 
 @router.post("/login", response_model=schemas.LoginResponse)
@@ -42,7 +45,9 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: Prisma = Depend
             "full_name": user.full_name,
             "role": user.role,
             "has_team": has_team,  # 👈
-            "is_active": bool(user.is_active)
+            "is_active": bool(user.is_active),
+            "free_transfers": user.free_transfers, # <-- ADD THIS
+        "played_first_gameweek": user.played_first_gameweek # <-- ADD THIS
         },
     }
 
@@ -55,5 +60,7 @@ async def me(db: Prisma = Depends(get_db), current_user = Depends(get_current_us
         "full_name": current_user.full_name,
         "role": current_user.role,
         "has_team": has_team,  # 👈
-        "is_active": bool(current_user.is_active)
+        "is_active": bool(current_user.is_active),
+        "free_transfers": current_user.free_transfers, # <-- ADD THIS
+        "played_first_gameweek": current_user.played_first_gameweek # <-- ADD THIS
     }
