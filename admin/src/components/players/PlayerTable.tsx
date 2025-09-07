@@ -28,17 +28,28 @@ interface PlayerTableProps {
 }
 
 export function PlayerTable({ players, onEdit, onDelete, sortConfig, onSortRequest }: PlayerTableProps) {
+  const STATUS_LABEL: Record<PlayerStatus, string> = {
+  ACTIVE: 'Available',
+  INJURED: 'Injured',
+  SUSPENDED: 'Suspended',
+};
+const STATUS_CLASS: Record<PlayerStatus, string> = {
+  ACTIVE: 'bg-green-100 text-green-700',
+  INJURED: 'bg-yellow-100 text-yellow-700',
+  SUSPENDED: 'bg-red-100 text-red-700',
+};
+function getStatusClass(s?: PlayerStatus) {
+  return s ? STATUS_CLASS[s] : 'bg-muted text-muted-foreground border-0';
+}
   
   const getStatusVariant = (status: PlayerStatus) => {
     switch (status) {
-      case 'available':
+      case 'ACTIVE':
         return 'bg-success/10 text-success border-success/20';
-      case 'injured':
+      case 'INJURED':
         return 'bg-destructive/10 text-destructive border-destructive/20';
-      case 'suspended':
+      case 'SUSPENDED':
         return 'bg-warning/10 text-warning border-warning/20';
-      case 'unavailable':
-        return 'bg-muted text-muted-foreground border-border';
       default:
         return 'bg-muted text-muted-foreground border-border';
     }
@@ -81,10 +92,14 @@ export function PlayerTable({ players, onEdit, onDelete, sortConfig, onSortReque
               <TableCell>{player.position}</TableCell>
               <TableCell>£{player.price.toFixed(1)}m</TableCell>
               <TableCell>
-                <Badge variant="outline" className={cn('capitalize', getStatusVariant(player.status))}>
-                  {player.status}
-                </Badge>
-              </TableCell>
+  {player.status ? (
+    <Badge variant="outline" className={cn(getStatusClass(player.status))}>
+      {STATUS_LABEL[player.status]}
+    </Badge>
+  ) : (
+    <span className="text-muted-foreground">—</span>
+  )}
+</TableCell>
               <TableCell className="text-right">
                 <PlayerActions player={player} onEdit={onEdit} onDelete={onDelete} />
               </TableCell>

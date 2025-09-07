@@ -1,9 +1,11 @@
-from pydantic import BaseModel, EmailStr, ConfigDict,Field
+from pydantic import BaseModel, EmailStr, ConfigDict,Field,field_validator
 from uuid import UUID
 from typing import List, Optional, TypeVar, Generic,Literal
 from datetime import datetime
 
 # --- Generic Type for Paginated Response ---
+PlayerStatus = Literal['ACTIVE', 'INJURED', 'SUSPENDED']
+
 T = TypeVar('T')
 
 class LoginRequest(BaseModel):
@@ -68,6 +70,9 @@ class PlayerBase(BaseModel):
     position: str
     price: float
     team_id: int
+    status: PlayerStatus
+    
+
 
 class PlayerCreate(PlayerBase):
     pass
@@ -150,13 +155,24 @@ class SetArmbandRequest(BaseModel):
 class SaveTeamPayload(BaseModel):
     players: list[dict]
 
+
+Position = Literal['GK', 'DEF', 'MID', 'FWD']
 class PlayerUpdate(BaseModel):
     full_name: Optional[str] = None
-    position: Optional[Literal['GK','DEF','MID','FWD']] = None
-    team_id: Optional[int] = None
+    position: Optional[Position] = None
     price: Optional[float] = None
-    status: Optional[Literal['available','injured','suspended']] = None
-    is_hidden: Optional[bool] = None   # only if you use this admin-only flag
+    status: Optional[PlayerStatus] = None
+    team_id: Optional[int] = None
+
+    @field_validator('price', mode='before')
+    @classmethod
+    def _price(cls, v):
+        return None if v is None else float(v)
+
+    @field_validator('team_id', mode='before')
+    @classmethod
+    def _team(cls, v):
+        return None if v is None else int(v)
 
 class LoginResponse(BaseModel):
     access_token: str

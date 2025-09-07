@@ -33,7 +33,7 @@ const initialFormData: PlayerFormData = {
   position: 'MID',
   price: 5.0,
   team_id: 0,
-  status: 'available',
+  status: 'ACTIVE',
 };
 
 export function PlayerFormModal({
@@ -141,10 +141,9 @@ export function PlayerFormModal({
                 <Select value={formData.status} onValueChange={(value: PlayerStatus) => handleChange('status', value)}>
                     <SelectTrigger><SelectValue/></SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="injured">Injured</SelectItem>
-                        <SelectItem value="suspended">Suspended</SelectItem>
-                        <SelectItem value="unavailable">Unavailable</SelectItem>
+                        <SelectItem value="ACTIVE">Active</SelectItem>
+                        <SelectItem value="INJURED">Injured</SelectItem>
+                        <SelectItem value="SUSPENDED">Suspended</SelectItem>
                     </SelectContent>
                 </Select>
             </div>

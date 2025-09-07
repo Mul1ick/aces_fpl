@@ -23,7 +23,7 @@ export interface Team {
 }
 
 // Player Status Type
-export type PlayerStatus = 'available' | 'injured' | 'suspended' | 'unavailable';
+export type PlayerStatus = 'ACTIVE' | 'INJURED' | 'SUSPENDED' ;
 
 export interface Player {
   id: number;
@@ -147,3 +147,4 @@ export interface UserUpdateData {
   role?: 'user' | 'admin';
   is_active?: boolean;
 }
+

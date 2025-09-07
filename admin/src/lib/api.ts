@@ -193,25 +193,26 @@ export const playerAPI = {
   if (position) params.append('position', position);
     
   return apiRequest(`/admin/players?${params}`, { method: 'GET' }, token);
-}
+},
 
-  async createPlayer(player: PlayerFormData, token: string): Promise<APIResponse<Player>> {
+  async createPlayer(player: PlayerFormData, token: string) {
     return apiRequest('/admin/players', {
       method: 'POST',
-      body: JSON.stringify(player),
+      body: JSON.stringify(player),  // player already has team_id
     }, token);
   },
 
-  async updatePlayer(playerId: string, player: Partial<PlayerFormData>, token: string): Promise<APIResponse<Player>> {
+  async updatePlayer(playerId: string, player: Partial<PlayerFormData>, token: string) {
     return apiRequest(`/admin/players/${playerId}`, {
       method: 'PUT',
-      body: JSON.stringify(player),
+      body: JSON.stringify(player),  // partial, but same keys
     }, token);
   },
 
-  async deletePlayer(playerId: string, token: string): Promise<APIResponse<void>> {
+  async deletePlayer(playerId: string, token: string) {
     return apiRequest(`/admin/players/${playerId}`, { method: 'DELETE' }, token);
   },
+
 };
 
 // Gameweek Management API calls

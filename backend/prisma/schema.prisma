@@ -39,11 +39,18 @@ model Team {
   @@map("teams")
 }
 
+enum PlayerStatus {
+  ACTIVE
+  INJURED
+  SUSPENDED
+}
+
 model Player {
   id          Int      @id @default(autoincrement())
   full_name   String
   position    String
   price       Decimal  @db.Decimal(5, 2)
+  status    PlayerStatus @default(ACTIVE)
   team_id     Int
   team        Team     @relation(fields: [team_id], references: [id], onDelete: Cascade)
   user_teams  UserTeam[]

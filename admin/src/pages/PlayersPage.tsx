@@ -142,15 +142,39 @@ useEffect(() => { loadPlayers(); }, [loadPlayers]);
   const handleCloseDeleteDialog = () => { setDeletingPlayer(null); };
 
   // Simulate form submission
-  const handleSubmitForm = async (data: PlayerFormData, playerId?: number) => {
-  if (!token) return;
+  const POSITION_MAP: Record<string, string> = {
+  Goalkeeper: 'GK',
+  Defender: 'DEF',
+  Midfielder: 'MID',
+  Forward: 'FWD',
+};
+
+const STATUS_MAP: Record<string, string> = {
+  Available: 'ACTIVE',
+  Injured: 'INJURED',
+  Suspended: 'SUSPENDED',
+};
+
+const handleSubmitForm = async (data: PlayerFormData, playerId?: number) => {
+  const adminToken = localStorage.getItem("admin_token");
+  if (!adminToken) { toast({ variant: 'destructive', title: 'Not authenticated' }); return; }
+
+  const payload: any = {
+    full_name: data.full_name,
+    position: POSITION_MAP[data.position as any] ?? data.position,   // map UI -> enum
+    team_id: Number(data.team_id),
+    status: STATUS_MAP[data.status as any] ?? data.status,           // map UI -> enum
+  };
+  // price only when creating (you show it disabled on edit)
+  if (!playerId && data.price != null) payload.price = Number(data.price);
+
   try {
     setIsLoading(true);
     if (playerId) {
-      await playerAPI.updatePlayer(String(playerId), data, token);
+      await playerAPI.updatePlayer(String(playerId), payload, adminToken);
       toast({ title: 'Player updated' });
     } else {
-      await playerAPI.createPlayer(data, token);
+      await playerAPI.createPlayer(payload, adminToken);
       toast({ title: 'Player created' });
     }
     await loadPlayers();
@@ -165,10 +189,14 @@ useEffect(() => { loadPlayers(); }, [loadPlayers]);
 
   // Simulate deletion
 const handleConfirmDelete = async () => {
-  if (!deletingPlayer || !token) return;
+  const adminToken = localStorage.getItem("admin_token");
+  if (!deletingPlayer || !adminToken) {
+    toast({ variant: 'destructive', title: 'Not authenticated' });
+    return;
+  }
   try {
     setIsLoading(true);
-    await playerAPI.deletePlayer(String(deletingPlayer.id), token);
+    await playerAPI.deletePlayer(String(deletingPlayer.id), adminToken);
     toast({ title: 'Player deleted' });
     await loadPlayers();
     setDeletingPlayer(null);
@@ -178,6 +206,8 @@ const handleConfirmDelete = async () => {
     setIsLoading(false);
   }
 };
+
+
   return (
     <div className="space-y-6">
       <div>

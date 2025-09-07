@@ -155,24 +155,31 @@ async def admin_list_players(
     )
 
 @router.post("/players", response_model=schemas.PlayerOut)
-async def admin_create_player(
-    payload: schemas.PlayerCreate,       # use your existing create schema
-    db: Prisma = Depends(get_db),
-):
-    return await db.player.create(data=payload.model_dump())
+async def admin_create_player(payload: schemas.PlayerCreate, db: Prisma = Depends(get_db)):
+    created = await db.player.create(data=payload.model_dump())
+    # re-read with relation loaded
+    full = await db.player.find_unique(
+        where={"id": created.id},
+        include={"team": True},   # simpler; avoids select issues
+    )
+    return full
 
 @router.put("/players/{player_id}", response_model=schemas.PlayerOut)
-async def admin_update_player(
-    player_id: int,
-    payload: schemas.PlayerUpdate,
-    db: Prisma = Depends(get_db),
-):
+async def admin_update_player(player_id: int, payload: schemas.PlayerUpdate, db: Prisma = Depends(get_db)):
     exists = await db.player.find_unique(where={"id": player_id})
     if not exists:
         raise HTTPException(status_code=404, detail="Player not found")
 
     data = payload.model_dump(exclude_unset=True, exclude_none=True)
-    return await db.player.update(where={"id": player_id}, data=data)
+
+    # map team change to relation connect
+    if "team_id" in data:
+        team_id = data.pop("team_id")
+        data["team"] = {"connect": {"id": team_id}}   # <-- use relation connect
+
+    await db.player.update(where={"id": player_id}, data=data)
+    full = await db.player.find_unique(where={"id": player_id}, include={"team": True})
+    return full
 
 @router.delete("/players/{player_id}", status_code=204)
 async def admin_delete_player(
