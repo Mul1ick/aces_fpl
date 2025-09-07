@@ -1,4 +1,3 @@
-// UPDATED: Corrected the import syntax on this line
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -70,7 +69,7 @@ export const StatsToolbar: React.FC<StatsToolbarProps> = ({ onFilterChange, onRe
         <PopoverContent className="w-[calc(100vw-2rem)] md:w-[500px] bg-white p-0" align="start">
             <FilterSection title="Global">
                 <button onClick={() => handleSelect({ type: 'global', value: 'All players' })} className="w-full text-left px-4 py-2 text-body hover:bg-gray-100 rounded-lg">All players</button>
-                <button onClick={() => handleSelect({ type: 'global', value: 'Watchlist' })} className="w-full text-left px-4 py-2 text-body hover:bg-gray-100 rounded-lg">Watchlist</button>
+                {/* The "Watchlist" button has been removed from this section */}
             </FilterSection>
             <FilterSection title="Position">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-4">
