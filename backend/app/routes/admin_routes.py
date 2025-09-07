@@ -220,6 +220,40 @@ async def admin_list_teams(db: Prisma = Depends(get_db)):
     print("[/admin/teams] sample_counts:", [(r["id"], r["player_count"]) for r in result[:5]])
     return result
 
+@router.post("/teams", response_model=schemas.TeamOut)
+async def admin_create_team(payload: schemas.TeamCreate, db: Prisma = Depends(get_db)):
+    exists = await db.team.find_first(where={
+        "OR": [{"name": payload.name}, {"short_name": payload.short_name}]
+    })
+    if exists:
+        raise HTTPException(409, "Team with same name or short_name already exists")
+
+    team = await db.team.create(data=payload.model_dump())
+    return team
+
+# PUT /admin/teams/{team_id}
+@router.put("/teams/{team_id}", response_model=schemas.TeamOut)
+async def admin_update_team(team_id: int, payload: schemas.TeamUpdate, db: Prisma = Depends(get_db)):
+    team = await db.team.find_unique(where={"id": team_id})
+    if not team:
+        raise HTTPException(404, "Team not found")
+
+    data = payload.model_dump(exclude_unset=True, exclude_none=True)
+    return await db.team.update(where={"id": team_id}, data=data)
+
+# DELETE /admin/teams/{team_id}
+@router.delete("/teams/{team_id}", status_code=204)
+async def admin_delete_team(team_id: int, db: Prisma = Depends(get_db)):
+    team = await db.team.find_unique(where={"id": team_id})
+    if not team:
+        raise HTTPException(404, "Team not found")
+
+    has_players = await db.player.count(where={"team_id": team_id})
+    if has_players:
+        raise HTTPException(400, "Cannot delete team with players assigned")
+
+    await db.team.delete(where={"id": team_id})
+
 
 @router.get("/gameweeks/current", response_model=schemas.GameweekOutWithFixtures)
 async def admin_get_current_gameweek(db: Prisma = Depends(get_db)):

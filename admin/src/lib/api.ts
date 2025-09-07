@@ -159,26 +159,26 @@ export const userAPI = {
 
 // Team Management API calls
 export const teamAPI = {
-  async getTeams(token: string): Promise<Team[]> {
-    return apiRequest('/admin/teams', { method: 'GET' }, token);
+  async getTeams(token: string) {
+    return apiRequest<Team[]>('/admin/teams', { method: 'GET' }, token);
   },
 
-  async createTeam(team: Omit<Team, 'id'>, token: string): Promise<APIResponse<Team>> {
-    return apiRequest('/admin/teams', {
+  async createTeam(team: Omit<Team, 'id' | 'player_count'>, token: string) {
+    return apiRequest<Team>('/admin/teams', {
       method: 'POST',
       body: JSON.stringify(team),
     }, token);
   },
 
-  async updateTeam(teamId: string, team: Partial<Team>, token: string): Promise<APIResponse<Team>> {
-    return apiRequest(`/admin/teams/${teamId}`, {
+  async updateTeam(teamId: string, team: Partial<Omit<Team, 'id' | 'player_count'>>, token: string) {
+    return apiRequest<Team>(`/admin/teams/${teamId}`, {
       method: 'PUT',
       body: JSON.stringify(team),
     }, token);
   },
 
-  async deleteTeam(teamId: string, token: string): Promise<APIResponse<void>> {
-    return apiRequest(`/admin/teams/${teamId}`, { method: 'DELETE' }, token);
+  async deleteTeam(teamId: string, token: string) {
+    return apiRequest<void>(`/admin/teams/${teamId}`, { method: 'DELETE' }, token);
   },
 };
 

@@ -14,11 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 import type { Team } from '@/types';
 
 interface TeamFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (teamData: Omit<Team, 'id'>, teamId?: number) => void;
-  editingTeam: Team | null;
-}
+   isOpen: boolean;
+   onClose: () => void;
+   onSubmit: (teamData: { name: string; short_name: string }, teamId?: number) => void;
+   editingTeam: Team | null;
+ }
 
 export function TeamFormModal({
   isOpen,
@@ -70,7 +70,10 @@ export function TeamFormModal({
         });
         return;
     }
-    onSubmit(formData, editingTeam?.id);
+    onSubmit(
+   { name: formData.name.trim(), short_name: formData.short_name.trim().toUpperCase() },
+   editingTeam?.id
+ );
   };
 
   return (

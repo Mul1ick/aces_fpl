@@ -64,6 +64,10 @@ class TeamOut(TeamBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+class TeamUpdate(BaseModel):
+    name: Optional[str] = None
+    short_name: Optional[str] = None
+
 # --- Player Schemas ---
 class PlayerBase(BaseModel):
     full_name: str
