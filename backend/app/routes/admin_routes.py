@@ -5,6 +5,10 @@ from app.database import get_db
 from typing import List, Optional
 from uuid import UUID
 import asyncio
+from collections import defaultdict
+import logging
+alog = logging.getLogger("aces.admin")
+
 
 router = APIRouter(
     prefix="/admin",
@@ -53,13 +57,30 @@ async def get_all_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
-    role: Optional[str] = Query(None), # --- NEW --- Add role filter
+    role: Optional[str] = Query(None),
 ):
-    """
-    Get a paginated list of all users, with optional search and role filtering.
-    """
-    # --- UPDATED --- Pass the new role filter to the crud function
-    return await crud.get_all_users(db, page=page, per_page=per_page, search=search, role=role)
+    result = await crud.get_all_users(db, page=page, per_page=per_page, search=search, role=role)
+
+    # result.items is list of User (Prisma models) — need to enrich with has_team
+    enriched_items = []
+    for u in result["items"]:
+        has_team = await crud.user_has_team(db, str(u.id))
+        enriched_items.append({
+            "id": str(u.id),
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": u.role,
+            "is_active": bool(u.is_active),
+            "has_team": has_team,
+        })
+
+    return {
+        "items": enriched_items,
+        "total": result["total"],      # ✅ dict key
+        "page": result["page"],        # ✅ dict key
+        "per_page": result["per_page"],# ✅ dict key
+        "pages": result["pages"],  
+    }
 
 
 @router.post("/users/{user_id}/approve", response_model=schemas.UserOut)
@@ -90,10 +111,10 @@ async def update_user_role(user_id: str, request: schemas.UserUpdateRole, db: Pr
         raise HTTPException(status_code=404, detail="User not found")
     return await crud.update_user_role(db, user_id, request.role)
 
-@router.get("/teams", response_model=List[schemas.TeamOut])
-async def admin_list_teams(db: Prisma = Depends(get_db)):
-    # Adjust field names to your schema (e.g., "short_name")
-    return await db.team.find_many(order={"name": "asc"})
+# @router.get("/teams", response_model=List[schemas.TeamOut])
+# async def admin_list_teams(db: Prisma = Depends(get_db)):
+#     # Adjust field names to your schema (e.g., "short_name")
+#     return await db.team.find_many(order={"name": "asc"})
 
 
 # --- PLAYER MANAGEMENT ---
@@ -154,3 +175,86 @@ async def admin_delete_player(
     if not exists:
         raise HTTPException(status_code=404, detail="Player not found")
     await db.player.delete(where={"id": player_id})
+
+
+# admin_routes.py
+@router.get("/teams", response_model=list[schemas.TeamOutWithCount])
+async def admin_list_teams(db: Prisma = Depends(get_db)):
+    print("[/admin/teams] HIT")
+
+    from collections import defaultdict
+    players = await db.player.find_many()
+    counts = defaultdict(int)
+    for p in players:
+        if p.team_id is not None:
+            counts[p.team_id] += 1
+
+    teams = await db.team.find_many(order={"name": "asc"})
+
+    result = [
+        {
+            "id": t.id,
+            "name": t.name,
+            "short_name": t.short_name,
+            # "logo_url": t.logo_url,
+            "player_count": counts.get(t.id, 0),
+        }
+        for t in teams
+    ]
+
+    print("[/admin/teams] sample_counts:", [(r["id"], r["player_count"]) for r in result[:5]])
+    return result
+
+
+@router.get("/gameweeks/current", response_model=schemas.GameweekOutWithFixtures)
+async def admin_get_current_gameweek(db: Prisma = Depends(get_db)):
+    gw = await crud.get_current_gameweek(db)
+    if not gw:
+        raise HTTPException(status_code=404, detail="No gameweeks configured.")
+
+    # ❌ no select=
+    fixtures = await db.fixture.find_many(
+        where={"gameweek_id": gw.id},
+        order={"id": "asc"},
+    )
+
+    # collect team ids
+    team_ids = {f.home_team_id for f in fixtures} | {f.away_team_id for f in fixtures}
+
+    # ❌ no select=
+    teams = await db.team.find_many(
+        where={"id": {"in": list(team_ids)}},
+    )
+    team_map = {t.id: t for t in teams}
+
+    # build response
+    return {
+        "id": gw.id,
+        "gw_number": gw.gw_number,
+        "deadline": gw.deadline,
+        "fixtures": [
+            {
+                "id": f.id,
+                "gameweek_id": f.gameweek_id,
+                "home_team_id": f.home_team_id,
+                "away_team_id": f.away_team_id,
+                "home_score": getattr(f, "home_score", None),
+                "away_score": getattr(f, "away_score", None),
+                "stats_entered": getattr(f, "stats_entered", False),
+                "home_team": {
+                    "id": team_map[f.home_team_id].id,
+                    "name": team_map[f.home_team_id].name,
+                    "short_name": team_map[f.home_team_id].short_name,
+                    # add logo_url if your Team model has it
+                    # "logo_url": getattr(team_map[f.home_team_id], "logo_url", None),
+                },
+                "away_team": {
+                    "id": team_map[f.away_team_id].id,
+                    "name": team_map[f.away_team_id].name,
+                    "short_name": team_map[f.away_team_id].short_name,
+                    # "logo_url": getattr(team_map[f.away_team_id], "logo_url", None),
+                },
+            }
+            for f in fixtures
+        ],
+    }

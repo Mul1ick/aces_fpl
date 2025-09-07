@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo,useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { TeamToolbar } from '@/components/teams/TeamsToolbar';
 import { TeamsTable } from '@/components/teams/TeamsTable';
@@ -6,42 +6,50 @@ import { TeamFormModal } from '@/components/teams/TeamFormModal';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { TeamActions } from '@/components/teams/TeamActions';
 import type { Team, Player } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { teamAPI } from '@/lib/api';
 
-// --- DUMMY DATA ---
-const DUMMY_TEAMS: Team[] = [
-  { id: 1, name: 'Satan', short_name: 'SAT', logo_url: 'red.png', next_fixture: 'MUN (A)' },
-  { id: 2, name: 'Bandra United', short_name: 'BAN', logo_url: 'blue.png', next_fixture: 'SAT (H)' },
-  { id: 3, name: 'Mumbai Hotspurs', short_name: 'MHS', logo_url: 'white.png', next_fixture: 'UMA (A)' },
-  { id: 4, name: 'Southside', short_name: 'SOU', logo_url: 'black.png', next_fixture: 'TIT (H)' },
-  { id: 5, name: 'Titans', short_name: 'TIT', logo_url: 'yellow.png', next_fixture: 'SOU (A)' },
-  { id: 6, name: 'Umaag Foundation Trust', short_name: 'UMA', logo_url: 'grey.png', next_fixture: 'MHS (H)' },
-];
 
-const DUMMY_PLAYERS: Pick<Player, 'id' | 'team_id'>[] = [
-    { id: 1, team_id: 1 }, { id: 2, team_id: 1 }, { id: 3, team_id: 1 },
-    { id: 4, team_id: 2 }, { id: 5, team_id: 2 },
-    { id: 6, team_id: 3 }, { id: 7, team_id: 3 }, { id: 8, team_id: 3 },
-    { id: 9, team_id: 4 }, { id: 10, team_id: 4 }, { id: 11, team_id: 4 },
-    { id: 12, team_id: 5 }, { id: 13, team_id: 5 },
-    { id: 14, team_id: 6 },
-];
-// --- END DUMMY DATA ---
+
+
 
 export function TeamsPage() {
-  const [teams, setTeams] = useState<Team[]>(DUMMY_TEAMS);
+  const { token } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null);
 
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const { toast } = useToast();
 
-  const playerCounts = useMemo(() => {
-    const counts: { [key: number]: number } = {};
-    for (const team of teams) {
-        counts[team.id] = DUMMY_PLAYERS.filter(p => p.team_id === team.id).length;
+  
+  useEffect(() => {
+  const t = token || localStorage.getItem("admin_token");
+  if (!t) {
+    console.warn("[TeamsPage] No admin token found — not fetching");
+    setIsLoading(false);
+    return;
+  }
+
+  (async () => {
+    try {
+      setError(null);
+      console.log("[TeamsPage] Fetching teams…");
+      const data = await teamAPI.getTeams(t); // must call /admin/teams
+      console.log("[TeamsPage] Teams loaded:", data?.length);
+      setTeams(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      console.error("[TeamsPage] Load error:", e);
+      setError(e.message || "Failed to load teams");
+    } finally {
+      setIsLoading(false);
     }
-    return counts;
-  }, [teams]);
+  })();
+}, [token]);
+console.log("[TeamsPage] teams rx:", teams.map(t => ({ id: t.id, name: t.name, pc: (t as any).player_count })));
 
   const handleAddTeam = () => {
     setEditingTeam(null);
@@ -57,31 +65,35 @@ export function TeamsPage() {
     setDeletingTeam(team);
   };
 
-  const handleConfirmDelete = useCallback(() => {
-    if (!deletingTeam) return;
-    setTeams(prevTeams => prevTeams.filter(team => team.id !== deletingTeam.id));
-    toast({ title: "Success", description: `${deletingTeam.name} has been deleted.` });
-    setDeletingTeam(null);
-  }, [deletingTeam, toast]);
-
-  const handleSubmitForm = (teamData: Omit<Team, 'id'>, teamId?: number) => {
-    if (teamId) {
-      setTeams(prevTeams =>
-        prevTeams.map(team =>
-          team.id === teamId ? { ...team, ...teamData, logo_url: team.logo_url } : team
-        )
-      );
-      toast({ title: "Success", description: "Team updated successfully." });
-    } else {
-      const newTeam: Team = {
-        id: Math.max(...teams.map(t => t.id), 0) + 1,
-        ...teamData,
-        logo_url: 'grey.png', // Default logo for new teams
-      };
-      setTeams(prevTeams => [...prevTeams, newTeam]);
-      toast({ title: "Success", description: "Team created successfully." });
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deletingTeam || !token) return;
+    try {
+      await teamAPI.deleteTeam(String(deletingTeam.id), token); // DELETE /admin/teams/{id}
+      setTeams(prev => prev.filter(t => t.id !== deletingTeam.id));
+      toast({ title: 'Success', description: `${deletingTeam.name} has been deleted.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete failed', description: e.message || 'Error' });
+    } finally {
+      setDeletingTeam(null);
     }
-    setIsModalOpen(false);
+  }, [deletingTeam, token, toast]);
+
+  const handleSubmitForm = async (teamData: Omit<Team, 'id'>, teamId?: number) => {
+    if (!token) return;
+    try {
+      if (teamId) {
+        const updated = await teamAPI.updateTeam(String(teamId), teamData, token); // PUT /admin/teams/{id}
+        setTeams(prev => prev.map(t => (t.id === teamId ? updated : t)));
+        toast({ title: 'Success', description: 'Team updated successfully.' });
+      } else {
+        const created = await teamAPI.createTeam(teamData, token); // POST /admin/teams
+        setTeams(prev => [created, ...prev]);
+        toast({ title: 'Success', description: 'Team created successfully.' });
+      }
+      setIsModalOpen(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Save failed', description: e.message || 'Error' });
+    }
   };
 
   return (
@@ -97,7 +109,6 @@ export function TeamsPage() {
         <TeamToolbar onAddTeam={handleAddTeam} />
         <TeamsTable 
             teams={teams}
-            playerCounts={playerCounts}
             onEditTeam={handleEditTeam}
             onDeleteTeam={handleDeleteTeam}
         />

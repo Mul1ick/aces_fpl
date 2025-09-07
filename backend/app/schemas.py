@@ -114,6 +114,12 @@ class Gameweek(BaseModel):
     id: int
     gw_number: int
     deadline: datetime
+    name: str
+    finished: bool
+    is_current: bool
+    is_next: bool
+    data_checked: bool
+
     model_config = ConfigDict(from_attributes=True)
 
 class Activity(BaseModel):
@@ -154,3 +160,33 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     user: UserOut
 
+
+class TeamOutWithCount(TeamOut):
+    player_count: int
+
+
+class TeamTiny(BaseModel):
+    id: int
+    name: str
+    short_name: str
+    logo_url: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class FixtureOut(BaseModel):
+    id: int
+    gameweek_id: int
+    home_team_id: int
+    away_team_id: int
+    home_score: Optional[int] = None
+    away_score: Optional[int] = None
+    stats_entered: Optional[bool] = None
+    home_team: TeamTiny
+    away_team: TeamTiny
+    model_config = ConfigDict(from_attributes=True)
+
+class GameweekOutWithFixtures(BaseModel):
+    id: int
+    gw_number: int
+    deadline: datetime
+    fixtures: List[FixtureOut] = []
+    model_config = ConfigDict(from_attributes=True)
