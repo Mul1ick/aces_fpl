@@ -11,6 +11,7 @@ const regularNavLinks = [
   { name: 'Pick Team', path: '/team' },
   { name: 'Transfers', path: '/transfers' },
   { name: 'Fixtures', path: '/fixtures' },
+  { name: 'League', path: '/leaderboard' },
   { name: 'Stats', path: '/stats' },
   { name: 'Help', path: '/help' },
 ];
@@ -23,15 +24,14 @@ const newUserNavLinks = [
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, logout } = useAuth(); // Get user from auth
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Dynamically choose which set of links to display
   const navLinks = user?.has_team ? regularNavLinks : newUserNavLinks;
 
   const handleSignOut = () => {
     logout();
-    navigate('/login'); // Redirect to login page after logout
+    navigate('/login');
   };
 
   const activeLinkStyle = {
@@ -101,10 +101,10 @@ const Navbar: React.FC = () => {
               className="fixed top-0 right-0 z-50 h-full w-full max-w-xs bg-black"
             >
                 <div className="flex justify-between items-center h-16 px-4 sm:px-6 border-b border-gray-800">
-                    <NavLink to="/dashboard" className="flex items-center space-x-3" onClick={() => setIsMenuOpen(false)}>
+                  <NavLink to="/dashboard" className="flex items-center space-x-3" onClick={() => setIsMenuOpen(false)}>
                         <img src={acesLogo} alt="Aces Logo" className="h-8 w-auto" />
                     </NavLink>
-                    <button onClick={() => setIsMenuOpen(false)}>
+                  <button onClick={() => setIsMenuOpen(false)}>
                         <X className="h-6 w-6 text-white" />
                     </button>
                 </div>
