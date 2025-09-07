@@ -202,3 +202,15 @@ class PlayerSelection(BaseModel):
 
 class SaveTeamPayload(BaseModel):
     players: List[PlayerSelection]
+
+ChipName = Literal['TRIPLE_CAPTAIN', 'WILDCARD']
+
+class PlayChipRequest(BaseModel):
+    chip: ChipName
+    gameweek_id: Optional[int] = None  # default = current GW
+
+class ChipStatus(BaseModel):
+    active: Optional[ChipName] = None
+    used: List[ChipName] = []
+
+

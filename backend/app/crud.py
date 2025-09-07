@@ -379,7 +379,8 @@ async def transfer_player(
         raise HTTPException(status_code=404, detail="User not found")
 
     # If the user has played their first gameweek, check their transfer count
-    if user.played_first_gameweek:
+    wildcard = await is_wildcard_active(db, user_id, gameweek_id)
+    if user.played_first_gameweek and not wildcard:
         if user.free_transfers < 1:
             raise HTTPException(status_code=400, detail="You have no free transfers remaining.")
     # If played_first_gameweek is false, they have unlimited transfers, so we proceed.
@@ -448,11 +449,11 @@ async def transfer_player(
                 'in_player': in_player_id,
             }
         )
-        if user.played_first_gameweek:
+        if user.played_first_gameweek and not wildcard:
             await tx.user.update(
                 where={'id': user_id},
                 data={'free_transfers': {'decrement': 1}}
-            )
+    )
 
     return await get_user_team_full(db, user_id, gameweek_id)
 
@@ -749,3 +750,119 @@ async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
         )
     
     return f"Rollover tasks complete for GW {completed_gw_id}."
+
+
+async def _resolve_gw(db: Prisma, gameweek_id: int | None):
+    if gameweek_id is not None:
+        gw = await db.gameweek.find_unique(where={'id': gameweek_id})
+        if not gw: raise HTTPException(404, "Gameweek not found")
+        return gw
+    return await get_current_gameweek(db)  # returns schemas.Gameweek
+
+async def get_chip_status(db: Prisma, user_id: str, gameweek_id: int) -> schemas.ChipStatus:
+    # active for this GW
+    active = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id}
+    )
+    # any chips already used this season
+    used_rows = await db.userchip.find_many(where={'user_id': user_id})
+    return schemas.ChipStatus(
+        active=active.chip if active else None,
+        used=[r.chip for r in used_rows]
+    )
+
+async def play_chip(db: Prisma, user_id: str, chip: str, gameweek_id: int | None):
+    gw = await _resolve_gw(db, gameweek_id)
+    # block after deadline
+    now_utc = datetime.now(timezone.utc)
+    if gw.deadline < now_utc:
+        raise HTTPException(400, "Deadline passed for this gameweek.")
+
+    # enforce single chip per GW and one-time use per chip
+    existing_gw = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gw.id}
+    )
+    if existing_gw:
+        raise HTTPException(400, "A chip is already active this Gameweek.")
+
+    already_used = await db.userchip.find_first(
+        where={'user_id': user_id, 'chip': chip}
+    )
+    if already_used:
+        raise HTTPException(400, f"{chip} already used this season.")
+
+    return await db.userchip.create(data={
+        'user_id': user_id,
+        'gameweek_id': gw.id,
+        'chip': chip
+    })
+
+async def cancel_chip(db: Prisma, user_id: str, gameweek_id: int | None):
+    gw = await _resolve_gw(db, gameweek_id)
+    now_utc = datetime.now(timezone.utc)
+    if gw.deadline < now_utc:
+        raise HTTPException(400, "Cannot cancel after deadline.")
+    await db.userchip.delete_many(where={'user_id': user_id, 'gameweek_id': gw.id})
+    return {"ok": True}
+
+async def is_wildcard_active(db: Prisma, user_id: str, gameweek_id: int) -> bool:
+    row = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'chip': 'WILDCARD'}
+    )
+    return bool(row)
+
+async def is_triple_captain_active(db: Prisma, user_id: str, gameweek_id: int) -> bool:
+    row = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'chip': 'TRIPLE_CAPTAIN'}
+    )
+    return bool(row)
+
+async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) -> int:
+    # team and flags
+    entries = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id}
+    )
+    if not entries:
+        total = 0
+        await db.usergameweekscore.upsert(
+            where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
+            data={'create': {'user_id': user_id, 'gameweek_id': gameweek_id, 'total_points': total},
+                  'update': {'total_points': total}}
+        )
+        return total
+
+    # points map
+    stats = await db.gameweekplayerstats.find_many(where={'gameweek_id': gameweek_id})
+    pts = {s.player_id: s.points for s in stats}  # missing => did not play
+
+    starters = [e for e in entries if not e.is_benched]
+    cap = next((e for e in starters if e.is_captain), None)
+    vice = next((e for e in starters if e.is_vice_captain), None)
+
+    base = sum(pts.get(e.player_id, 0) for e in starters)
+
+    triple = await is_triple_captain_active(db, user_id, gameweek_id)
+    # choose who gets the bonus: captain if played, else vice if played, else nobody
+    bonus_target = None
+    if cap and (cap.player_id in pts):
+        bonus_target = cap.player_id
+    elif triple and vice and (vice.player_id in pts):
+        bonus_target = vice.player_id
+
+    if triple and bonus_target is not None:
+        # captain already included once in base; add +2x extra to make it triple
+        total = base + 2 * pts[bonus_target]
+    else:
+        # standard double captain
+        if cap and (cap.player_id in pts):
+            total = base + pts[cap.player_id]
+        else:
+            total = base  # no appearance from cap; no standard bonus
+
+    await db.usergameweekscore.upsert(
+        where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
+        data={'create': {'user_id': user_id, 'gameweek_id': gameweek_id, 'total_points': total},
+              'update': {'total_points': total}}
+    )
+    return total
+

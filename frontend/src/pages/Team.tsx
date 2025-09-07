@@ -22,6 +22,8 @@ const Team: React.FC = () => {
   const [detailedPlayer, setDetailedPlayer] = useState<any | null>(null);
   const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") || "" : "";
+
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) return;
@@ -216,7 +218,7 @@ const handlePlayerClick = (clickedPlayer: any) => {
                     <p className="text-sm text-gray-500">Gameweek 16 Deadline: Sat 23 Aug 11:00</p>
                 </div>
             </div>
-            <GameweekChips />
+            {token && <GameweekChips token={token} /* gw optional; omit to use current */ />}
         </div>
         
         <main 

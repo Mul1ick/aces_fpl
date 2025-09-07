@@ -184,14 +184,16 @@ export const teamAPI = {
 
 // Player Management API calls
 export const playerAPI = {
-  async getPlayers(token: string, search = '', team = '', position = ''): Promise<Player[]> {
-    const params = new URLSearchParams();
-    if (search) params.append('search', search);
-    if (team) params.append('team', team);
-    if (position) params.append('position', position);
+  async getPlayers(
+  token: string, search = '', team = '', position = ''
+): Promise<PaginatedResponse<Player>> {
+  const params = new URLSearchParams();
+  if (search) params.append('search', search);
+  if (team) params.append('team', team);
+  if (position) params.append('position', position);
     
-    return apiRequest(`/admin/players?${params}`, { method: 'GET' }, token);
-  },
+  return apiRequest(`/admin/players?${params}`, { method: 'GET' }, token);
+}
 
   async createPlayer(player: PlayerFormData, token: string): Promise<APIResponse<Player>> {
     return apiRequest('/admin/players', {

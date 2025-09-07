@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv() 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes,fixture_routes,transfer_routes
+from app.routes import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes,fixture_routes,transfer_routes,chip_routes
 from app.config import CORS_ORIGINS
 import logging
 
@@ -37,8 +37,10 @@ app.include_router(gameweek_routes.router, tags=["Gameweeks"])
 app.include_router(leaderboard_routes.router)
 app.include_router(fixture_routes.router)
 app.include_router(transfer_routes.router)
+app.include_router(chip_routes.router)
 # Secure routes for the Admin Portal
 app.include_router(admin_routes.router) # Prefix is already defined in admin_routes.py
+
 
 # --- Root Endpoint ---
 @app.get("/")

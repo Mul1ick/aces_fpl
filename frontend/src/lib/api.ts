@@ -9,5 +9,37 @@ export const API = {
     // Add more as needed
     team: `${API_BASE_URL}/teams`,
     gameweek: `${API_BASE_URL}/gameweeks`,
+    chips: {
+      status: (gw?: number) =>
+        gw ? `${API_BASE_URL}/chips/status?gameweek_id=${gw}` : `${API_BASE_URL}/chips/status`,
+      play: `${API_BASE_URL}/chips/play`,
+      cancel: (gw?: number) =>
+        gw ? `${API_BASE_URL}/chips/cancel?gameweek_id=${gw}` : `${API_BASE_URL}/chips/cancel`,
+    },
   },
 };
+
+export type ChipName = 'TRIPLE_CAPTAIN' | 'WILDCARD';
+export type ChipStatus = { active: ChipName | null; used: ChipName[] };
+async function apiFetch(url: string, init: RequestInit, token: string) {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(init.headers || {}),
+    },
+  });
+  if (!res.ok) throw new Error((await res.json()).detail || `HTTP ${res.status}`);
+  return res.status === 204 ? null : res.json();
+}
+
+export async function getChipStatus(token: string, gw?: number): Promise<ChipStatus> {
+  return apiFetch(API.endpoints.chips.status(gw), { method: 'GET' }, token);
+}
+export async function playChip(token: string, chip: ChipName, gw?: number) {
+  return apiFetch(API.endpoints.chips.play, { method: 'POST', body: JSON.stringify({ chip, gameweek_id: gw ?? null }) }, token);
+}
+export async function cancelChip(token: string, gw?: number) {
+  return apiFetch(API.endpoints.chips.cancel(gw), { method: 'DELETE' }, token);
+}
