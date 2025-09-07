@@ -14,7 +14,9 @@ import Transfers from "./pages/Transfers";
 import Gameweek from "./pages/Gameweek";
 import Leaderboard from "./pages/Leaderboard";
 import NotFound from "./pages/NotFound";
-import Fixtures from "./pages/Fixtures"; // Import the new Fixtures page
+import Fixtures from "./pages/Fixtures";
+import Stats from "./pages/Stats";
+import Help from "./pages/Help"; // 1. Import the new Help page
 
 const queryClient = new QueryClient();
 
@@ -34,55 +36,17 @@ const App = () => (
 
               {/* --- Routes WITH the Navbar (wrapped by MainLayout) --- */}
               <Route element={<MainLayout />}>
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/team"
-                  element={
-                    <ProtectedRoute>
-                      <Team />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/transfers"
-                  element={
-                    <ProtectedRoute>
-                      <Transfers />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/gameweek/:gw"
-                  element={
-                    <ProtectedRoute>
-                      <Gameweek />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/leaderboard"
-                  element={
-                    <ProtectedRoute>
-                      <Leaderboard />
-                    </ProtectedRoute>
-                  }
-                />
-                {/* --- ADDED FIXTURES ROUTE --- */}
-                <Route
-                  path="/fixtures"
-                  element={
-                    <ProtectedRoute>
-                      <Fixtures />
-                    </ProtectedRoute>
-                  }
-                />
+                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
+                <Route path="/transfers" element={<ProtectedRoute><Transfers /></ProtectedRoute>} />
+                <Route path="/gameweek/:gw" element={<ProtectedRoute><Gameweek /></ProtectedRoute>} />
+                <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+                <Route path="/fixtures" element={<ProtectedRoute><Fixtures /></ProtectedRoute>} />
+                <Route path="/stats" element={<ProtectedRoute><Stats /></ProtectedRoute>} />
+                
+                {/* 2. Add the new route for the Help page */}
+                <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+
               </Route>
 
               {/* --- Catch-all Not Found Route --- */}
@@ -96,4 +60,3 @@ const App = () => (
 );
 
 export default App;
-
