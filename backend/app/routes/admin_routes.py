@@ -85,13 +85,21 @@ async def get_all_users(
 
 @router.post("/users/{user_id}/approve", response_model=schemas.UserOut)
 async def approve_user(user_id: str, db: Prisma = Depends(get_db)):
-    """
-    Approve a single user by their ID.
-    """
     user = await crud.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return await crud.approve_user(db, user_id)
+
+    updated = await crud.approve_user(db, user_id)
+    has_team = await crud.user_has_team(db, user_id)
+
+    return {
+        "id": str(updated.id),
+        "email": updated.email,
+        "full_name": updated.full_name,
+        "role": updated.role,
+        "is_active": bool(updated.is_active),
+        "has_team": has_team,
+    }
 
 @router.post("/users/bulk-approve", response_model=dict)
 async def bulk_approve_users(request: schemas.BulkApproveRequest, db: Prisma = Depends(get_db)):
