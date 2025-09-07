@@ -26,15 +26,16 @@ export const ListView: React.FC<ListViewProps> = ({ players }) => {
             </tr>
           </thead>
           <tbody>
-            {sortedPlayers.map((player, index) => (
+            {sortedPlayers.map((player) => (
               <tr key={player.id} className={cn("border-b border-gray-200", player.is_benched ? "bg-gray-50 opacity-70" : "")}>
                 <td className="p-3">
                   <div className="flex items-center space-x-2">
-                     {player.isCaptain && <Star className="size-4 text-white fill-fpl-pink stroke-fpl-pink" />}
+                     {player.isCaptain && <Star className="size-4 text-white fill-[#E90052] stroke-[#E90052]" />}
                      {player.isVice && <Shield className="size-4 text-white fill-gray-600 stroke-gray-600" />}
                     <div>
                         <p className="font-bold text-sm text-black">{player.name}</p>
-                        <p className="text-xs text-gray-500">{player.team} • {player.pos}</p>
+                        {/* Corrected this line to use player.team.name */}
+                        <p className="text-xs text-gray-500">{player.team?.name || 'N/A'} • {player.pos}</p>
                     </div>
                   </div>
                 </td>

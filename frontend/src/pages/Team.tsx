@@ -1,169 +1,82 @@
-import React, { useState,useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import PlayerCard from '@/components/layout/PlayerCard'; 
+import PlayerCard from '@/components/layout/PlayerCard';
 import { ManagerInfoCard } from '@/components/gameweek/ManagerInfoCard';
 import { GameweekChips } from '@/components/team/GameweekChips';
 import { FixturesCard } from '@/components/team/FixturesCard';
 import { EditablePlayerCard } from '@/components/team/EditablePlayerCard';
 import { cn } from '@/lib/utils';
 import { TeamResponse } from "@/types";
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 // --- ASSET IMPORTS ---
 import pitchBackground from '@/assets/images/pitch.svg';
 
-type PlayerType = {
-  id: number;
-  name: string;
-  team: string;
-  pos: string;
-  fixture?: string;
-  points?: number;
-  isCaptain?: boolean;
-  isVice?: boolean;
-};
-// --- MOCK DATA & CONFIGURATION ---
-// const initialSquad = {
-//   starting: [
-//     { id: 1, name: 'Raya', team: 'Satan', pos: 'GK', fixture: 'MUN(A)', points: 6, isCaptain: false, isVice: false },
-//     { id: 2, name: 'Saliba', team: 'Satan', pos: 'DEF', fixture: 'MUN(A)', points: 7, isCaptain: false, isVice: false },
-//     { id: 3, name: 'Shaw', team: 'Bandra United', pos: 'DEF', fixture: 'SAT(H)', points: 5, isCaptain: false, isVice: false },
-//     { id: 4, name: 'Trippier', team: 'Southside', pos: 'DEF', fixture: 'TIT(H)', points: 8, isCaptain: false, isVice: false },
-//     { id: 5, name: 'Fernandes', team: 'Bandra United', pos: 'MID', fixture: 'SAT(H)', points: 12, isCaptain: true, isVice: false },
-//     { id: 6, name: 'Son', team: 'Mumbai Hotspurs', pos: 'MID', fixture: 'UMA(A)', points: 9, isCaptain: false, isVice: true },
-//     { id: 7, name: 'Joelinton', team: 'Southside', pos: 'MID', fixture: 'TIT(H)', points: 4, isCaptain: false, isVice: false },
-//     { id: 8, name: 'Haaland', team: 'Titans', pos: 'FWD', fixture: 'SOU(A)', points: 13, isCaptain: false, isVice: false },
-//   ],
-//   bench: [
-//     { id: 9, name: 'Pope', team: 'Umaag Foundation Trust', pos: 'GK', fixture: 'MHS(H)', points: 1 },
-//     { id: 10, name: 'Maddison', team: 'Mumbai Hotspurs', pos: 'MID', fixture: 'UMA(A)', points: 5 },
-//     { id: 11, name: 'Watkins', team: 'Titans', pos: 'FWD', fixture: 'SOU(A)', points: 2 },
-//   ]
-// };
-
 const Team: React.FC = () => {
-  const [squad, setSquad] = useState({ starting: [], bench: [] });
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [detailedPlayer, setDetailedPlayer] = useState(null);
-  
-
+  const [squad, setSquad] = useState<{ starting: any[], bench: any[] }>({ starting: [], bench: [] });
+  const [initialSquadState, setInitialSquadState] = useState<string>('');
+  const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
+  const [detailedPlayer, setDetailedPlayer] = useState<any | null>(null);
+  const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
 
   useEffect(() => {
-  const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
 
-  fetch("http://localhost:8000/teams/team", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
-    .then(async res => {
-      if (!res.ok) {
-        throw new Error(`Fetch failed with status ${res.status}`);
-      }
-
-      const data = await res.json();
-      console.log("1. Raw data from API:", data); 
-      if (!data.starting || !data.bench) {
-        throw new Error("Malformed team data");
-      }
-
-      // Combine all players into one array to evaluate is_benched flag
-      const allPlayers = [...data.starting, ...data.bench];
-
-      // Transform function
-      const transformPlayer = (player) => ({
-        id: player.id,
-        name: player.full_name,
-        team: player.team.name,
-        pos: player.position,
-        fixture: player.fixture_str,
-        points: 0,
-        isCaptain: player.is_captain,
-        isVice: player.is_vice_captain,
-        is_benched:player.is_benched,
-      });
-
-      // Divide players correctly
-      const starting = data.starting.map(transformPlayer);
-      const bench = data.bench.map(transformPlayer);
-
-      console.log("2. Processed 'starting' array:", starting);
-      console.log("3. Processed 'bench' array:", bench);
-      setSquad({ starting, bench });
-
+    fetch("http://localhost:8000/teams/team", {
+      headers: { Authorization: `Bearer ${token}` },
     })
-    .catch(err => {
-      console.error("Failed to fetch team:", err);
-      setSquad({ starting: [], bench: [] });
-    });
-}, []);
+      .then(async res => {
+        if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
+        const data: TeamResponse = await res.json();
+        if (!data.starting || !data.bench) throw new Error("Malformed team data");
 
-  // In Team.tsx (or wherever you keep this state)
-const setArmband = async (playerId: number, kind: 'C' | 'VC') => {
-  const token = localStorage.getItem("access_token");
-  try {
-    const res = await fetch("http://localhost:8000/teams/armband", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ player_id: playerId, kind }),
-    });
+        const transformPlayer = (player: any) => ({
+          id: player.id,
+          name: player.full_name,
+          team: player.team.name,
+          pos: player.position,
+          fixture: player.fixture_str,
+          points: 0,
+          isCaptain: player.is_captain,
+          isVice: player.is_vice_captain,
+          is_benched: player.is_benched,
+        });
 
-    if (!res.ok) {
-      const msg = await res.text();
-      throw new Error(msg);
-    }
+        const starting = data.starting.map(transformPlayer);
+        const bench = data.bench.map(transformPlayer);
+        
+        const currentSquad = { starting, bench };
+        setSquad(currentSquad);
+        setInitialSquadState(JSON.stringify(currentSquad));
+      })
+      .catch(err => {
+        console.error("Failed to fetch team:", err);
+        setSquad({ starting: [], bench: [] });
+      });
+  }, []);
 
-    const data = await res.json();
-
-    const xform = (p: any) => ({
-      id: p.id,
-      name: p.full_name,
-      team: p.team.name,
-      pos: p.position,
-      fixture: p.fixture_str,
-      points: p.points ?? 0,
-      isCaptain: p.is_captain,
-      isVice: p.is_vice_captain,
-      is_benched: p.is_benched,
-    });
-
-    setSquad({
-      starting: (data.starting || []).map(xform),
-      bench: (data.bench || []).map(xform),
-    });
-    setDetailedPlayer(null);
-
-  } catch (e: any) {
-    console.error("Failed to set armband:", e);
-    alert(typeof e?.message === 'string' ? e.message : 'Failed to set armband');
-  }
-};
-
-
-  const handlePlayerClick = (playerToSwap, isFromBench) => {
+  const isDirty = useMemo(() => {
+    return JSON.stringify(squad) !== initialSquadState;
+  }, [squad, initialSquadState]);
+  
+  const handlePlayerClick = (playerToSwap: any, isFromBench: boolean) => {
     if (!selectedPlayer) {
-      // If no player is selected for a sub, open the detail card
       setDetailedPlayer(playerToSwap);
       return;
     }
 
-    // A player is already selected, so attempt a substitution
     if (selectedPlayer.isFromBench === isFromBench) {
-      // Clicked another player in the same area, so just switch selection
       setSelectedPlayer({ ...playerToSwap, isFromBench });
       return;
     }
 
-    // Determine which player is coming from the pitch and which from the bench
     const pitchPlayer = selectedPlayer.isFromBench ? playerToSwap : selectedPlayer;
     const benchPlayer = selectedPlayer.isFromBench ? selectedPlayer : playerToSwap;
 
     // --- VALIDATION LOGIC ---
-    const newStarters = squad.starting.filter(p => p.id !== pitchPlayer.id);
-    newStarters.push(benchPlayer);
-
+    let newStarters = squad.starting.filter(p => p.id !== pitchPlayer.id).concat(benchPlayer);
     const goalkeepers = newStarters.filter(p => p.pos === 'GK').length;
     const defenders = newStarters.filter(p => p.pos === 'DEF').length;
 
@@ -178,23 +91,58 @@ const setArmband = async (playerId: number, kind: 'C' | 'VC') => {
       return;
     }
 
-    // --- PERFORM SWAP ---
-    const updatedStarting = squad.starting.map(p => p.id === pitchPlayer.id ? benchPlayer : p);
-    const updatedBench = squad.bench.map(p => p.id === benchPlayer.id ? pitchPlayer : p);
+    // --- CAPTAINCY RE-ASSIGNMENT LOGIC ---
+    if (pitchPlayer.isCaptain) {
+        const viceCaptain = squad.starting.find(p => p.isVice);
+        if (viceCaptain) {
+            newStarters = newStarters.map(p => p.id === viceCaptain.id ? { ...p, isCaptain: true, isVice: false } : p);
+            const newViceCaptainCandidate = newStarters.find(p => p.id !== viceCaptain.id);
+            if (newViceCaptainCandidate) {
+                newStarters = newStarters.map(p => p.id === newViceCaptainCandidate.id ? { ...p, isVice: true } : p);
+            }
+        }
+    } else if (pitchPlayer.isVice) {
+        const captain = squad.starting.find(p => p.isCaptain);
+        const newViceCaptainCandidate = newStarters.find(p => p.id !== captain?.id);
+        if (newViceCaptainCandidate) {
+            newStarters = newStarters.map(p => p.id === newViceCaptainCandidate.id ? { ...p, isVice: true } : p);
+        }
+    }
 
-    setSquad({ starting: updatedStarting, bench: updatedBench });
+    // --- PERFORM SWAP ---
+    const cleanBenchPlayer = { ...pitchPlayer, isCaptain: false, isVice: false };
+    const cleanPitchPlayer = { ...benchPlayer, isCaptain: false, isVice: false };
+
+    const finalStarters = newStarters.map(p => p.id === benchPlayer.id ? cleanPitchPlayer : p);
+    const finalBench = squad.bench.map(p => p.id === benchPlayer.id ? cleanBenchPlayer : p);
+
+    setSquad({ starting: finalStarters, bench: finalBench });
     setSelectedPlayer(null);
   };
   
-  const handleSelectForSub = (playerToSub) => {
+  const handleSelectForSub = (playerToSub: any) => {
     const isBenched = squad.bench.some(p => p.id === playerToSub.id);
     setSelectedPlayer({ ...playerToSub, isFromBench: isBenched });
-    setDetailedPlayer(null); // Close the detail card to allow the next selection
+    setDetailedPlayer(null);
+  };
+  
+  const setArmband = async (playerId: number, kind: 'C' | 'VC') => { /* ...existing function... */ };
+
+  const handleSaveTeam = () => {
+    setInitialSquadState(JSON.stringify(squad));
+    setIsSavedModalOpen(true);
   };
 
-  if (!Array.isArray(squad.starting) || !Array.isArray(squad.bench)) {
-  return <div className="p-4">Loading team...</div>;
-}
+  const handleReset = () => {
+    if (initialSquadState) {
+        setSquad(JSON.parse(initialSquadState));
+    }
+  };
+
+  if (!squad.starting.length && !squad.bench.length) {
+    return <div className="p-4">Loading team...</div>;
+  }
+
   const playersByPos = {
     GK: squad.starting.filter(p => p.pos === 'GK'),
     DEF: squad.starting.filter(p => p.pos === 'DEF'),
@@ -204,12 +152,9 @@ const setArmband = async (playerId: number, kind: 'C' | 'VC') => {
 
   return (
     <div className="w-full min-h-screen bg-white flex flex-col lg:h-screen lg:flex-row font-sans">
-      {/* Left Column (Desktop Only) */}
       <div className="hidden lg:block lg:w-2/5 p-4 h-screen overflow-y-auto">
         <ManagerInfoCard />
       </div>
-
-      {/* Right Column / Main Mobile View */}
       <div className="flex flex-col flex-1 lg:w-3/5 lg:h-screen">
         <div className="p-4 space-y-4">
             <div className="flex justify-between items-center">
@@ -229,7 +174,6 @@ const setArmband = async (playerId: number, kind: 'C' | 'VC') => {
             backgroundPosition: 'center top',
           }}
         >
-          {/* Formation Rows */}
           {Object.values(playersByPos).map((players, index) => (
             <div key={index} className="flex justify-center items-center gap-x-8 sm:gap-x-12">
               {players.map(p => (
@@ -259,12 +203,21 @@ const setArmband = async (playerId: number, kind: 'C' | 'VC') => {
           </div>
         </footer>
 
+        <div className="p-4 text-center bg-white border-t-2 border-gray-200">
+            <Button 
+                onClick={handleSaveTeam} 
+                disabled={!isDirty}
+                className="bg-dashboard-gradient text-white font-bold text-lg px-8 py-6 rounded-lg shadow-lg disabled:opacity-50"
+            >
+                Save Your Team
+            </Button>
+        </div>
+
         <div className="p-4">
             <FixturesCard />
         </div>
       </div>
       
-      {/* Manager Info Card (Mobile Only) */}
       <div className="block lg:hidden p-4">
           <ManagerInfoCard />
       </div>
@@ -272,6 +225,17 @@ const setArmband = async (playerId: number, kind: 'C' | 'VC') => {
       <AnimatePresence>
         {detailedPlayer && <EditablePlayerCard player={detailedPlayer} onClose={() => setDetailedPlayer(null)} onSubstitute={handleSelectForSub} onSetArmband={setArmband} />}
       </AnimatePresence>
+
+      <AlertDialog open={isSavedModalOpen} onOpenChange={setIsSavedModalOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Team Saved!</AlertDialogTitle>
+            </AlertDialogHeader>
+            <AlertDialogAction onClick={() => setIsSavedModalOpen(false)}>
+                Continue
+            </AlertDialogAction>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

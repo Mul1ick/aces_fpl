@@ -30,7 +30,7 @@ const StatRow = ({ label, value, points }) => (
 export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onClose }) => {
   if (!player) return null;
 
-  const jerseySrc = TEAM_JERSEYS[player.team] || tshirtRed;
+  const jerseySrc = TEAM_JERSEYS[player.team.name] || tshirtRed; // Correctly access team name for jersey
 
   return (
     <motion.div
@@ -45,20 +45,21 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
         className="relative w-full max-w-sm"
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on the card
+        onClick={(e) => e.stopPropagation()}
       >
         <Card className="border-2 border-gray-300 shadow-xl bg-white text-black">
           <CardHeader className="p-4 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-2xl font-bold text-black">{player.name}</CardTitle>
+              <CardTitle className="text-2xl font-bold text-black">{player.name || player.full_name}</CardTitle>
               <p className="text-sm text-gray-500">vs. {player.fixture}</p>
             </div>
-            <img src={jerseySrc} alt={`${player.team} jersey`} className="w-12 h-auto" />
+            <img src={jerseySrc} alt={`${player.team.name} jersey`} className="w-12 h-auto" />
           </CardHeader>
           <CardContent className="p-4">
             <div className="flex justify-between items-center mb-4">
               <div>
-                <p className="font-bold text-black">{player.team}</p>
+                {/* Corrected this line to use player.team.name */}
+                <p className="font-bold text-black">{player.team?.name || 'N/A'}</p>
                 <p className="text-xs text-gray-500">Full Time</p>
               </div>
               <p className="text-3xl font-bold text-black">{player.points} pts</p>
