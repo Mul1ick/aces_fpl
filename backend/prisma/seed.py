@@ -3,8 +3,14 @@ from prisma import Prisma
 from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 import random
+# --- NEW: Import for password hashing ---
+from passlib.context import CryptContext
 
 # --- Configuration ---
+# --- NEW: Admin User Credentials ---
+ADMIN_EMAIL = "admin@aces.com"
+ADMIN_PASSWORD = "adminPassword" # IMPORTANT: Use a strong password in a real production environment
+
 TEAMS_DATA = [
     {'name': 'Satan', 'short_name': 'SAT'},
     {'name': 'Bandra United', 'short_name': 'BAN'},
@@ -42,11 +48,14 @@ REAL_PLAYERS = {
     ],
 }
 
+# --- NEW: Password hashing context ---
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 async def main():
     """
     Main function to seed the database.
     - Cleans up existing data.
+    - Creates an admin user.
     - Creates teams, players, gameweeks, fixtures, and sample stats.
     """
     db = Prisma()
@@ -61,6 +70,29 @@ async def main():
     await db.player.delete_many()
     await db.team.delete_many()
     print("✅ Cleanup complete.")
+
+    # --- NEW: Seed Admin User ---
+    print("\n🔑 Seeding Admin User...")
+    hashed_password = pwd_context.hash(ADMIN_PASSWORD)
+    await db.user.upsert(
+        where={'email': ADMIN_EMAIL},
+        data={
+            'create': {
+                'email': ADMIN_EMAIL,
+                'hashed_password': hashed_password,
+                'role': 'admin',
+                'is_active': True,
+                'full_name': 'Admin User'
+            },
+            'update': {
+                'hashed_password': hashed_password,
+                'role': 'admin',
+                'is_active': True
+            }
+        }
+    )
+    print(f"✅ Admin user '{ADMIN_EMAIL}' created/updated.")
+
 
     # --- 1. Seed Teams ---
     print("\n🌱 Seeding Teams...")

@@ -7,9 +7,14 @@ load_dotenv()
 # --- NEW: Define a default list of origins ---
 # This list will be used if the CORS_ORIGINS environment variable is not set.
 # It includes both your main FPL app and your new Admin Portal.
+# DEFAULT_ORIGINS = [
+#     "http://localhost:3000",  # Default for main FPL React App
+#     "http://localhost:8080",  # Default for new Admin Portal React App
+# ]
+
 DEFAULT_ORIGINS = [
-    "http://localhost:3000",  # Default for main FPL React App
-    "http://localhost:8080",  # Default for new Admin Portal React App
+    "https://aces-fpl.vercel.app/",  # Default for main FPL React App
+    "https://acesfpl.vercel.app/",  # Default for new Admin Portal React App
 ]
 
 # --- UPDATED: Safer parsing of the CORS_ORIGINS environment variable ---
