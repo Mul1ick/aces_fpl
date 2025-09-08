@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Professional Admin Portal Design System - Aces FPL Admin */
+
+@layer base {
+  :root {
+    /* Core Background & Surfaces */
+    --background: 0 0% 99%;
+    --foreground: 215 27% 17%;
+    
+    /* Admin Card System */
+    --card: 0 0% 100%;
+    --card-foreground: 215 27% 17%;
+    
+    /* Professional Admin Colors */
+    --primary: 217 91% 60%;        /* Professional Blue */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 217 91% 55%;
+    
+    --secondary: 270 95% 75%;      /* Professional Purple */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 270 95% 70%;
+    
+    /* Admin Status Colors */
+    --success: 142 71% 45%;        /* Success Green */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;         /* Warning Orange */
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;      /* Destructive Red */
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Neutral Admin Tones */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 215 27% 17%;
+    
+    /* Admin Form Elements */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+    
+    /* Admin Sidebar */
+    --sidebar-background: 215 27% 17%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 27% 25%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 27% 25%;
+    --sidebar-ring: 217 91% 60%;
+    
+    /* Admin Shadows & Effects */
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-elevated: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-primary: 0 4px 14px 0 rgb(59 130 246 / 0.15);
+    
+    /* Admin Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(270 95% 75%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(158 64% 52%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 99%), hsl(210 40% 96%));
+    
+    /* Admin Animation Timing */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+    
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 215 27% 17%;
+    --foreground: 0 0% 100%;
+    --card: 215 27% 19%;
+    --card-foreground: 0 0% 100%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 95% 75%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 215 27% 25%;
+    --muted-foreground: 210 40% 70%;
+    --accent: 215 27% 25%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 27% 25%;
+    --input: 215 27% 25%;
+    --ring: 217 91% 60%;
+    --sidebar-background: 215 27% 15%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 27% 20%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 27% 20%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Admin Portal Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+@layer utilities {
+  .admin-gradient {
+    background: var(--gradient-primary);
+  }
+  
+  .admin-card-shadow {
+    box-shadow: var(--shadow-card);
+  }
+  
+  .admin-elevated-shadow {
+    box-shadow: var(--shadow-elevated);
+  }
+  
+  .admin-primary-shadow {
+    box-shadow: var(--shadow-primary);
+  }
+  
+  .admin-transition {
+    transition: var(--transition-normal);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

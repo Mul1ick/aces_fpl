@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-py"
+  enable_experimental_decimal = true
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  hashed_password String
+  role            String        @default("user") // --- UPDATED --- Added this role field
+  is_active       Boolean       @default(false)
+  full_name       String?
+  fantasy_team    FantasyTeam?
+
+  free_transfers        Int      @default(1) // Users start with 1 free transfer
+  played_first_gameweek Boolean  @default(false)
+
+  user_teams      UserTeam[]
+  user_gameweek_scores UserGameweekScore[]
+  transfers      transfer_log[]
+  user_chips  UserChip[]
+
+  @@map("users")
+}
+
+model Team {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  short_name String   @unique @db.VarChar(3)
+  players    Player[]
+  home_fixtures  Fixture[] @relation("HomeTeam")
+  away_fixtures  Fixture[] @relation("AwayTeam")
+
+  @@map("teams")
+}
+
+enum PlayerStatus {
+  ACTIVE
+  INJURED
+  SUSPENDED
+}
+
+model Player {
+  id          Int      @id @default(autoincrement())
+  full_name   String
+  position    String
+  price       Decimal  @db.Decimal(5, 2)
+  status    PlayerStatus @default(ACTIVE)
+  team_id     Int
+  team        Team     @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  user_teams  UserTeam[]
+  gameweek_player_stats GameweekPlayerStats[]
+  transfersIn  transfer_log[] @relation("TransfersIn")
+  transfersOut transfer_log[] @relation("TransfersOut")
+
+  @@map("players")
+}
+
+model Gameweek {
+  id          Int      @id @default(autoincrement())
+  gw_number   Int      @unique
+  deadline    DateTime @db.Timestamptz(6)
+  user_teams  UserTeam[]
+  fixtures   Fixture[]
+  gameweek_player_stats GameweekPlayerStats[]
+  user_gameweek_scores  UserGameweekScore[]
+  user_chips  UserChip[]
+
+  @@map("gameweeks")
+}
+
+model FantasyTeam {
+  id      Int    @id @default(autoincrement())
+  name    String
+  user_id String @unique
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("fantasy_teams")
+}
+
+model UserTeam {
+  id              Int      @id @default(autoincrement())
+  user_id         String
+  gameweek_id     Int
+  player_id       Int
+  is_captain      Boolean  @default(false)
+  is_vice_captain Boolean  @default(false)
+  is_benched      Boolean  @default(false)
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
+  player   Player   @relation(fields: [player_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, gameweek_id, player_id])
+  @@map("user_teams")
+}
+
+model GameweekPlayerStats {
+  id            Int     @id @default(autoincrement())
+  gameweek_id   Int
+  player_id     Int
+
+  // granular stats
+  goals_scored  Int     @default(0)
+  assists       Int     @default(0)
+  yellow_cards  Int     @default(0)
+  red_cards     Int     @default(0)
+  bonus_points  Int     @default(0)
+  minutes       Int     @default(0)
+
+  // denormalized total for fast reads
+  points        Int     @default(0)
+
+  gameweek      Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
+  player        Player   @relation(fields: [player_id], references: [id], onDelete: Cascade)
+
+  @@unique([gameweek_id, player_id])
+  @@map("gameweek_player_stats")
+}
+
+model UserGameweekScore {
+  id           Int    @id @default(autoincrement())
+  user_id      String
+  gameweek_id  Int
+  total_points Int
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, gameweek_id])
+  @@map("user_gameweek_scores")
+}
+
+
+model Fixture {
+  id            Int      @id @default(autoincrement())
+  gameweek_id   Int
+  home_team_id  Int
+  away_team_id  Int
+  kickoff       DateTime? @db.Timestamptz(6)
+
+  home_score    Int?
+  away_score    Int?
+
+  stats_entered Boolean @default(false)
+
+  gameweek Gameweek @relation(fields: [gameweek_id], references: [id])
+  home     Team     @relation("HomeTeam", fields: [home_team_id], references: [id])
+  away     Team     @relation("AwayTeam", fields: [away_team_id], references: [id])
+
+  @@index([gameweek_id])
+  @@index([home_team_id])
+  @@index([away_team_id])
+  @@map("fixtures")
+}
+
+model transfer_log {
+  id          Int      @id @default(autoincrement())
+  user_id     String
+  out_player  Int?     // can be null if it's only an inbound transfer
+  in_player   Int?     // can be null if it's only an outbound transfer
+  gameweek_id Int
+  created_at  DateTime @default(now())
+
+  user      User      @relation(fields: [user_id], references: [id])
+
+  // make these OPTIONAL because the FK scalars are optional
+  out_rel   Player?   @relation("TransfersOut", fields: [out_player], references: [id])
+  in_rel    Player?   @relation("TransfersIn",  fields: [in_player],  references: [id])
+  
+  
+  @@index([gameweek_id])
+  @@index([in_player])
+  @@index([out_player])
+  @@index([created_at])
+  @@map("transfer_log")
+}
+
+enum ChipType {
+  TRIPLE_CAPTAIN
+  WILDCARD
+}
+
+model UserChip {
+  id           Int       @id @default(autoincrement())
+  user_id      String
+  gameweek_id  Int
+  chip         ChipType
+  played_at    DateTime  @default(now())
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
+
+  // one chip per GW, and a chip can be used only once per user
+  @@unique([user_id, gameweek_id])
+  @@unique([user_id, chip])
+  @@index([gameweek_id])
+  @@map("user_chips")
+}
