@@ -337,9 +337,13 @@ async def admin_submit_fixture_stats(
     pos_map = {p.id: p.position for p in players}
 
     def goal_pts(pos: str) -> int:
-        if pos in ("GK", "DEF"): return 6
-        if pos == "MID": return 5
-        return 4  # FWD
+        if pos == "GK":
+            return 10
+        if pos == "DEF":
+            return 6
+        if pos == "MID":
+            return 5
+        return 4  # FWD / default
 
     async with db.tx() as tx:
         # optional: update fixture score if those fields exist
@@ -360,14 +364,13 @@ async def admin_submit_fixture_stats(
             if not pos:
                 continue
 
-            points = (
-                goal_pts(pos) * s.goals_scored
-                + 3 * s.assists
-                - 1 * s.yellow_cards
-                - 3 * s.red_cards
-                + s.bonus_points
-                # minutes logic if you want: +2 for >=60 mins, +1 for 1–59, etc.
-            )
+            gs   = int(s.goals_scored or 0)
+            ast  = int(s.assists or 0)
+            yc   = int(s.yellow_cards or 0)
+            rc   = int(s.red_cards or 0)
+            bps  = int(s.bonus_points or 0)
+
+            points = goal_pts(pos) * gs + 3 * ast - 1 * yc - 3 * rc + bps
 
             await tx.gameweekplayerstats.upsert(
                 where={
@@ -380,20 +383,20 @@ async def admin_submit_fixture_stats(
                     "create": {
                         "gameweek_id": gameweek_id,
                         "player_id": s.player_id,
-                        "goals_scored": s.goals_scored,
-                        "assists": s.assists,
-                        "yellow_cards": s.yellow_cards,
-                        "red_cards": s.red_cards,
-                        "bonus_points": s.bonus_points,
+                        "goals_scored": gs,
+                        "assists": ast,
+                        "yellow_cards": yc,
+                        "red_cards": rc,
+                        "bonus_points": bps,
                         # "minutes": s.minutes,
                         "points": points,
                     },
                     "update": {
-                        "goals_scored": s.goals_scored,
-                        "assists": s.assists,
-                        "yellow_cards": s.yellow_cards,
-                        "red_cards": s.red_cards,
-                        "bonus_points": s.bonus_points,
+                        "goals_scored": gs,
+                        "assists": ast,
+                        "yellow_cards": yc,
+                        "red_cards": rc,
+                        "bonus_points": bps,
                         # "minutes": s.minutes,
                         "points": points,
                     },
