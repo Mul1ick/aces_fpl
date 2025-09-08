@@ -24,6 +24,17 @@ type PlayerStatInputs = {
   };
 };
 
+const DEFAULT_ROW_STATS = {
+  goals_scored: 0,
+  assists: 0,
+  yellow_cards: 0,
+  red_cards: 0,
+  bonus_points: 0,
+} as const;
+
+type StatKey = keyof typeof DEFAULT_ROW_STATS;
+const STAT_FIELDS: StatKey[] = ['goals_scored','assists','yellow_cards','red_cards','bonus_points'];
+
 // Fixture type needs to be defined here as well for props
 interface Fixture {
   id: number;
@@ -37,42 +48,54 @@ interface StatsEntryModalProps {
   fixture: Fixture | null;
   players: Player[];
   isOpen: boolean;
+  loading?: boolean;
   onClose: () => void;
   onSave: (fixtureId: number, scores: { home_score: number; away_score: number }, stats: PlayerStatInputs) => void;
 }
 
-const PlayerStatRow = ({ player, stats, onStatChange }: { player: Player; stats: PlayerStatInputs[number]; onStatChange: (playerId: number, field: keyof PlayerStatInputs[number], value: number) => void; }) => (
-    <div className="grid grid-cols-6 items-center gap-3 py-2 border-b last:border-b-0">
-        <div className="col-span-2">
-            <p className="font-medium text-sm truncate">{player.full_name}</p>
-            <p className="text-xs text-muted-foreground">{player.position}</p>
-        </div>
-        {Object.keys(stats).map((key) => (
-            <Input
-                key={key}
-                type="number"
-                min="0"
-                className="h-8 text-center"
-                value={stats[key as keyof typeof stats]}
-                onChange={(e) => onStatChange(player.id, key as keyof typeof stats, parseInt(e.target.value) || 0)}
-            />
-        ))}
+const PlayerStatRow = ({
+  player,
+  stats,
+  onStatChange,
+}: {
+  player: Player;
+  stats: Partial<typeof DEFAULT_ROW_STATS> | undefined;
+  onStatChange: (playerId: number, field: StatKey, value: number) => void;
+}) => {
+  const row = { ...DEFAULT_ROW_STATS, ...(stats || {}) };
+  return (
+    <div className="grid grid-cols-7 items-center gap-3 py-2 border-b last:border-b-0">
+      <div className="col-span-2">
+        <p className="font-medium text-sm truncate">{player.full_name}</p>
+        <p className="text-xs text-muted-foreground">{player.position}</p>
+      </div>
+      {STAT_FIELDS.map((field) => (
+        <Input
+          key={field}
+          type="number"
+          min="0"
+          className="h-8 text-center"
+          value={row[field]}
+          onChange={(e) => onStatChange(player.id, field, parseInt(e.target.value) || 0)}
+        />
+      ))}
     </div>
-);
+  );
+};
 
 const StatsTableHeader = () => (
-    <div className="grid grid-cols-6 items-center gap-3 px-2 pb-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
-        <div className="col-span-2">Player</div>
-        <div className="text-center">G</div>
-        <div className="text-center">A</div>
-        <div className="text-center">YC</div>
-        <div className="text-center">RC</div>
-        <div className="text-center">BP</div>
-    </div>
+  <div className="grid grid-cols-7 items-center gap-3 px-2 pb-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
+    <div className="col-span-2">Player</div>
+    <div className="text-center">G</div>
+    <div className="text-center">A</div>
+    <div className="text-center">YC</div>
+    <div className="text-center">RC</div>
+    <div className="text-center">BP</div>
+  </div>
 );
 
 
-export function StatsEntryModal({ fixture, players, isOpen, onClose, onSave }: StatsEntryModalProps) {
+export function StatsEntryModal({ fixture, players, isOpen, loading = false,onClose, onSave }: StatsEntryModalProps) {
   const [stats, setStats] = useState<PlayerStatInputs>({});
   const [homeScore, setHomeScore] = useState<number | string>('');
   const [awayScore, setAwayScore] = useState<number | string>('');
@@ -83,12 +106,13 @@ export function StatsEntryModal({ fixture, players, isOpen, onClose, onSave }: S
   };
 
   const { homePlayers, awayPlayers } = useMemo(() => {
-    if (!fixture) return { homePlayers: [], awayPlayers: [] };
-    return {
-      homePlayers: players.filter(p => p.team_id === fixture.home_team.id),
-      awayPlayers: players.filter(p => p.team_id === fixture.away_team.id),
-    };
-  }, [fixture, players]);
+  if (!fixture) return { homePlayers: [], awayPlayers: [] };
+  const getTid = (p: Player) => (p as any).team_id ?? (p as any).team?.id;
+  return {
+    homePlayers: players.filter(p => getTid(p) === fixture.home_team.id),
+    awayPlayers: players.filter(p => getTid(p) === fixture.away_team.id),
+  };
+}, [fixture, players]);
 
   useEffect(() => {
     if (fixture) {
@@ -149,6 +173,11 @@ export function StatsEntryModal({ fixture, players, isOpen, onClose, onSave }: S
         
         <div className="p-6">
             <ScrollArea className="h-[50vh] w-full">
+               {loading ? (
+    <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+      Loading players…
+    </div>
+  ) : (
               <div className="space-y-6">
                 {/* Home Team Section in a distinct container */}
                 <div className="border rounded-lg p-4">
@@ -159,8 +188,13 @@ export function StatsEntryModal({ fixture, players, isOpen, onClose, onSave }: S
                     <StatsTableHeader />
                     <div className="px-2">
                         {homePlayers.map(player => (
-                            <PlayerStatRow key={player.id} player={player} stats={stats[player.id]} onStatChange={handleStatChange} />
-                        ))}
+  <PlayerStatRow
+    key={player.id}
+    player={player}
+    stats={stats[player.id]}   // may be undefined; component handles it
+    onStatChange={handleStatChange}
+  />
+))}
                     </div>
                 </div>
 
@@ -173,17 +207,23 @@ export function StatsEntryModal({ fixture, players, isOpen, onClose, onSave }: S
                     <StatsTableHeader />
                     <div className="px-2">
                         {awayPlayers.map(player => (
-                            <PlayerStatRow key={player.id} player={player} stats={stats[player.id]} onStatChange={handleStatChange} />
+                           <PlayerStatRow
+    key={player.id}
+    player={player}
+    stats={stats[player.id]}   // may be undefined; component handles it
+    onStatChange={handleStatChange}
+  />
                         ))}
                     </div>
                 </div>
               </div>
+                )}
             </ScrollArea>
         </div>
 
         <DialogFooter className="p-6 pt-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}>Save Stats & Results</Button>
+          <Button onClick={handleSave}disabled={loading || homePlayers.length === 0 || awayPlayers.length === 0}>Save Stats & Results</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

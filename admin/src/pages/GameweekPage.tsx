@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, ShieldQuestion } from 'lucide-react';
 import type { Team, Player, PlayerStatus } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { gameweekAPI } from '@/lib/api';
+import { gameweekAPI,playerAPI } from '@/lib/api';
 import { useEffect } from 'react';
 
 // --- DUMMY DATA ---
@@ -69,6 +69,10 @@ export function GameweekPage() {
   const [selectedFixture, setSelectedFixture] = useState<any | null>(null);
   const [isConfirming, setConfirming] = useState<'calculate' | 'finalize' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [modalPlayers, setModalPlayers] = useState<Player[]>([]);
+const [modalLoading, setModalLoading] = useState(false);
+
+
 
   useEffect(() => {
     const t = token || localStorage.getItem("admin_token");
@@ -101,18 +105,68 @@ export function GameweekPage() {
 
   const allStatsEntered = useMemo(() => fixtures.every(f => f.stats_entered), [fixtures]);
 
-  const handleOpenStatsModal = (fixtureId: number) => {
-    const fixture = fixtures.find(f => f.id === fixtureId);
-    if (fixture) setSelectedFixture(fixture);
-  };
+  const handleOpenStatsModal = async (fixtureId: number) => {
+  const t = token || localStorage.getItem("admin_token");
+  const fx = fixtures.find(f => f.id === fixtureId);
+  if (!t || !fx) return;
 
-  const handleSaveStats = useCallback((fixtureId: number, scores: { home_score: number; away_score: number }) => {
-    setFixtures(prev => 
-      prev.map(f => f.id === fixtureId ? { ...f, stats_entered: true, home_score: scores.home_score, away_score: scores.away_score } : f)
+  try {
+    setModalLoading(true);
+    const [home, away] = await Promise.all([
+      playerAPI.getByTeam(t, fx.home_team_id),
+      playerAPI.getByTeam(t, fx.away_team_id),
+    ]);
+    setModalPlayers([...home, ...away]);
+    setSelectedFixture(fx);
+  } catch (e:any) {
+    toast({ variant: "destructive", title: "Load failed", description: e.message || "Could not load players." });
+  } finally {
+    setModalLoading(false);
+  }
+};
+
+const handleSaveStats = async (
+  fixtureId: number,
+  scores: { home_score: number; away_score: number },
+  statsMap: { [playerId: number]: {
+    goals_scored: number; assists: number; yellow_cards: number; red_cards: number; bonus_points: number; minutes?: number;
+  }}
+) => {
+  const t = token || localStorage.getItem("admin_token");
+  if (!t || !gameweek) return;
+
+  // map object -> array for API
+  const player_stats = Object.entries(statsMap).map(([pid, s]) => ({
+    player_id: Number(pid),
+    goals_scored: s.goals_scored ?? 0,
+    assists: s.assists ?? 0,
+    yellow_cards: s.yellow_cards ?? 0,
+    red_cards: s.red_cards ?? 0,
+    bonus_points: s.bonus_points ?? 0,
+    minutes: s.minutes ?? 0,
+  }));
+
+  try {
+    await gameweekAPI.submitPlayerStats(gameweek.id, fixtureId, {
+      home_score: scores.home_score,
+      away_score: scores.away_score,
+      player_stats,
+    }, t);
+
+    // reflect locally
+    setFixtures(prev =>
+      prev.map(f =>
+        f.id === fixtureId
+          ? { ...f, stats_entered: true, home_score: scores.home_score, away_score: scores.away_score }
+          : f
+      )
     );
     setSelectedFixture(null);
-    toast({ title: "Success", description: "Match stats have been saved." });
-  }, [toast]);
+    toast({ title: "Saved", description: "Stats updated." });
+  } catch (e:any) {
+    toast({ variant: "destructive", title: "Save failed", description: e.message || "Error" });
+  }
+};
 
   const handleCalculatePoints = useCallback(() => {
     setGameweek(gw => ({ ...gw, status: 'Calculating' }));
@@ -172,7 +226,8 @@ export function GameweekPage() {
         isOpen={!!selectedFixture}
         onClose={() => setSelectedFixture(null)}
         fixture={selectedFixture}
-        players={DUMMY_PLAYERS}
+        players={modalPlayers}
+        loading={modalLoading}
         onSave={handleSaveStats}
       />
 

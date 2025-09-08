@@ -234,3 +234,30 @@ class ChipStatus(BaseModel):
     used: List[ChipName] = []
 
 
+class PlayerStatIn(BaseModel):
+    player_id: int
+    goals_scored: int = 0
+    assists: int = 0
+    yellow_cards: int = 0
+    red_cards: int = 0
+    bonus_points: int = 0
+
+class SubmitFixtureStats(BaseModel):
+    fixture_id: int
+    home_score: int = Field(ge=0)
+    away_score: int = Field(ge=0)
+    player_stats: List[PlayerStatIn]
+
+class PlayerStatOut(BaseModel):
+    player_id: int
+    goals_scored: int
+    assists: int
+    yellow_cards: int
+    red_cards: int
+    bonus_points: int
+    minutes: int
+
+class FixtureStatsOut(BaseModel):
+    home_score: int | None = None
+    away_score: int | None = None
+    player_stats: list[PlayerStatOut]

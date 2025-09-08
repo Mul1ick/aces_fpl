@@ -212,6 +212,10 @@ export const playerAPI = {
   async deletePlayer(playerId: string, token: string) {
     return apiRequest(`/admin/players/${playerId}`, { method: 'DELETE' }, token);
   },
+  async getByTeam(token: string, teamId: number) {
+    const params = new URLSearchParams({ team: String(teamId) });
+    return apiRequest(`/admin/players?${params}`, { method: 'GET' }, token) as Promise<Player[]>;
+  },
 
 };
 
@@ -229,13 +233,40 @@ export const gameweekAPI = {
     return apiRequest(`/admin/gameweeks/${gameweekId}/fixtures`, { method: 'GET' }, token);
   },
 
-  async submitPlayerStats(gameweekId: string, fixtureId: string, stats: PlayerStats[], token: string): Promise<APIResponse<void>> {
+  async submitPlayerStats(
+    gameweekId: string | number,
+    fixtureId: string | number,
+    stats: {
+      home_score: number;
+      away_score: number;
+      player_stats: Array<{
+        player_id: number;
+        goals_scored: number;
+        assists: number;
+        yellow_cards: number;
+        red_cards: number;
+        bonus_points: number;
+        minutes?: number;
+      }>;
+    },
+    token: string,
+  ) {
     return apiRequest(`/admin/gameweeks/${gameweekId}/stats`, {
       method: 'POST',
-      body: JSON.stringify({ fixture_id: fixtureId, player_stats: stats }),
+      body: JSON.stringify({
+        fixture_id: Number(fixtureId),
+        home_score: stats.home_score,
+        away_score: stats.away_score,
+        player_stats: stats.player_stats,
+      }),
     }, token);
   },
 
+
+  async getFixtureStats(fixtureId: string, token: string) {
+    return apiRequest(`/admin/fixtures/${fixtureId}/stats`, { method: 'GET' }, token);
+  },
+  
   async calculatePoints(gameweekId: string, token: string): Promise<APIResponse<void>> {
     return apiRequest(`/admin/gameweeks/${gameweekId}/calculate-points`, {
       method: 'POST',

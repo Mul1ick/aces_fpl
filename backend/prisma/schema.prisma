@@ -101,13 +101,23 @@ model UserTeam {
 }
 
 model GameweekPlayerStats {
-  id          Int      @id @default(autoincrement())
-  gameweek_id Int
-  player_id   Int
-  points      Int
+  id            Int     @id @default(autoincrement())
+  gameweek_id   Int
+  player_id     Int
 
-  gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
-  player   Player   @relation(fields: [player_id], references: [id], onDelete: Cascade)
+  // granular stats
+  goals_scored  Int     @default(0)
+  assists       Int     @default(0)
+  yellow_cards  Int     @default(0)
+  red_cards     Int     @default(0)
+  bonus_points  Int     @default(0)
+  minutes       Int     @default(0)
+
+  // denormalized total for fast reads
+  points        Int     @default(0)
+
+  gameweek      Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
+  player        Player   @relation(fields: [player_id], references: [id], onDelete: Cascade)
 
   @@unique([gameweek_id, player_id])
   @@map("gameweek_player_stats")
@@ -136,6 +146,8 @@ model Fixture {
 
   home_score    Int?
   away_score    Int?
+
+  stats_entered Boolean @default(false)
 
   gameweek Gameweek @relation(fields: [gameweek_id], references: [id])
   home     Team     @relation("HomeTeam", fields: [home_team_id], references: [id])

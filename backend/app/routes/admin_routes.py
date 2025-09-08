@@ -307,3 +307,131 @@ async def admin_get_current_gameweek(db: Prisma = Depends(get_db)):
             for f in fixtures
         ],
     }
+
+@router.get("/fixtures/{fixture_id}/players")
+async def admin_fixture_players(fixture_id: int, db: Prisma = Depends(get_db)):
+    fx = await db.fixture.find_unique(where={"id": fixture_id})
+    if not fx:
+        raise HTTPException(404, "Fixture not found")
+    players = await db.player.find_many(
+        where={"team_id": {"in": [fx.home_team_id, fx.away_team_id]}},
+        include={"team": {"select": {"id": True, "name": True, "short_name": True}}},
+        order={"full_name": "asc"},
+    )
+    return players
+
+@router.post("/gameweeks/{gameweek_id}/stats")
+async def admin_submit_fixture_stats(
+    gameweek_id: int,
+    payload: schemas.SubmitFixtureStats,
+    db: Prisma = Depends(get_db),
+):
+    fx = await db.fixture.find_unique(where={"id": payload.fixture_id})
+    if not fx or fx.gameweek_id != gameweek_id:
+        raise HTTPException(400, "Fixture does not belong to this gameweek")
+
+    ids = [s.player_id for s in payload.player_stats]
+    players = await db.player.find_many(
+    where={'id': {'in': list(ids)}},
+)
+    pos_map = {p.id: p.position for p in players}
+
+    def goal_pts(pos: str) -> int:
+        if pos in ("GK", "DEF"): return 6
+        if pos == "MID": return 5
+        return 4  # FWD
+
+    async with db.tx() as tx:
+        # optional: update fixture score if those fields exist
+        try:
+            await tx.fixture.update(
+                where={"id": payload.fixture_id},
+                data={
+                    "home_score": payload.home_score,
+                    "away_score": payload.away_score,
+                    "stats_entered": True,
+                },
+            )
+        except Exception:
+            pass
+
+        for s in payload.player_stats:
+            pos = pos_map.get(s.player_id)
+            if not pos:
+                continue
+
+            points = (
+                goal_pts(pos) * s.goals_scored
+                + 3 * s.assists
+                - 1 * s.yellow_cards
+                - 3 * s.red_cards
+                + s.bonus_points
+                # minutes logic if you want: +2 for >=60 mins, +1 for 1–59, etc.
+            )
+
+            await tx.gameweekplayerstats.upsert(
+                where={
+                    "gameweek_id_player_id": {
+                        "gameweek_id": gameweek_id,
+                        "player_id": s.player_id,
+                    }
+                },
+                data={
+                    "create": {
+                        "gameweek_id": gameweek_id,
+                        "player_id": s.player_id,
+                        "goals_scored": s.goals_scored,
+                        "assists": s.assists,
+                        "yellow_cards": s.yellow_cards,
+                        "red_cards": s.red_cards,
+                        "bonus_points": s.bonus_points,
+                        # "minutes": s.minutes,
+                        "points": points,
+                    },
+                    "update": {
+                        "goals_scored": s.goals_scored,
+                        "assists": s.assists,
+                        "yellow_cards": s.yellow_cards,
+                        "red_cards": s.red_cards,
+                        "bonus_points": s.bonus_points,
+                        # "minutes": s.minutes,
+                        "points": points,
+                    },
+                },
+            )
+
+    return {"ok": True}
+
+@router.get("/fixtures/{fixture_id}/stats", response_model=schemas.FixtureStatsOut)
+async def admin_get_fixture_stats(fixture_id: int, db: Prisma = Depends(get_db)):
+    fx = await db.fixture.find_unique(where={"id": fixture_id})
+    if not fx:
+        raise HTTPException(404, "Fixture not found")
+
+    rows = await db.gameweekplayerstats.find_many(
+        where={"gameweek_id": fx.gameweek_id}
+    )
+    # If you want to limit to only players from the two clubs:
+    team_players = await db.player.find_many(
+        where={"team_id": {"in": [fx.home_team_id, fx.away_team_id]}},
+        select={"id": True},
+    )
+    ids = {p.id for p in team_players}
+    rows = [r for r in rows if r.player_id in ids]
+
+    return {
+        "home_score": getattr(fx, "home_score", None),
+        "away_score": getattr(fx, "away_score", None),
+        "player_stats": [
+            {
+                "player_id": r.player_id,
+                "goals_scored": r.goals_scored,
+                "assists": r.assists,
+                "yellow_cards": r.yellow_cards,
+                "red_cards": r.red_cards,
+                "bonus_points": r.bonus_points,
+                "minutes": r.minutes,
+            }
+            for r in rows
+        ],
+    }
