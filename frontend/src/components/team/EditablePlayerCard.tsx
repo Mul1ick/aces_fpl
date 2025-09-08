@@ -64,16 +64,16 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
             <div className="flex items-center space-x-4">
                 <img src={jerseySrc} alt={`${player.team} jersey`} className="w-16 h-auto" />
                 <div>
-                    <p className="text-xs text-gray-500 font-bold">{player.pos}</p>
-                    <CardTitle className="text-2xl font-bold">{player.name}</CardTitle>
-                    <p className="text-md font-semibold text-gray-700">{player.team}</p>
+                    <p className="text-xs text-gray-500 font-bold">{player.position}</p>
+<CardTitle className="text-2xl font-bold">{player.full_name}</CardTitle>
+<p className="text-md font-semibold text-gray-700">{player.team?.name}</p>
                 </div>
             </div>
           </CardHeader>
           <CardContent className="p-4">
             <div className="grid grid-cols-3 gap-4 text-center mb-4">
                 <div>
-                    <p className="font-bold text-lg">£5.0m</p>
+                   <p className="font-bold text-lg">£{Number(player?.price ?? 0).toFixed(1)}m</p>
                     <p className="text-xs text-gray-500">Price</p>
                 </div>
                  <div>
@@ -89,9 +89,14 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
             <div>
                 <h4 className="font-bold text-md mb-2">Fixtures</h4>
                 <div className="space-y-1">
-                    <FixtureRow gameweek="GW1" opponent="AVL (A)" points={9} />
-                    <FixtureRow gameweek="GW2" opponent="LIV (H)" points={4} />
-                    <FixtureRow gameweek="GW3" opponent="LEE (A)" points={2} />
+                     {(player.recent_fixtures ?? []).map((fx: any) => (
+    <FixtureRow
+      key={`gw-${fx.gw}`}
+      gameweek={`GW${fx.gw}`}
+      opponent={`${fx.opp} (${fx.ha})`}
+      points={fx.points ?? 0}
+    />
+  ))}
                 </div>
             </div>
 

@@ -67,10 +67,20 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
             
             <div>
                 <h4 className="font-bold text-md mb-2 text-black">Points Breakdown</h4>
-                <div className="space-y-1">
-                    <StatRow label="Minutes played" value="90" points={2} />
-                    <StatRow label="Clean sheets" value="1" points={4} />
-                </div>
+                {player?.breakdown && player.breakdown.length > 0 ? (
+    <div className="grid grid-cols-2 gap-y-1 text-sm">
+      {player.breakdown.map((row: any) => (
+        <div key={row.label} className="col-span-2 flex justify-between">
+          <span className="text-muted-foreground">
+            {row.label}{typeof row.value === "number" ? ` (${row.value})` : ""}
+          </span>
+          <span className="font-medium">{row.points}</span>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="text-sm text-muted-foreground">No breakdown available.</p>
+  )}
             </div>
 
             <Button className="w-full mt-6" variant="outline">

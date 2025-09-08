@@ -36,17 +36,52 @@ const Team: React.FC = () => {
         const data: TeamResponse = await res.json();
         if (!data.starting || !data.bench) throw new Error("Malformed team data");
 
-        const transformPlayer = (player: any) => ({
-          id: player.id,
-          name: player.full_name,
-          team: player.team.name,
-          pos: player.position,
-          fixture: player.fixture_str,
-          points: 0,
-          isCaptain: player.is_captain,
-          isVice: player.is_vice_captain,
-          is_benched: player.is_benched,
-        });
+  //       const transformPlayer = (player: any) => ({
+  //         id: player.id,
+  // full_name: player.full_name,
+  // position: player.position,
+  // team: player.team,                  // keep full team object
+  // price: player.price,                // keep price
+  // points: player.points,
+  // fixture_str: player.fixture_str,
+  // is_captain: player.is_captain,
+  // is_vice_captain: player.is_vice_captain,
+  // is_benched: player.is_benched,
+  // recent_fixtures: player.recent_fixtures,  // keep fixtures
+  // raw_stats: player.raw_stats,
+  // breakdown: player.breakdown,
+  //       });
+  const transformPlayer = (p: any) => ({
+  id: p.id,
+
+  // names/position (both old and new keys)
+  name: p.full_name,
+  full_name: p.full_name,
+  pos: p.position,
+  position: p.position,
+
+  // team: keep STRING for existing components + OBJECT for modal
+  team: p.team?.name,      // string (PlayerCard, jersey map, filters)
+  team_obj: p.team,        // object (modal header)
+
+  // numbers
+  price: p.price,
+  points: p.points,
+  fixture: p.fixture_str,
+  fixture_str: p.fixture_str,
+
+  // flags (both styles)
+  isCaptain: p.is_captain,
+  isVice: p.is_vice_captain,
+  is_captain: p.is_captain,
+  is_vice_captain: p.is_vice_captain,
+  is_benched: p.is_benched,
+
+  // extras for modal
+  recent_fixtures: p.recent_fixtures,
+  raw_stats: p.raw_stats,
+  breakdown: p.breakdown,
+});
 
         const starting = data.starting.map(transformPlayer);
         const bench = data.bench.map(transformPlayer);
@@ -183,7 +218,7 @@ const handlePlayerClick = (clickedPlayer: any) => {
             name: p.full_name,
             team: p.team.name,
             pos: p.position,
-            fixture: p.fixture_str,
+            fixture_str: p.fixture_str,
             points: p.points,
             isCaptain: p.is_captain,
             isVice: p.is_vice_captain,

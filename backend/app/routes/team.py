@@ -98,3 +98,13 @@ async def save_team(
         new_players=[p.dict() for p in payload.players]
     )
     return updated
+
+
+@router.get("/teams/{gameweek_id}/players/{player_id}/card")
+async def get_player_card_endpoint(
+    gameweek_id: int,
+    player_id: int,
+    db: Prisma = Depends(get_db),
+    current_user: schemas.UserOut = Depends(get_current_user)
+):
+    return await crud.get_player_card(db, current_user.id, gameweek_id, player_id)

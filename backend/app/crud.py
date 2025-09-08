@@ -206,31 +206,29 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     if not entries:
         return {"team_name": fantasy_team.name, "starting": [], "bench": []}
 
-    # 2) Points for current GW
     player_ids: List[int] = [e.player_id for e in entries]
+    team_ids: List[int] = list({e.player.team_id for e in entries})
+
+    # 2) Points and raw stats for current GW
     stats = await db.gameweekplayerstats.find_many(
         where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
     )
     logger.info(f"Stats fetched for {len(stats)} players")
     pts_map: Dict[int, int] = {s.player_id: s.points for s in stats}
+    stats_map: Dict[int, Any] = {s.player_id: s for s in stats}
 
-    # 3) Find NEXT gameweek (by gw_number, safer than id+1)
+    # 3) Current and next gameweeks
     cur_gw = await db.gameweek.find_unique(where={'id': gameweek_id})
-    logger.info(f"Current GW: {cur_gw.gw_number if cur_gw else None}")
-    next_gw: Optional = None
-    if cur_gw:
-        next_gw = await db.gameweek.find_unique(where={'gw_number': cur_gw.gw_number + 1})
-    logger.info(f"Next GW: {next_gw.gw_number if next_gw else None}")
+    if not cur_gw:
+        raise HTTPException(status_code=404, detail="Gameweek not found")
+    next_gw = await db.gameweek.find_unique(where={'gw_number': cur_gw.gw_number + 1})
 
-    # 4) Build team_id -> fixture_str map for next GW
-    fixture_map: Dict[int, str] = {}
+    team_ids: List[int] = list({e.player.team_id for e in entries})
+
+    # 4) Build fixture_str for NEXT GW (kept for your UI)
+    fixture_map_next: Dict[int, str] = {}
     if next_gw:
-        # Which club IDs do we care about?
-        team_ids = list({e.player.team_id for e in entries})
-        logger.info(f"Looking for fixtures for team_ids={team_ids}")
-
-        # Get all fixtures in next GW involving any of those teams
-        fixtures = await db.fixture.find_many(
+        fixtures_next = await db.fixture.find_many(
             where={
                 'gameweek_id': next_gw.id,
                 'OR': [
@@ -240,48 +238,115 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
             },
             include={'home': True, 'away': True}
         )
-        logger.info(f"Found {len(fixtures)} fixtures for next GW")
-
-        # Format helper: "OPP (H/A) • Sat 30 Aug 20:00"
-        def fmt(kickoff: datetime, opp_short: str, venue: str) -> str:
-            # Adjust formatting as you prefer
+        def fmt_next(opp_short: str, venue: str) -> str:
             return f"{opp_short} ({venue}) "
-
-        # Build map for both home and away teams
-        for f in fixtures:
-            logger.debug(f"Fixture: {f.home.short_name} vs {f.away.short_name} @ {f.kickoff}")
+        for f in fixtures_next:
             if f.home_team_id in team_ids:
-                fixture_map[f.home_team_id] = fmt(f.kickoff, f.away.short_name, 'H')
+                fixture_map_next[f.home_team_id] = fmt_next(f.away.short_name, 'H')
             if f.away_team_id in team_ids:
-                fixture_map[f.away_team_id] = fmt(f.kickoff, f.home.short_name, 'A')
+                fixture_map_next[f.away_team_id] = fmt_next(f.home.short_name, 'A')
 
-    logger.info(f"Fixture map built: {fixture_map}")
 
-    # 5) Shape response objects
+    # 5) Recent fixtures (last two + current) with points per player
+    #    a) find GW rows
+    gw_rows = await db.gameweek.find_many(
+    where={"gw_number": {"gte": max(1, cur_gw.gw_number - 2), "lte": cur_gw.gw_number}},
+    order={"gw_number": "asc"}
+    )
+    gw_id_to_num: Dict[int, int] = {g.id: g.gw_number for g in gw_rows}
+    recent_gw_ids: List[int] = [g.id for g in gw_rows]
+
+    fixtures_recent = await db.fixture.find_many(
+        where={
+            "gameweek_id": {"in": recent_gw_ids},
+            "OR": [
+                {"home_team_id": {"in": team_ids}},
+                {"away_team_id": {"in": team_ids}},
+            ],
+        },
+        include={"home": True, "away": True},
+        order={"kickoff": "asc"}
+    )
+
+
+    fixtures_by_team: Dict[int, List[Any]] = {}
+    for f in fixtures_recent:
+        fixtures_by_team.setdefault(f.home_team_id, []).append(f)
+        fixtures_by_team.setdefault(f.away_team_id, []).append(f)
+
+    # points by player across those recent GWs
+    recent_stats = await db.gameweekplayerstats.find_many(
+        where={"player_id": {"in": player_ids}, "gameweek_id": {"in": recent_gw_ids}}
+    )
+    pts_by_player_gw: Dict[tuple[int, int], int] = {
+        (s.player_id, s.gameweek_id): int(s.points or 0) for s in recent_stats
+    }
+
+    def _breakdown_for(position: str, st: Any) -> tuple[dict, list[dict]]:
+        raw = {
+            "minutes": int(st.minutes or 0),
+            "goals_scored": int(st.goals_scored or 0),
+            "assists": int(st.assists or 0),
+            "yellow_cards": int(st.yellow_cards or 0),
+            "red_cards": int(st.red_cards or 0),
+            "bonus_points": int(st.bonus_points or 0),
+        }
+        pos = (position or "").upper()
+        goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
+        breakdown = [
+            {"label": "Appearance",   "value": 1 if raw["minutes"] > 0 else 0, "points": 1 if raw["minutes"] > 0 else 0},
+            {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
+            {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
+            {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
+            {"label": "Red cards",    "value": raw["red_cards"],               "points": -3 * raw["red_cards"]},
+            {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
+        ]
+        return raw, breakdown
+
+
+    # 6) Shape response objects
     def to_display(entry):
         club = entry.player.team
-        return {
+        out = {
             "id": entry.player.id,
             "full_name": entry.player.full_name,
             "position": entry.player.position,
             "price": entry.player.price,
             "is_captain": entry.is_captain,
             "is_vice_captain": entry.is_vice_captain,
-            "team": {
-                "id": club.id,
-                "name": club.name,
-                "short_name": club.short_name,
-            },
+            "team": {"id": club.id, "name": club.name, "short_name": club.short_name},
             "is_benched": entry.is_benched,
             "points": pts_map.get(entry.player.id, 0),
-            # 👇 NEW: this is what your frontend reads
-            "fixture_str": fixture_map.get(club.id, "—"),
+            "fixture_str": fixture_map_next.get(club.id, "—"),
         }
+
+        st = stats_map.get(entry.player.id)
+        if st:
+            raw, br = _breakdown_for(entry.player.position, st)
+            out["raw_stats"] = raw
+            out["breakdown"] = br
+        else:
+            out["raw_stats"] = None
+            out["breakdown"] = None
+
+        rows = []
+        for f in fixtures_by_team.get(club.id, []):
+            gw_num = gw_id_to_num.get(f.gameweek_id)
+            if not gw_num:
+                continue
+            is_home = (f.home_team_id == club.id)
+            opp = f.away.short_name if is_home else f.home.short_name
+            pts = pts_by_player_gw.get((entry.player.id, f.gameweek_id), 0)
+            rows.append({"gw": gw_num, "opp": opp, "ha": "H" if is_home else "A", "points": pts})
+        out["recent_fixtures"] = rows
+
+        return out
 
     all_players = [to_display(e) for e in entries]
     starting = [p for p in all_players if not p["is_benched"]]
     bench = [p for p in all_players if p["is_benched"]]
 
+    
     return {
         "team_name": fantasy_team.name,
         "starting": starting,
@@ -866,3 +931,118 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
     )
     return total
 
+
+async def get_player_card(
+    db: Prisma,
+    user_id: str,
+    gameweek_id: int,
+    player_id: int,
+) -> Dict[str, Any]:
+    """
+    For the given user + GW + player:
+      - verify the player is in user's team for this GW
+      - return price, team info, captain/vice/bench flags
+      - return current-GW total points + per-stat breakdown
+      - return recent_fixtures: last two GWs + current with points
+    """
+    # 0) verify membership in team and load player + club
+    ut = await db.userteam.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': player_id},
+        include={'player': {'include': {'team': True}}},
+    )
+    if not ut:
+        raise HTTPException(404, "Player not in your team for this gameweek.")
+
+    player = ut.player
+    club = player.team
+
+    # 1) current GW stat row for this player
+    st = await db.gameweekplayerstats.find_first(
+        where={'gameweek_id': gameweek_id, 'player_id': player_id}
+    )
+
+    def _breakdown_for(position: str, st_row: Any) -> tuple[Dict[str, int], List[Dict[str, int | str]]]:
+        if not st_row:
+            return {}, []
+        raw = {
+            "minutes": int(st_row.minutes or 0),
+            "goals_scored": int(st_row.goals_scored or 0),
+            "assists": int(st_row.assists or 0),
+            "yellow_cards": int(st_row.yellow_cards or 0),
+            "red_cards": int(st_row.red_cards or 0),
+            "bonus_points": int(st_row.bonus_points or 0),
+        }
+        pos = (position or "").upper()
+        goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
+        breakdown = [
+            {"label": "Appearance",   "value": 1 if raw["minutes"] > 0 else 0, "points": 1 if raw["minutes"] > 0 else 0},
+            {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
+            {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
+            {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
+            {"label": "Red cards",    "value": raw["red_cards"],               "points": -3 * raw["red_cards"]},
+            {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
+        ]
+        return raw, breakdown
+
+    raw_stats, breakdown = _breakdown_for(player.position, st)
+    total_points = int(st.points) if st and st.points is not None else 0
+
+    # 2) recent fixtures: last two + current
+    cur_gw = await db.gameweek.find_unique(where={'id': gameweek_id})
+    if not cur_gw:
+        raise HTTPException(404, "Gameweek not found")
+
+    gw_rows = await db.gameweek.find_many(
+        where={"gw_number": {"gte": max(1, cur_gw.gw_number - 2), "lte": cur_gw.gw_number}},
+        order={"gw_number": "asc"}
+    )
+    gw_id_to_num: Dict[int, int] = {g.id: g.gw_number for g in gw_rows}
+    recent_gw_ids: List[int] = [g.id for g in gw_rows]
+
+    fixtures_recent = await db.fixture.find_many(
+        where={
+            "gameweek_id": {"in": recent_gw_ids},
+            "OR": [
+                {"home_team_id": club.id},
+                {"away_team_id": club.id},
+            ],
+        },
+        include={"home": True, "away": True},
+        order={"kickoff": "asc"}
+    )
+
+    # points for this player across those GWs
+    recent_stats = await db.gameweekplayerstats.find_many(
+        where={"player_id": player_id, "gameweek_id": {"in": recent_gw_ids}}
+    )
+    pts_by_gw: Dict[int, int] = {s.gameweek_id: int(s.points or 0) for s in recent_stats}
+
+    recent_fixtures: List[Dict[str, Any]] = []
+    for f in fixtures_recent:
+        gw_num = gw_id_to_num.get(f.gameweek_id)
+        if not gw_num:
+            continue
+        is_home = f.home_team_id == club.id
+        opp = f.away.short_name if is_home else f.home.short_name
+        recent_fixtures.append({
+            "gw": gw_num,
+            "opp": opp,
+            "ha": "H" if is_home else "A",
+            "points": pts_by_gw.get(f.gameweek_id, 0),
+        })
+
+    # 3) assemble card payload
+    return {
+        "id": player.id,
+        "full_name": player.full_name,
+        "position": player.position,
+        "price": player.price,                       # use as-is; format in UI
+        "team": {"id": club.id, "name": club.name, "short_name": club.short_name} if club else None,
+        "is_captain": bool(ut.is_captain),
+        "is_vice_captain": bool(ut.is_vice_captain),
+        "is_benched": bool(ut.is_benched),
+        "points": total_points,
+        "raw_stats": raw_stats or None,
+        "breakdown": breakdown or None,
+        "recent_fixtures": recent_fixtures,
+    }

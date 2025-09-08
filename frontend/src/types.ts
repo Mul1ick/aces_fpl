@@ -22,5 +22,3 @@ export interface TeamResponse {
   starting: Player[];
   bench: Player[];
 }
-export type ChipName = 'TRIPLE_CAPTAIN' | 'WILDCARD';
-export type ChipStatus = { active: ChipName | null; used: ChipName[] };

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict,Field,field_validator
 from uuid import UUID
-from typing import List, Optional, TypeVar, Generic,Literal
+from typing import List, Optional, TypeVar, Generic,Literal,Dict,Any
 from datetime import datetime
 
 # --- Generic Type for Paginated Response ---
@@ -109,6 +109,9 @@ class PlayerDisplay(BaseModel):
     is_benched:bool
     points: int
     fixture_str: Optional[str] = None
+    recent_fixtures: Optional[List[Dict[str, Any]]] = None
+    raw_stats: Optional[Dict[str, int]] = None   # minutes, goals_scored, assists, yellow_cards, red_cards, bonus_points
+    breakdown: Optional[List[Dict[str, int | str]]] = None
     model_config = ConfigDict(from_attributes=True)
 
 class GetTeamResponse(BaseModel):
