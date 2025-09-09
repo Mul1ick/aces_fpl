@@ -186,7 +186,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     useEffect(() => {
         const fetchPlayers = async () => {
           try {
-            const response = await fetch(`${API.BASEURL}/players/`);
+            const response = await fetch(`${API.BASE_URL}/players/`);
             if (!response.ok) throw new Error('API failed');
             const data = await response.json();
             const mapped = data.map(player => ({
