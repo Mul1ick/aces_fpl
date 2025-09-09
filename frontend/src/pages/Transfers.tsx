@@ -236,7 +236,7 @@ const Transfers: React.FC = () => {
     const payload = { team_name: teamName, players };
 
     try {
-      const response = await fetch(`${API.endpoints.team}/submit-team`, {
+      const response = await fetch(`${API.endpoints.team}/team/submit-team`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
