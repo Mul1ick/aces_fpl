@@ -47,6 +47,8 @@ async def get_pending_users(db: Prisma = Depends(get_db)):
             "role": u.role,
             "is_active": bool(u.is_active),
             "has_team": flags[i],
+            "free_transfers": (u.profile.free_transfers if u.profile else 1),
+            "played_first_gameweek": (u.profile.played_first_gameweek if u.profile else False),
         }
         for i, u in enumerate(users)
     ]
