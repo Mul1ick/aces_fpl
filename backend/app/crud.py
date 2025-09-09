@@ -18,10 +18,10 @@ async def get_user_by_email(db: Prisma, email: str):
 async def get_user_by_id(db: Prisma, user_id: str):
     try:
         uuid_obj = UUID(user_id)
-        return await db.user.find_unique(where={"id": str(uuid_obj)})
+        return await db.user.find_unique(where={"id": str(uuid_obj)}, include={"profile": True})
     except (ValueError, TypeError):
         return None
-
+    
 async def create_user(db: Prisma, user: schemas.UserCreate):
     hashed_pw = auth.hash_password(user.password)
     new_user = await db.user.create(
@@ -36,7 +36,7 @@ async def create_user(db: Prisma, user: schemas.UserCreate):
 # --- ADMIN USER FUNCTIONS ---
 
 async def get_pending_users(db: Prisma):
-    return await db.user.find_many(where={'is_active': False})
+    return await db.user.find_many(where={'is_active': False},include={"profile": True},)
 
 async def get_all_users(db: Prisma, page: int, per_page: int, search: Optional[str] = None, role: Optional[str] = None):
     skip = (page - 1) * per_page
@@ -57,6 +57,7 @@ async def get_all_users(db: Prisma, page: int, per_page: int, search: Optional[s
         where=where_clause,
         skip=skip,
         take=per_page,
+        include={"profile": True},
     )
     
     return {
@@ -68,16 +69,12 @@ async def get_all_users(db: Prisma, page: int, per_page: int, search: Optional[s
     }
 
 async def approve_user(db: Prisma, user_id: str):
-    return await db.user.update(
-        where={'id': user_id},
-        data={'is_active': True}
-    )
+    await db.user.update(where={'id': user_id}, data={'is_active': True})
+    return await db.user.find_unique(where={'id': user_id}, include={"profile": True})
 
 async def update_user_role(db: Prisma, user_id: str, role: str):
-    return await db.user.update(
-        where={'id': user_id},
-        data={'role': role}
-    )
+    await db.user.update(where={'id': user_id}, data={'role': role})
+    return await db.user.find_unique(where={'id': user_id}, include={"profile": True})
 
 async def bulk_approve_users(db: Prisma, user_ids: List[UUID]):
     user_id_strs = [str(uid) for uid in user_ids]
