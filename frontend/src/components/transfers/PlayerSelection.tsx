@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { API } from '@/lib/api';
 import { Slider } from '@/components/ui/slider';
 
 // --- ASSET IMPORTS & CONSTANTS ---
@@ -185,7 +186,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     useEffect(() => {
         const fetchPlayers = async () => {
           try {
-            const response = await fetch('http://localhost:8000/players/');
+            const response = await fetch(`${API.BASEURL}/players/`);
             if (!response.ok) throw new Error('API failed');
             const data = await response.json();
             const mapped = data.map(player => ({
