@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { FixtureList } from '@/components/fixtures/FixtureList';
 import { GameweekNavigator } from '@/components/fixtures/GameweekNavigator';
+import { API } from '@/lib/api';
 
 // --- LOGO IMPORTS ---
 import redLogo from '@/assets/images/team-logos/red.png';
@@ -69,7 +70,7 @@ const Fixtures: React.FC = () => {
 
     (async () => {
       try {
-        const res = await fetch('http://localhost:8000/fixtures', {
+        const res = await fetch(`${API.BASE_URL}/fixtures`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!res.ok) {

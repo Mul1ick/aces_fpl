@@ -9,7 +9,8 @@ import { PlayerSelectionList, PlayerSelectionModal } from '@/components/transfer
 import { EnterSquadModal } from '@/components/transfers/EnterSquadModal';
 import { Button } from '@/components/ui/button';
 import { TeamResponse } from "@/types";
-
+import {API } from "@/lib/api"
+ 
 // --- CONFIGURATION ---
 const initialSquad = {
   GK: [null, null],
@@ -133,7 +134,7 @@ const Transfers: React.FC = () => {
 
       if (hasTeam === true) {
         try {
-          const response = await fetch("http://localhost:8000/teams/team", {
+          const response = await fetch(`${API.endpoints.team}/team`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!response.ok) throw new Error("No team found for user");
@@ -235,7 +236,7 @@ const Transfers: React.FC = () => {
     const payload = { team_name: teamName, players };
 
     try {
-      const response = await fetch("http://localhost:8000/teams/submit-team", {
+      const response = await fetch(`${API.endpoints.team}/submit-team`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

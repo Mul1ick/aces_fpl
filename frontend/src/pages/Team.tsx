@@ -10,6 +10,7 @@ import { TeamResponse } from "@/types";
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { API } from '@/lib/api'
 
 // --- ASSET IMPORTS ---
 import pitchBackground from '@/assets/images/pitch.svg';
@@ -28,7 +29,7 @@ const Team: React.FC = () => {
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
-    fetch("http://localhost:8000/teams/team", {
+    fetch(`${API.endpoints.team}/team`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async res => {
@@ -199,7 +200,7 @@ const handlePlayerClick = (clickedPlayer: any) => {
     };
 
     try {
-        const response = await fetch("http://localhost:8000/teams/save-team", {
+        const response = await fetch(`${API.endpoints.team}/save-team`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(payload),
