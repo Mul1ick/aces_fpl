@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes,fixture_routes,transfer_routes,chip_routes
 from app.config import CORS_ORIGINS
 import logging
+from app.database import db_client
 
 logging.basicConfig(
     level=logging.INFO,  # or DEBUG if you want the detailed logs
@@ -26,6 +27,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def startup():
+    await db_client.connect()
+
+@app.on_event("shutdown")
+async def shutdown():
+    await db_client.disconnect()
 
 # --- API Router Includes ---
 # Public routes for the main FPL application

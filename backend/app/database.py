@@ -4,5 +4,5 @@ from prisma import Prisma
 db_client = Prisma()
 
 async def get_db():
-    yield Prisma
+    yield db_client
 
