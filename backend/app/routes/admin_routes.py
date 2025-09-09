@@ -74,6 +74,8 @@ async def get_all_users(
             "role": u.role,
             "is_active": bool(u.is_active),
             "has_team": has_team,
+            "free_transfers": (u.profile.free_transfers if u.profile else 1),
+            "played_first_gameweek": (u.profile.played_first_gameweek if u.profile else False),
         })
 
     return {
@@ -101,6 +103,8 @@ async def approve_user(user_id: str, db: Prisma = Depends(get_db)):
         "role": updated.role,
         "is_active": bool(updated.is_active),
         "has_team": has_team,
+        "free_transfers": (updated.profile.free_transfers if updated.profile else 1),
+        "played_first_gameweek": (updated.profile.played_first_gameweek if updated.profile else False),
     }
 
 @router.post("/users/bulk-approve", response_model=dict)
