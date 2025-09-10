@@ -49,8 +49,8 @@ async def get_pending_users(db: Prisma = Depends(get_db)):
             "role": u.role,
             "is_active": bool(u.is_active),
             "has_team": flags[i],
-            "free_transfers": (u.profile.free_transfers if u.profile else 1),
-            "played_first_gameweek": (u.profile.played_first_gameweek if u.profile else False),
+            "free_transfers": (u.free_transfers if u.free_transfers is not None else 1),
+            "played_first_gameweek": (u.played_first_gameweek if u.played_first_gameweek is not None else False),
         }
         for i, u in enumerate(users)
     ]
@@ -76,8 +76,8 @@ async def get_all_users(
             "role": u.role,
             "is_active": bool(u.is_active),
             "has_team": has_team,
-            "free_transfers": (u.profile.free_transfers if u.profile else 1),
-            "played_first_gameweek": (u.profile.played_first_gameweek if u.profile else False),
+            "free_transfers": (u.free_transfers if u.free_transfers is not None else 1),
+            "played_first_gameweek": (u.played_first_gameweek if u.played_first_gameweek is not None else False),
         })
 
     return {
@@ -105,8 +105,8 @@ async def approve_user(user_id: str, db: Prisma = Depends(get_db)):
         "role": updated.role,
         "is_active": bool(updated.is_active),
         "has_team": has_team,
-        "free_transfers": (updated.profile.free_transfers if updated.profile else 1),
-        "played_first_gameweek": (updated.profile.played_first_gameweek if updated.profile else False),
+        "free_transfers": (updated.free_transfers if updated.free_transfers is not None else 1),
+        "played_first_gameweek": (updated.played_first_gameweek if updated.played_first_gameweek is not None else False),
     }
 
 @router.post("/users/bulk-approve", response_model=dict,dependencies=[Depends(get_current_admin_user)])
