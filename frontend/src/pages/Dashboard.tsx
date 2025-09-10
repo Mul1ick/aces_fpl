@@ -89,7 +89,7 @@ const Dashboard: React.FC = () => {
     // We only fetch data if the user has a team
     if (user?.has_team) {
       const token = localStorage.getItem("access_token");
-      const URL = `${API.BASE_URL}/transfers/stats`;
+      const URL = API.endpoints.transferStats;
 
       (async () => {
         try {

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-const API = import.meta.env.VITE_API_BASE_URL;
-const LOGIN_URL = `${API}/auth/login`;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const LOGIN_URL = `${API_BASE_URL}/auth/login`;
 
 interface User {
   id: string;
@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   
   const fetchAndSetUser = async (token: string) => {
     try {
-        const response = await fetch(`${API.BASE_URL}/auth/me`, {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) throw new Error("Token invalid");
@@ -71,7 +71,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     try {
       const t = localStorage.getItem("admin_token");
       if (!t) return; // no session
-      const res = await fetch(`${API}/auth/me`, {
+      const res = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${t}` },
       });
       if (!res.ok) {
@@ -158,7 +158,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      const response = await fetch(API.endpoints.signup, {
+      const response = await fetch(API_BASE_URL.endpoints.signup, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, full_name: name }),
@@ -183,11 +183,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     setUser(null);
     setPendingApproval(false);
     localStorage.removeItem("aces_fpl_user");
-    localStorage.removeItem("access_token");
+    localStorage.removeItem("admin_token");
   };
 
   const refreshUserStatus = async () => {
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("admin_token");
     if (token) {
         await fetchAndSetUser(token);
     }

@@ -25,7 +25,7 @@ const Gameweek: React.FC = () => {
       }
 
       try {
-        const response = await fetch(`${API.BASE_URL.team}/team`, {
+        const response = await fetch(API.endpoints.team, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

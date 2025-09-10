@@ -70,7 +70,7 @@ const Fixtures: React.FC = () => {
 
     (async () => {
       try {
-        const res = await fetch(`${API.BASE_URL}/fixtures`, {
+        const res = await fetch(API.endpoints.fixtures, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!res.ok) {

@@ -32,8 +32,8 @@ class UserOut(UserBase):
     is_active: bool
     role: str
     has_team: bool
-    free_transfers: int  # <-- ADD THIS
-    played_first_gameweek: bool # <-- ADD THIS
+    free_transfers: int = 0                 # ← add default
+    played_first_gameweek: bool = False
 
     # created_at is no longer required by the API response
     
