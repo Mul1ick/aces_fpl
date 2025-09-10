@@ -10,6 +10,7 @@ import { GameweekStatusCard } from "@/components/dashboard/GameweekStatusCard";
 import { TransfersCard } from "@/components/dashboard/TransfersCard";
 import { TeamOfTheWeekCard } from "@/components/dashboard/TeamOfTheWeekCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { API } from "@/lib/api";
 
 type TransferStatItem = {
   player_id: number;
@@ -88,7 +89,7 @@ const Dashboard: React.FC = () => {
     // We only fetch data if the user has a team
     if (user?.has_team) {
       const token = localStorage.getItem("access_token");
-      const URL = "http://localhost:8000/transfers/stats";
+      const URL = API.endpoints.transferStats;
 
       (async () => {
         try {

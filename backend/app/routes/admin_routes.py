@@ -8,6 +8,8 @@ import asyncio
 from collections import defaultdict
 import logging
 alog = logging.getLogger("aces.admin")
+from app.auth import get_current_admin_user
+from fastapi import Depends
 
 
 router = APIRouter(
@@ -29,7 +31,7 @@ async def get_dashboard_stats(db: Prisma = Depends(get_db)):
 
 # --- USER MANAGEMENT ---
 
-@router.get("/users/pending", response_model=List[schemas.UserOut])
+@router.get("/users/pending", response_model=List[schemas.UserOut],dependencies=[Depends(get_current_admin_user)])
 async def get_pending_users(db: Prisma = Depends(get_db)):
     users = await crud.get_pending_users(db)  # returns List[PrismaModels.User]
 
@@ -51,7 +53,7 @@ async def get_pending_users(db: Prisma = Depends(get_db)):
         for i, u in enumerate(users)
     ]
 
-@router.get("/users", response_model=schemas.PaginatedResponse[schemas.UserOut])
+@router.get("/users", response_model=schemas.PaginatedResponse[schemas.UserOut],dependencies=[Depends(get_current_admin_user)])
 async def get_all_users(
     db: Prisma = Depends(get_db),
     page: int = Query(1, ge=1),
@@ -83,7 +85,7 @@ async def get_all_users(
     }
 
 
-@router.post("/users/{user_id}/approve", response_model=schemas.UserOut)
+@router.post("/users/{user_id}/approve", response_model=schemas.UserOut,dependencies=[Depends(get_current_admin_user)])
 async def approve_user(user_id: str, db: Prisma = Depends(get_db)):
     user = await crud.get_user_by_id(db, user_id)
     if not user:
@@ -101,7 +103,7 @@ async def approve_user(user_id: str, db: Prisma = Depends(get_db)):
         "has_team": has_team,
     }
 
-@router.post("/users/bulk-approve", response_model=dict)
+@router.post("/users/bulk-approve", response_model=dict,dependencies=[Depends(get_current_admin_user)])
 async def bulk_approve_users(request: schemas.BulkApproveRequest, db: Prisma = Depends(get_db)):
     """
     Approve multiple users in a single request.
@@ -109,7 +111,7 @@ async def bulk_approve_users(request: schemas.BulkApproveRequest, db: Prisma = D
     result = await crud.bulk_approve_users(db, request.user_ids)
     return {"message": f"Successfully approved {result.count} users."}
 
-@router.post("/users/{user_id}/role", response_model=schemas.UserOut)
+@router.post("/users/{user_id}/role", response_model=schemas.UserOut,dependencies=[Depends(get_current_admin_user)])
 async def update_user_role(user_id: str, request: schemas.UserUpdateRole, db: Prisma = Depends(get_db)):
     """
     Update a user's role (e.g., promote to admin).

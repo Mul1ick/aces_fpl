@@ -7,6 +7,7 @@ import { PitchView } from '@/components/gameweek/PitchView';
 import { ListView } from '@/components/gameweek/ListView';
 import { ManagerInfoCard } from '@/components/gameweek/ManagerInfoCard';
 import { Card } from '@/components/ui/card';
+import { API } from '@/lib/api';
 import { PlayerDetailCard } from '@/components/gameweek/PlayerDetailCard';
 
 const Gameweek: React.FC = () => {
@@ -24,7 +25,7 @@ const Gameweek: React.FC = () => {
       }
 
       try {
-        const response = await fetch("http://localhost:8000/teams/team", {
+        const response = await fetch(API.endpoints.team, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
