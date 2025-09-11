@@ -270,3 +270,10 @@ class GameweekStatsOut(BaseModel):
     user_points: int
     average_points: int
     highest_points: int
+
+class ManagerHubStats(BaseModel):
+    overall_points: int
+    gameweek_points: int
+    total_players: int
+    squad_value: float
+    in_the_bank: float

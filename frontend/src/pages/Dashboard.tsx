@@ -64,6 +64,14 @@ const Dashboard: React.FC = () => {
     average_points: 0,
     highest_points: 0,
   });
+  const [hubStats, setHubStats] = useState({
+    overall_points: 0,
+    gameweek_points: 0,
+    total_players: 0,
+    squad_value: 0.0,
+    in_the_bank: 110.0,
+  });
+
 
   const [transfersIn, setTransfersIn] = useState<
     { rank: number; name: string; club: string; pos: string; transfers: string }[]
@@ -179,6 +187,31 @@ const Dashboard: React.FC = () => {
 
 
 
+  useEffect(() => {
+    const fetchHubStats = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const response = await fetch("http://localhost:8000/users/stats", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setHubStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch manager hub stats:", error);
+      }
+    };
+
+    if (user) {
+      fetchHubStats();
+    }
+  }, [user]);
+
+
+
+
   // Your Existing Dashboard Code
   return (
     <div className="bg-white min-h-screen text-black">
@@ -200,7 +233,7 @@ const Dashboard: React.FC = () => {
  />
                 </motion.div>
                 <motion.div variants={itemVariants}>
-                  <ManagerHubCard />
+                  <ManagerHubCard stats={hubStats}/>
                 </motion.div>
               </div>
 

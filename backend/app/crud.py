@@ -1077,3 +1077,48 @@ async def get_gameweek_stats_for_user(db: Prisma, user_id: str, gameweek_id: int
         "average_points": average_points,
         "highest_points": highest_points,
     }
+
+
+async def get_manager_hub_stats(db: Prisma, user_id: str, gameweek_id: int):
+    """
+    Calculates the stats needed for the Manager Hub card on the dashboard.
+    """
+    # 1. Calculate Overall Points (sum of all gameweek scores for the user)
+    overall_scores = await db.usergameweekscore.group_by(
+        by=['user_id'],
+        where={'user_id': user_id},
+        sum={'total_points': True}
+    )
+    overall_points = overall_scores[0]['_sum']['total_points'] if overall_scores else 0
+
+    # 2. Get Gameweek Points for the current week
+    gameweek_score = await db.usergameweekscore.find_unique(
+        where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}}
+    )
+    gameweek_points = gameweek_score.total_points if gameweek_score else 0
+
+    # 3. Get Total Players (count of all active users)
+    total_players = await db.user.count(where={'is_active': True})
+
+
+    # --- 4. Calculate Squad Value ---
+    # Get all players in the user's current squad
+    user_squad_entries = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id},
+        include={'player': True} # Include the full player object to get the price
+    )
+
+    # Sum the prices of all players in the squad
+    squad_value = sum(p.player.price for p in user_squad_entries) if user_squad_entries else 0.0
+
+    # --- NEW: Calculate In The Bank ---
+    total_budget = 110.0
+    in_the_bank = total_budget - float(squad_value)
+
+    return {
+        "overall_points": overall_points or 0,
+        "gameweek_points": gameweek_points,
+        "total_players": total_players,
+        "squad_value" : float(squad_value),
+        "in_the_bank":in_the_bank
+    }
