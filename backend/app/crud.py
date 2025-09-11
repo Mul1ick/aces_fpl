@@ -1046,3 +1046,34 @@ async def get_player_card(
         "breakdown": breakdown or None,
         "recent_fixtures": recent_fixtures,
     }
+
+# In backend/app/crud.py
+
+async def get_gameweek_stats_for_user(db: Prisma, user_id: str, gameweek_id: int):
+    """
+    Calculates the user's points, the average points, and the highest points
+    for a specific gameweek.
+    """
+    # 1. Get all scores for the specified gameweek
+    all_scores = await db.usergameweekscore.find_many(
+        where={'gameweek_id': gameweek_id}
+    )
+
+    if not all_scores:
+        # If no scores are in yet, return all zeros
+        return {"user_points": 0, "average_points": 0, "highest_points": 0}
+
+    # 2. Find the current user's score
+    user_score_entry = next((s for s in all_scores if s.user_id == user_id), None)
+    user_points = user_score_entry.total_points if user_score_entry else 0
+    
+    # 3. Calculate average and highest scores
+    total_points_sum = sum(s.total_points for s in all_scores)
+    average_points = round(total_points_sum / len(all_scores))
+    highest_points = max(s.total_points for s in all_scores)
+
+    return {
+        "user_points": user_points,
+        "average_points": average_points,
+        "highest_points": highest_points,
+    }

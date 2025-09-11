@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.database import get_db
 from prisma import Prisma
 from datetime import datetime, timezone
+from app.auth import get_current_user
+from prisma import models as PrismaModels
+from app import schemas, crud
 
 router = APIRouter()
 
@@ -31,3 +34,15 @@ async def get_current_gameweek(db: Prisma = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No gameweek found.")
         
     return gameweek
+
+@router.get("/stats", response_model=schemas.GameweekStatsOut)
+async def get_gameweek_stats(
+    db: Prisma = Depends(get_db),
+    current_user: PrismaModels.User = Depends(get_current_user)
+):
+    current_gameweek = await crud.get_current_gameweek(db)
+    return await crud.get_gameweek_stats_for_user(
+        db,
+        user_id=str(current_user.id),
+        gameweek_id=current_gameweek.id
+    )

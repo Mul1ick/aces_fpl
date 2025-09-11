@@ -264,3 +264,9 @@ class FixtureStatsOut(BaseModel):
     home_score: int | None = None
     away_score: int | None = None
     player_stats: list[PlayerStatOut]
+
+
+class GameweekStatsOut(BaseModel):
+    user_points: int
+    average_points: int
+    highest_points: int

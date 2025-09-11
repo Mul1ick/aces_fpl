@@ -11,6 +11,7 @@ import { TransfersCard } from "@/components/dashboard/TransfersCard";
 import { TeamOfTheWeekCard } from "@/components/dashboard/TeamOfTheWeekCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API } from "@/lib/api";
+import { TeamResponse } from "@/types"; 
 
 type TransferStatItem = {
   player_id: number;
@@ -57,6 +58,13 @@ const teamOfTheWeek = {
 
 const Dashboard: React.FC = () => {
   const { user, isLoading } = useAuth();
+  const [squad, setSquad] = useState<TeamResponse | null>(null);
+  const [gameweekStats, setGameweekStats] = useState({
+    user_points: 0,
+    average_points: 0,
+    highest_points: 0,
+  });
+
   const [transfersIn, setTransfersIn] = useState<
     { rank: number; name: string; club: string; pos: string; transfers: string }[]
   >([]);
@@ -123,7 +131,54 @@ const Dashboard: React.FC = () => {
   if (user && user.has_team === false) {
     return <NewUserDashboard />;
   }
+
+  useEffect(() => {
+    const fetchGameweekStats = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const response = await fetch("http://localhost:8000/gameweeks/stats", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setGameweekStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch gameweek stats:", error);
+      }
+    };
+
+    if (user) { // Only fetch if the user is loaded
+        fetchGameweekStats();
+    }
+  }, [user]);
   
+
+  useEffect(() => {
+    // Fetch the user's team data when the component mounts
+    const fetchTeam = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!user || !token) return;
+
+      try {
+        const response = await fetch("http://localhost:8000/teams/team", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data: TeamResponse = await response.json();
+          setSquad(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch team data on dashboard:", error);
+      }
+    };
+    
+    fetchTeam();
+  }, [user]);
+
+
+
   // Your Existing Dashboard Code
   return (
     <div className="bg-white min-h-screen text-black">
@@ -137,7 +192,12 @@ const Dashboard: React.FC = () => {
               {/* Left Column */}
               <div className="space-y-8">
                 <motion.div variants={itemVariants}>
-                  <GameweekHeroCard user={user} />
+                  <GameweekHeroCard user={user}
+                  points={gameweekStats.user_points}
+      averagePoints={gameweekStats.average_points}
+      highestPoints={gameweekStats.highest_points}
+      teamName={squad?.team_name}
+ />
                 </motion.div>
                 <motion.div variants={itemVariants}>
                   <ManagerHubCard />
