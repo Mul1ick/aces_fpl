@@ -146,7 +146,8 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem("access_token");
       if (!token) return;
       try {
-        const response = await fetch("http://localhost:8000/gameweeks/stats", {
+        const response = await fetch(API.endpoints.gameweekStats
+, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
@@ -171,7 +172,7 @@ const Dashboard: React.FC = () => {
       if (!user || !token) return;
 
       try {
-        const response = await fetch("http://localhost:8000/teams/team", {
+        const response = await fetch(API.endpoints.team, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
@@ -193,7 +194,7 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem("access_token");
       if (!token) return;
       try {
-        const response = await fetch("http://localhost:8000/users/stats", {
+        const response = await fetch(API.endpoints.userStats, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
@@ -216,7 +217,7 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem("access_token");
       if (!token) return;
       try {
-        const response = await fetch("http://localhost:8000/gameweeks/team-of-the-week", {
+        const response = await fetch(API.endpoints.teamOfTheWeek, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
