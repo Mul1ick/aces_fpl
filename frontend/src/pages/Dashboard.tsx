@@ -59,6 +59,7 @@ const teamOfTheWeek = {
 const Dashboard: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [squad, setSquad] = useState<TeamResponse | null>(null);
+  const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
   const [gameweekStats, setGameweekStats] = useState({
     user_points: 0,
     average_points: 0,
@@ -210,6 +211,29 @@ const Dashboard: React.FC = () => {
   }, [user]);
 
 
+  useEffect(() => {
+    const fetchTeamOfTheWeek = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const response = await fetch("http://localhost:8000/gameweeks/team-of-the-week", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setTeamOfTheWeek(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch Team of the Week:", error);
+      }
+    };
+    
+    if (user) {
+        fetchTeamOfTheWeek();
+    }
+  }, [user]);
+
+
 
 
   // Your Existing Dashboard Code
@@ -246,7 +270,7 @@ const Dashboard: React.FC = () => {
                     <CardContent className="space-y-8">
                          <GameweekStatusCard />
                         <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
-                        <TeamOfTheWeekCard team={teamOfTheWeek} />
+                        {teamOfTheWeek && <TeamOfTheWeekCard team={teamOfTheWeek} />}
                     </CardContent>
                 </Card>
               </motion.div>

@@ -277,3 +277,10 @@ class ManagerHubStats(BaseModel):
     total_players: int
     squad_value: float
     in_the_bank: float
+
+class TeamOfTheWeekOut(BaseModel):
+    manager_name: str
+    team_name: str
+    points: int
+    starting: List[PlayerDisplay]
+    bench: List[PlayerDisplay]

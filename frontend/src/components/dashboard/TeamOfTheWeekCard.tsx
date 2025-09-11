@@ -18,15 +18,16 @@ const TEAM_JERSEYS = {
 };
 
 interface TeamOfTheWeek {
-  manager: string;
+  manager_name: string;
   points: number;
-  players: any[];
+  starting: any[]; // Using 'any' for simplicity, you can create a specific type
   bench: any[];
 }
 
 interface TeamOfTheWeekCardProps {
   team: TeamOfTheWeek;
 }
+
 
 export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team }) => {
   return (
@@ -36,16 +37,17 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team }) =>
             <CardTitle className="text-xl group-hover:underline">Team of the Week</CardTitle>
             <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
         </Link>
+        <p className="text-sm text-gray-500 font-semibold">{team.manager_name} - <span className="font-bold text-black">{team.points} pts</span></p>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
           <h4 className="font-bold text-gray-500 text-sm">Starting XI</h4>
-          {team.players.map(player => (
+          {team.starting.map(player => (
             <div key={player.id} className="flex items-center space-x-3 text-sm">
-              <img src={TEAM_JERSEYS[player.club]} alt={`${player.club} jersey`} className="w-6 h-8 object-contain"/>
+              <img src={TEAM_JERSEYS[player.team.short_name]} alt={`${player.team.short_name} jersey`} className="w-6 h-8 object-contain"/>
               <div className="flex-1">
-                <p className="font-bold text-black">{player.name}</p>
-                <p className="text-xs text-gray-500">{player.club} · {player.pos}</p>
+                <p className="font-bold text-black">{player.full_name}</p>
+               <p className="text-xs text-gray-500">{player.team.short_name} · {player.position}</p>
               </div>
               <p className="font-bold text-black">{player.points} pts</p>
             </div>
@@ -53,10 +55,10 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team }) =>
           <h4 className="font-bold text-gray-500 text-sm pt-2 border-t">Bench</h4>
           {team.bench.map(player => (
             <div key={player.id} className="flex items-center space-x-3 text-sm">
-              <img src={TEAM_JERSEYS[player.club]} alt={`${player.club} jersey`} className="w-6 h-8 object-contain"/>
+              <img src={TEAM_JERSEYS[player.team.short_name]} alt={`${player.team.short_name} jersey`} className="w-6 h-8 object-contain"/>
               <div className="flex-1">
-                <p className="font-bold text-black">{player.name}</p>
-                <p className="text-xs text-gray-500">{player.club} · {player.pos}</p>
+                <p className="font-bold text-black">{player.full_name}</p>
+                <p className="text-xs text-gray-500">{player.team.short_name} · {player.position}</p>
               </div>
               <p className="font-bold text-black">{player.points} pts</p>
             </div>

@@ -430,7 +430,6 @@ async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
 
 # app/crud.py
 
-from fastapi import HTTPException
 
 async def transfer_player(
     db: Prisma,
@@ -1121,4 +1120,66 @@ async def get_manager_hub_stats(db: Prisma, user_id: str, gameweek_id: int):
         "total_players": total_players,
         "squad_value" : float(squad_value),
         "in_the_bank":in_the_bank
+    }
+
+# In backend/app/crud.py
+from datetime import datetime, timezone
+
+async def get_team_of_the_week(db: Prisma):
+    """
+    Finds the highest-scoring team from the most recently completed gameweek.
+    """
+    now_utc = datetime.now(timezone.utc)
+
+    # 1. Find the most recently completed gameweek
+    last_completed_gw = await db.gameweek.find_first(
+        where={'deadline': {'lt': now_utc}},
+        order={'deadline': 'desc'}
+    )
+    if not last_completed_gw:
+        return None
+    # 2. Find the highest score in that gameweek
+    top_score = await db.usergameweekscore.find_first(
+        where={'gameweek_id': last_completed_gw.id},
+        order={'total_points': 'desc'}
+    )
+    if not top_score:
+        return None
+
+    top_user_id = top_score.user_id
+
+    # 3. Fetch the manager's details (User and FantasyTeam)
+    manager = await db.user.find_unique(
+        where={'id': top_user_id},
+        include={'fantasy_team': True}
+    )
+    manager_name = manager.full_name if manager and manager.full_name else "Top Manager"
+    team_name = manager.fantasy_team.name if manager and manager.fantasy_team else "Team of the Week"
+
+    # 4. Fetch the full team of the top-scoring user
+    # This logic is now self-contained and doesn't depend on the flawed get_user_team_full
+    user_team_entries = await db.userteam.find_many(
+        where={'user_id': top_user_id, 'gameweek_id': last_completed_gw.id},
+        include={'player': {'include': {'team': True}}}
+    )
+
+    def to_display(entry):
+        return {
+            "id": entry.player.id, "full_name": entry.player.full_name,
+            "position": entry.player.position, "price": entry.player.price,
+            "is_captain": entry.is_captain, "is_vice_captain": entry.is_vice_captain,
+            "is_benched": entry.is_benched, "team": entry.player.team,
+            "points": 0, "fixture_str": "" # Points/fixture not needed for this card display
+        }
+
+    all_players = [to_display(p) for p in user_team_entries]
+    starting = [p for p in all_players if not p["is_benched"]]
+    bench = [p for p in all_players if p["is_benched"]]
+
+    return {
+        "manager_name": manager_name,
+        "team_name": team_name,
+        "points": top_score.total_points,
+        "starting": starting,
+        "bench": bench
     }
