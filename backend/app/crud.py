@@ -357,26 +357,63 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
 
 
 async def get_leaderboard(db: Prisma):
-    scores = await db.usergameweekscore.group_by(
-        by=['user_id'],
-        sum={'total_points': True},
-        order={'_sum': {'total_points': 'desc'}}
+    """
+    Gets all active users with a fantasy team and ranks them by their
+    total points, defaulting to 0 for users with no scores yet.
+    """
+    # 1. Get all active users who have created a fantasy team.
+    #    This is now our source of truth for who should be on the leaderboard.
+    all_users_with_teams = await db.user.find_many(
+        where={
+            'is_active': True,
+            'fantasy_team': {
+                'is_not': None
+            }
+        },
+        include={'fantasy_team': True}
     )
 
+    if not all_users_with_teams:
+        return []
+
+    # 2. Get all aggregated scores and create an efficient lookup map.
+    scores_data = await db.usergameweekscore.group_by(
+        by=['user_id'],
+        sum={'total_points': True}
+    )
+    # score_map will look like: {'user-uuid-1': 150, 'user-uuid-2': 95}
+    score_map = {
+        score['user_id']: score['_sum']['total_points'] or 0
+        for score in scores_data
+    }
+
+    # 3. Combine user data with scores, defaulting to 0 if a user has no score entry.
+    unranked_list = []
+    for user in all_users_with_teams:
+        total_points = score_map.get(str(user.id), 0)
+        unranked_list.append({
+            "user_details": user,
+            "total_points": total_points
+        })
+
+    # 4. Sort the combined list by points in descending order.
+    unranked_list.sort(key=lambda x: x['total_points'], reverse=True)
+
+    # 5. Build the final response with the correct rank.
     leaderboard = []
-    for rank, score in enumerate(scores, 1):
-        user_details = await db.user.find_unique(
-            where={'id': score['user_id']},
-            include={'fantasy_team': True}
-        )
-        if user_details and user_details.fantasy_team:
-            leaderboard.append({
-                "rank": rank,
-                "team_name": user_details.fantasy_team.name,
-                "manager_email": user_details.email,
-                "total_points": score['_sum']['total_points'] or 0
-            })
+    for rank, item in enumerate(unranked_list, 1):
+        user_details = item['user_details']
+        leaderboard.append({
+            "rank": rank,
+            "team_name": user_details.fantasy_team.name,
+            "manager_email": user_details.email,
+            "total_points": item['total_points']
+        })
+
     return leaderboard
+
+
+
 
 async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
     # 1. Check if the user already has a team for this GW

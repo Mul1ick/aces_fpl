@@ -284,3 +284,9 @@ class TeamOfTheWeekOut(BaseModel):
     points: int
     starting: List[PlayerDisplay]
     bench: List[PlayerDisplay]
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    team_name: str
+    manager_email: EmailStr  # Add this field
+    total_points: int

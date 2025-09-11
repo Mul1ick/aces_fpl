@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/fpl-button";
 import { Card, CardContent } from "@/components/ui/fpl-card";
 import { Input } from "@/components/ui/input";
 import acesLogo from "@/assets/aces-logo.png";
+import { API } from "@/lib/api";
 
 // --- TYPES ---
 interface LeaderboardEntry {
@@ -13,8 +14,9 @@ interface LeaderboardEntry {
   team_name: string;
   manager_email: string;
   total_points: number;
-  gwPoints?: number;
+  gwPoints?: number; // Gameweek points can be added later if the API provides it
 }
+
 
 // --- MOBILE CARD COMPONENT ---
 const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean }> = ({ entry, isCurrentUser }) => (
@@ -37,11 +39,12 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
       </div>
       <div className="text-right">
         <p className="text-xl font-bold text-pl-white">{entry.total_points}</p>
-        <p className="text-caption text-pl-white/60">{entry.gwPoints} (GW)</p>
+        {entry.gwPoints && <p className="text-caption text-pl-white/60">{entry.gwPoints} (GW)</p>}
       </div>
     </div>
   </motion.div>
 );
+
 
 
 const Leaderboard: React.FC = () => {
@@ -63,16 +66,13 @@ const Leaderboard: React.FC = () => {
       }
       try {
         setIsLoading(true);
-        const response = await fetch("http://localhost:8000/leaderboard/", {
+        const response = await fetch(API.endpoints.leaderboard, { // Using the API helper
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) throw new Error("Failed to fetch leaderboard data.");
         const data: LeaderboardEntry[] = await response.json();
-        const dataWithGwPoints = data.map(entry => ({
-            ...entry,
-            gwPoints: Math.floor(Math.random() * 40) + 30,
-        }));
-        setLeaderboardData(dataWithGwPoints);
+        // You can add logic here to fetch and add GW points if needed
+        setLeaderboardData(data);
       } catch (e) {
         setError(e instanceof Error ? e.message : "An unknown error occurred.");
       } finally {
@@ -89,18 +89,21 @@ const Leaderboard: React.FC = () => {
         entry.team_name.toLowerCase().includes(searchQuery.toLowerCase())
     ), [leaderboardData, searchQuery]);
 
+
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const paginatedData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
   };
 
-  return (
+
+   return (
     <div className="min-h-screen bg-pl-purple">
       <div className="container mx-auto px-4 sm:px-6 py-8 max-w-[1100px]">
         <motion.div initial="hidden" animate="visible" variants={containerVariants}>
@@ -109,7 +112,7 @@ const Leaderboard: React.FC = () => {
           <motion.div variants={containerVariants} className="mb-6 text-center">
             <img src={acesLogo} alt="Aces FPL Logo" className="w-16 h-16 mx-auto mb-2" />
             <h1 className="text-4xl md:text-5xl font-extrabold text-pl-white">
-              FANTASY PREMIER LEAGUE
+              Overall League
             </h1>
             <p className="text-caption text-pl-white/60 mt-2">
               Last updated: {new Date().toLocaleString()}
@@ -149,28 +152,25 @@ const Leaderboard: React.FC = () => {
                   <div className="h-96 flex items-center justify-center text-pl-pink">{error}</div>
                 ) : (
                   <>
-                    {/* --- DESKTOP TABLE (Hidden on mobile) --- */}
+                    {/* --- DESKTOP TABLE --- */}
                     <div className="overflow-x-auto hidden md:block">
                       <table className="w-full text-left">
                         <thead className="border-b border-pl-border">
                           <tr>
                             <th className="p-4 text-caption font-semibold text-pl-white/60 w-16 text-center">Rank</th>
                             <th className="p-4 text-caption font-semibold text-pl-white/60">Team & Manager</th>
-                            <th className="p-4 text-caption font-semibold text-pl-white/60 text-center">GW</th>
                             <th className="p-4 text-caption font-semibold text-pl-white/60 text-center">Total</th>
                           </tr>
                         </thead>
                         <motion.tbody initial="hidden" animate="visible" variants={containerVariants}>
-                          {paginatedData.map((entry, index) => (
+                          {paginatedData.map((entry) => (
                             <motion.tr
                               key={entry.rank}
                               variants={containerVariants}
                               className={`border-b border-pl-border last:border-b-0 transition-colors ${entry.manager_email === user?.email ? "bg-pl-green/10 hover:bg-pl-green/20" : "hover:bg-pl-white/5"}`}
                             >
                               <td className="p-4 text-center">
-                                <span className={`font-semibold tabular-nums flex items-center justify-center gap-2 ${entry.manager_email === user?.email ? "text-pl-green" : "text-pl-white"}`}>
-                                  {index % 3 === 1 && <ArrowUpCircle className="size-4 text-green-500" />}
-                                  {index % 4 === 1 && <ArrowDownCircle className="size-4 text-red-500" />}
+                                <span className={`font-semibold tabular-nums ${entry.manager_email === user?.email ? "text-pl-green" : "text-pl-white"}`}>
                                   {entry.rank}
                                 </span>
                               </td>
@@ -178,7 +178,6 @@ const Leaderboard: React.FC = () => {
                                 <p className="font-semibold text-pl-white">{entry.team_name}</p>
                                 <p className="text-caption text-pl-white/60">{entry.manager_email}</p>
                               </td>
-                              <td className="p-4 text-center text-body text-pl-white tabular-nums">{entry.gwPoints}</td>
                               <td className="p-4 text-center text-body font-bold text-pl-white tabular-nums">{entry.total_points}</td>
                             </motion.tr>
                           ))}
@@ -186,7 +185,7 @@ const Leaderboard: React.FC = () => {
                       </table>
                     </div>
                     
-                    {/* --- MOBILE CARD LIST (Hidden on desktop) --- */}
+                    {/* --- MOBILE CARD LIST --- */}
                     <div className="md:hidden">
                         <motion.div initial="hidden" animate="visible" variants={containerVariants}>
                            {paginatedData.map(entry => (
