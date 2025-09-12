@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import acesLogo from "@/assets/aces-logo.png";
+import acesLogo from "@/assets/aces-logo-black.png";
 
 const Splash: React.FC = () => {
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ const Splash: React.FC = () => {
           <motion.img 
             src={acesLogo} 
             alt="Aces FPL Logo" 
-            className="w-24 h-auto mx-auto mb-6 drop-shadow-lg"
+            className="w-80 h-auto mx-auto mb-6 drop-shadow-lg"
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2, type: "spring", stiffness: 100 }}

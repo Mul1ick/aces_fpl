@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { motion } from 'framer-motion';
 
 // --- COMPONENT IMPORTS ---
 import { TransfersHeroCard } from '@/components/transfers/TransfersHeroCard';
@@ -10,6 +12,9 @@ import { EnterSquadModal } from '@/components/transfers/EnterSquadModal';
 import { Button } from '@/components/ui/button';
 import { TeamResponse } from "@/types";
 import { API } from '@/lib/api';
+import acesLogo from "@/assets/aces-logo.png";
+import { Skeleton } from '@/components/ui/skeleton';
+import { TransferListView } from '@/components/transfers/TransferListView';
 
 // --- CONFIGURATION ---
 const initialSquad = {
@@ -19,11 +24,50 @@ const initialSquad = {
   FWD: [null, null, null],
 };
 
+const TeamPageSkeleton = () => (
+    <div className="w-full min-h-screen bg-white font-sans">
+        <div className="grid grid-cols-1 lg:grid-cols-10">
+            <div className="hidden lg:block lg:col-span-4 h-screen overflow-y-auto p-4 border-r">
+                <div className="space-y-4">
+                    <Skeleton className="h-48 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                    <div className="p-4 space-y-3">
+                        {[...Array(5)].map((_, i) => (
+                            <div key={i} className="flex items-center space-x-4">
+                                <Skeleton className="h-12 w-12 rounded-full" />
+                                <div className="flex-1 space-y-2">
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-3 w-1/2" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            <div className="lg:col-span-6 flex flex-col h-screen">
+                <div className="p-4">
+                    <Skeleton className="h-40 w-full rounded-lg" />
+                </div>
+                <div className="flex-1 p-4">
+                    <Skeleton className="h-full w-full rounded-lg" />
+                </div>
+                <div className="p-4 grid grid-cols-3 gap-4 border-t">
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
+
 const serializeSquad = (sq: any) => JSON.stringify({
-  GK: (sq.GK ?? []).map(p => p ? p.id : null),
-  DEF: (sq.DEF ?? []).map(p => p ? p.id : null),
-  MID: (sq.MID ?? []).map(p => p ? p.id : null),
-  FWD: (sq.FWD ?? []).map(p => p ? p.id : null),
+  GK: (sq.GK ?? []).map((p: any) => p ? p.id : null),
+  DEF: (sq.DEF ?? []).map((p: any) => p ? p.id : null),
+  MID: (sq.MID ?? []).map((p: any) => p ? p.id : null),
+  FWD: (sq.FWD ?? []).map((p: any) => p ? p.id : null),
   caps: {
     c: Object.values(sq).flat().find((p: any) => p?.isCaptain || p?.is_captain)?.id ?? null,
     v: Object.values(sq).flat().find((p: any) => p?.isVice || p?.is_vice_captain)?.id ?? null,
@@ -45,24 +89,21 @@ function buildPlayersPayloadFromSquad(squad: any) {
       is_captain: !!(p.is_captain ?? p.isCaptain),
       is_vice_captain: !!(p.is_vice_captain ?? p.isVice),
       is_benched: !!(p.is_benched ?? p.isBenched),
-    }))
+     }))
   );
 
   if (flat.length !== 11) return flat;
-
   const gks = flat.filter(p => p.position === "GK");
   if (gks.length === 2) {
     const gkBucket = (squad.GK ?? []).filter(Boolean);
     const starterGKId = gkBucket[0]?.id ?? gks[0].id;
     gks.forEach(gk => (gk.is_benched = gk.id !== starterGKId));
   }
-
   const captain = flat.find(p => p.is_captain) || null;
   const vice = flat.find(p => p.is_vice_captain) || null;
   const protectedIds = new Set([captain?.id, vice?.id].filter(Boolean) as number[]);
   const benchSet = new Set(flat.filter(p => p.is_benched).map(p => p.id));
   const need = 3 - benchSet.size;
-
   if (need > 0) {
     const candidates = ["FWD", "MID", "DEF"]
       .flatMap(pos => (squad[pos] ?? []).slice().reverse())
@@ -71,7 +112,7 @@ function buildPlayersPayloadFromSquad(squad: any) {
       .filter((p: any) => p && p.position !== "GK" && !protectedIds.has(p.id) && !benchSet.has(p.id));
     for (let i = 0; i < need && i < candidates.length; i++) {
       if (candidates[i]) {
-        candidates[i].is_benched = true;
+         candidates[i].is_benched = true;
         benchSet.add(candidates[i].id);
       }
     }
@@ -80,7 +121,6 @@ function buildPlayersPayloadFromSquad(squad: any) {
       .slice(0, Math.abs(need));
     extras.forEach(p => (p.is_benched = false));
   }
-
   if (captain && captain.is_benched) captain.is_benched = false;
   if (vice && vice.is_benched) vice.is_benched = false;
   if (captain && vice && captain.id === vice.id) {
@@ -88,12 +128,13 @@ function buildPlayersPayloadFromSquad(squad: any) {
     const starter = flat.find(p => !p.is_benched && p.id !== captain.id && p.position !== "GK");
     if (starter) starter.is_vice_captain = true;
   }
-
   return flat;
 }
 
+
 const Transfers: React.FC = () => {
   const { user, refreshUserStatus, isLoading: isAuthLoading } = useAuth();
+  const { toast } = useToast();
   const [squad, setSquad] = useState(initialSquad);
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -105,20 +146,24 @@ const Transfers: React.FC = () => {
   const [existingTeamName, setExistingTeamName] = useState<string>('');
   const navigate = useNavigate();
   const token = localStorage.getItem("access_token");
+  
+  const [view, setView] = useState<'pitch' | 'list'>('pitch');
 
   const hasTeam = user?.has_team;
 
   const transformApiDataToSquad = (players: any[]) => {
     const newSquad = JSON.parse(JSON.stringify(initialSquad));
-    players.forEach(raw => {
-      const pos = String(raw?.pos ?? raw?.position ?? "").toUpperCase();
-      if (newSquad[pos]) {
-        const idx = newSquad[pos].findIndex((s: any) => s === null);
-        if (idx !== -1) {
-          newSquad[pos][idx] = { ...raw, pos };
-        }
-      }
-    });
+    if (Array.isArray(players)) {
+        players.forEach(raw => {
+            const pos = String(raw?.pos ?? raw?.position ?? "").toUpperCase();
+            if (newSquad[pos]) {
+                const idx = newSquad[pos].findIndex((s: any) => s === null);
+                if (idx !== -1) {
+                    newSquad[pos][idx] = { ...raw, pos };
+                }
+            }
+        });
+    }
     return newSquad;
   };
 
@@ -137,15 +182,27 @@ const Transfers: React.FC = () => {
           const response = await fetch(API.endpoints.team, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          if (!response.ok) throw new Error("No team found for user");
+
+          if (!response.ok) {
+            setSquad(initialSquad);
+            setBaseline(serializeSquad(initialSquad));
+            return;
+          }
+
           const data: TeamResponse = await response.json();
           setExistingTeamName(data.team_name || '');
-          const allPlayers = [...data.starting, ...data.bench];
+
+          const startingPlayers = Array.isArray(data.starting) ? data.starting : [];
+          const benchPlayers = Array.isArray(data.bench) ? data.bench : [];
+          const allPlayers = [...startingPlayers, ...benchPlayers];
+          
           const populatedSquad = transformApiDataToSquad(allPlayers);
           setSquad(populatedSquad);
           setBaseline(serializeSquad(populatedSquad));
         } catch (error) {
-          console.error("Failed to fetch team:", error);
+          console.error("Failed to fetch or process team data:", error);
+          setSquad(initialSquad);
+          setBaseline(serializeSquad(initialSquad));
         } finally {
           setIsLoading(false);
         }
@@ -153,14 +210,39 @@ const Transfers: React.FC = () => {
     };
 
     if (!isAuthLoading) {
-        fetchAndSetTeam();
+      fetchAndSetTeam();
     }
-  }, [user, isAuthLoading]);
+  }, [user, isAuthLoading, token]);
 
-  const showNotification = (message: string, type: 'success' | 'error') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
+
+  const squadValidation = useMemo(() => {
+    const allPlayers = Object.values(squad).flat().filter(p => p !== null);
+    const teamCounts = allPlayers.reduce((acc, player) => {
+      const teamName = player.team?.name || player.club;
+      if (teamName) {
+        acc[teamName] = (acc[teamName] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    for (const team in teamCounts) {
+      if (teamCounts[team] > 2) {
+        return { isValid: false, errorTeam: team };
+      }
+    }
+    return { isValid: true, errorTeam: null };
+  }, [squad]);
+
+  useEffect(() => {
+    if (!squadValidation.isValid && squadValidation.errorTeam) {
+      setNotification({
+        message: `You cannot have more than 2 players from ${squadValidation.errorTeam}.`,
+        type: 'error',
+      });
+    } else {
+      setNotification(null);
+    }
+  }, [squadValidation]);
 
   const handlePlayerSelect = (player: any) => {
     setIsPlayerSelectionOpen(false);
@@ -173,7 +255,7 @@ const Transfers: React.FC = () => {
 
     if (positionToFill) {
         setSquad((current) => {
-            const newSquad = { ...current };
+             const newSquad = { ...current };
             const positionArray = [...newSquad[positionToFill.position]];
             positionArray[positionToFill.index] = player;
             newSquad[positionToFill.position] = positionArray;
@@ -191,10 +273,10 @@ const Transfers: React.FC = () => {
             const positionArray = [...newSquad[posKey]];
             positionArray[emptySlotIndex] = player;
             newSquad[posKey] = positionArray;
-            return newSquad;
+             return newSquad;
         });
     } else {
-        showNotification(`All ${posKey} slots are full.`, 'error');
+        toast({ variant: "destructive", title: "Slots Full", description: `All ${posKey} slots are full.` });
     }
   };
 
@@ -221,13 +303,19 @@ const Transfers: React.FC = () => {
     });
   };
 
-  const handleAutoFill = () => showNotification('Autofill feature coming soon!', 'success');
+  const handleAutoFill = () => toast({ title: 'Coming Soon!', description: 'Autofill feature is on the way.'});
 
   const handleReset = () => {
-    if (hasTeam) {
-        fetchAndSetTeam({ resetBaseline: false });
-    } else {
+    if (baseline) {
+      const baselineSquad = JSON.parse(baseline);
+      // This part is tricky because the baseline is just IDs. We need the full player objects.
+      // The simplest robust way is just to re-trigger the initial fetch.
+      // For now, a simpler reset to initial state if no team existed.
+      if (hasTeam) {
+         toast({ title: "Reset", description: "Functionality to revert to saved team is coming soon." });
+      } else {
         setSquad(initialSquad);
+      }
     }
   };
 
@@ -239,7 +327,7 @@ const Transfers: React.FC = () => {
       const response = await fetch(API.endpoints.submitTeam, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
@@ -252,12 +340,15 @@ const Transfers: React.FC = () => {
       
       await response.json();
       if (!hasTeam) {
-        await refreshUserStatus();
+         await refreshUserStatus();
       }
       navigate('/dashboard');
     } catch (error) {
-      console.error("Error submitting team:", error);
-      showNotification(error instanceof Error ? error.message : 'Failed to save team', 'error');
+      toast({
+          variant: "destructive",
+          title: "Error Submitting Team",
+          description: error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
     }
   };
 
@@ -273,23 +364,48 @@ const Transfers: React.FC = () => {
   }, [squad]);
 
   const dirty = useMemo(() => serializeSquad(squad) !== baseline, [squad, baseline]);
+  
+  const LoadingIndicator = () => (
+    <div className="w-full min-h-screen bg-white flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        >
+          <img src={acesLogo} alt="Loading..." className="w-24 h-auto" />
+        </motion.div>
+    </div>
+  );
 
   if (isLoading || isAuthLoading) {
-    return <div className="p-4 text-center">Loading...</div>;
+    return <LoadingIndicator />;
   }
-  
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.15 } }
+  };
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   return (
     <div className="w-full min-h-screen bg-white font-sans">
-      <div className="grid grid-cols-1 lg:grid-cols-10">
-        <div className="hidden lg:block lg:col-span-4 h-screen overflow-y-auto p-4 border-r">
+      <motion.div 
+        className="grid grid-cols-1 lg:grid-cols-10"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <motion.div variants={itemVariants} className="hidden lg:block lg:col-span-4 h-screen overflow-y-auto p-4 border-r">
           <PlayerSelectionList
             onClose={() => {}}
             onPlayerSelect={handlePlayerSelect}
             positionFilter={positionToFill?.position}
             squad={squad}
           />
-        </div>
-        <div className="lg:col-span-6 flex flex-col h-screen">
+        </motion.div>
+        <motion.div variants={itemVariants} className="lg:col-span-6 flex flex-col flex-1">
           <div className="p-4 space-y-4">
             <TransfersHeroCard
               teamName={hasTeam ? existingTeamName || 'Your Team' : 'Pick a Team Name'}
@@ -298,37 +414,61 @@ const Transfers: React.FC = () => {
               bank={bank}
               notification={notification}
               user={user}
+              view={view}
+              setView={setView}
             />
           </div>
-          <TransferPitchView
-            squad={squad}
-            onSlotClick={handleSlotClick}
-            onPlayerRemove={handlePlayerRemove}
-            onStartTransfer={handleStartTransfer}
-          />
+          
+          <div className="flex-1 flex flex-col min-h-0">
+            {view === 'pitch' ? (
+              <TransferPitchView
+                squad={squad}
+                onSlotClick={handleSlotClick}
+                onPlayerRemove={handlePlayerRemove}
+                onStartTransfer={handleStartTransfer}
+              />
+            ) : (
+              <div className="flex-1 overflow-y-auto p-4">
+                <TransferListView
+                  squad={squad}
+                  onPlayerRemove={handlePlayerRemove}
+                />
+              </div>
+            )}
+          </div>
+
           <div className="p-4 grid grid-cols-3 gap-4 border-t">
             <Button variant="outline" onClick={handleAutoFill}>Autofill</Button>
             <Button variant="destructive" onClick={handleReset}>Reset</Button>
             {hasTeam ? (
               <Button
                 onClick={handleSaveExistingTeam}
-                disabled={!dirty || playersSelected !== 11}
-                title={playersSelected !== 11 ? 'Select 11 players to save' : dirty ? 'Save changes' : 'No changes to save'}
+                disabled={!dirty || playersSelected !== 11 || !squadValidation.isValid}
+                title={
+                    playersSelected !== 11 ? 'Select 11 players to save' 
+                    : !squadValidation.isValid ? `Error: Too many players from ${squadValidation.errorTeam}`
+                    : dirty ? 'Save changes' 
+                    : 'No changes to save'
+                }
               >
                 Save Team
               </Button>
             ) : (
               <Button
                 onClick={() => setIsEnterSquadModalOpen(true)}
-                disabled={playersSelected !== 11}
-                title={playersSelected !== 11 ? 'Select 11 players to continue' : 'Enter Squad'}
+                disabled={playersSelected !== 11 || !squadValidation.isValid}
+                title={
+                    playersSelected !== 11 ? 'Select 11 players to continue'
+                    : !squadValidation.isValid ? `Error: Too many players from ${squadValidation.errorTeam}`
+                    : 'Enter Squad'
+                }
               >
                 Enter Squad
               </Button>
             )}
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
       <PlayerSelectionModal
         isOpen={isPlayerSelectionOpen}
         onClose={() => setIsPlayerSelectionOpen(false)}

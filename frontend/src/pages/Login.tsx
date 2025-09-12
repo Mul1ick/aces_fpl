@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/fpl-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/fpl-card";
 import { PillToggle } from "@/components/ui/pill-toggle";
-import acesLogo from "@/assets/aces-logo.png";
+import acesLogo from "@/assets/aces-logo-black.png";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
