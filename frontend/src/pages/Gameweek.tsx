@@ -20,7 +20,6 @@ const Gameweek: React.FC = () => {
     const fetchTeam = async () => {
       const token = localStorage.getItem("access_token");
       if (!token) {
-        // Handle case where user is not logged in
         return;
       }
 
@@ -32,7 +31,7 @@ const Gameweek: React.FC = () => {
         });
 
         if (!response.ok) {
-          throw new Error("Failed to fetch team data");
+           throw new Error("Failed to fetch team data");
         }
         
         const data: TeamResponse = await response.json();
@@ -60,26 +59,30 @@ const Gameweek: React.FC = () => {
   const allPlayers = [...squad.starting, ...squad.bench];
 
   return (
-    <div className="w-full min-h-screen bg-white flex flex-col lg:h-screen lg:flex-row font-sans">
-      {/* Left Column (Desktop Only) */}
-      <div className="hidden lg:block lg:w-2/5 p-4 h-screen overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <ManagerInfoCard />
+    // --- MODIFIED: Removed lg:h-screen to allow global scroll ---
+    <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
+       {/* --- MODIFIED: Added classes for sticky positioning --- */}
+      <div className="hidden lg:block lg:w-2/5 p-4">
+        <div className="lg:sticky lg:top-4">
+            <ManagerInfoCard />
+        </div>
       </div>
 
       {/* Right Column / Main Mobile View */}
-      <div className="flex flex-col flex-1 lg:w-3/5 lg:h-screen">
+      {/* --- MODIFIED: Removed lg:h-screen --- */}
+      <div className="flex flex-col flex-1 lg:w-3/5">
         <div className="lg:m-4 lg:border-2 lg:border-gray-300 lg:rounded-lg flex flex-col flex-grow">
-            <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] p-4 lg:rounded-t-lg">
+           <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] p-4 lg:rounded-t-lg">
                 <GameweekHeader 
                     gw={gw} 
                     view={view} 
-                    setView={setView}
+                     setView={setView}
                     teamName={squad.team_name}
                 />
             </div>
             
             {view === 'pitch' ? (
-                <PitchView playersByPos={playersByPos} bench={squad.bench} onPlayerClick={setDetailedPlayer} />
+               <PitchView playersByPos={playersByPos} bench={squad.bench} onPlayerClick={setDetailedPlayer} />
             ) : (
                 <ListView players={allPlayers} />
             )}

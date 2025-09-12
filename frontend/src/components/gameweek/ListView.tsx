@@ -1,19 +1,21 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Shield, Star } from 'lucide-react';
 
 interface ListViewProps {
   players: any[];
 }
 
 export const ListView: React.FC<ListViewProps> = ({ players }) => {
-  // Sort players by position: GK, DEF, MID, FWD, then Bench
-  const sortedPlayers = [...players].sort((a, b) => {
-    const positionOrder = { GK: 1, DEF: 2, MID: 3, FWD: 4 };
-    if (a.is_benched && !b.is_benched) return 1;
-    if (!a.is_benched && b.is_benched) return -1;
-    return positionOrder[a.pos] - positionOrder[b.pos];
-  });
+  // --- MODIFIED: Separate players into starters and bench for distinct rendering ---
+  const starters = players.filter(p => !p.is_benched);
+  const bench = players.filter(p => p.is_benched);
+
+  const positionOrder = { GK: 1, DEF: 2, MID: 3, FWD: 4 };
+
+  // Sort starters and bench separately
+  const sortedStarters = starters.sort((a, b) => positionOrder[a.position] - positionOrder[b.position]);
+  const sortedBench = bench.sort((a, b) => positionOrder[a.position] - positionOrder[b.position]);
+
 
   return (
     <div className="flex-1 p-4 min-h-0">
@@ -26,26 +28,53 @@ export const ListView: React.FC<ListViewProps> = ({ players }) => {
             </tr>
           </thead>
           <tbody>
-            {sortedPlayers.map((player) => (
-              <tr key={player.id} className={cn("border-b border-gray-200", player.is_benched ? "bg-gray-50 opacity-70" : "")}>
+            {/* Render Starters */}
+            {sortedStarters.map((player) => (
+              <tr key={player.id} className="border-b border-gray-200">
                 <td className="p-3">
-                  <div className="flex items-center space-x-2">
-                     {player.isCaptain && <Star className="size-4 text-white fill-[#E90052] stroke-[#E90052]" />}
-                     {player.isVice && <Shield className="size-4 text-white fill-gray-600 stroke-gray-600" />}
-                    <div>
-                        <p className="font-bold text-sm text-black">{player.name}</p>
-                        {/* Corrected this line to use player.team.name */}
-                        <p className="text-xs text-gray-500">{player.team?.name || 'N/A'} • {player.pos}</p>
+                   <div className="flex items-center space-x-2">
+                     <div>
+                        <p className="font-bold text-sm text-black">
+                          {player.full_name}
+                          {/* --- ADDED: (C) and (VC) labels --- */}
+                          {player.is_captain && <span className="font-semibold text-gray-600"> (C)</span>}
+                          {player.is_vice_captain && <span className="font-semibold text-gray-600"> (VC)</span>}
+                        </p>
+                        <p className="text-xs text-gray-500">{player.team?.name || 'N/A'} • {player.position}</p>
                     </div>
                   </div>
                 </td>
                 <td className="p-3 text-right font-bold text-lg text-black tabular-nums">
-                  {player.points * (player.isCaptain ? 2 : 1)}
+                  {player.points * (player.is_captain ? 2 : 1)}
+                </td>
+              </tr>
+            ))}
+
+            {/* --- ADDED: Header row for substitutes --- */}
+            <tr>
+              <td colSpan={2} className="p-2 bg-gray-200 text-center font-bold text-xs text-gray-600 uppercase tracking-wider">
+                Substitutes
+              </td>
+            </tr>
+
+            {/* Render Bench */}
+            {sortedBench.map((player) => (
+              <tr key={player.id} className="border-b border-gray-200 bg-gray-50 opacity-80">
+                <td className="p-3">
+                   <div className="flex items-center space-x-2">
+                     <div>
+                        <p className="font-bold text-sm text-black">{player.full_name}</p>
+                        <p className="text-xs text-gray-500">{player.team?.name || 'N/A'} • {player.position}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="p-3 text-right font-bold text-lg text-black tabular-nums">
+                  {player.points}
                 </td>
               </tr>
             ))}
           </tbody>
-        </table>
+         </table>
       </div>
     </div>
   );

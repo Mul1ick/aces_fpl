@@ -16,18 +16,9 @@ interface EditablePlayerCardProps {
   player: any;
   onClose: () => void;
   onSubstitute: (player: any) => void;
-onSetArmband: (playerId: number, kind: 'C' | 'VC') => void;
+  onSetArmband: (playerId: number, kind: 'C' | 'VC') => void;
+  onViewProfile: () => void; // Added this prop
 }
-
-const StatRow = ({ label, value, rank }) => (
-    <div className="flex justify-between items-center py-2 text-sm">
-        <p className="text-gray-600">{label}</p>
-        <div className="flex items-center">
-            <p className="font-bold w-12 text-center">{value}</p>
-            <p className="text-xs text-gray-400 w-16 text-right">{rank}</p>
-        </div>
-    </div>
-);
 
 const FixtureRow = ({ gameweek, opponent, points }) => (
     <div className="flex justify-between items-center py-2 border-b border-gray-200 text-sm">
@@ -37,7 +28,7 @@ const FixtureRow = ({ gameweek, opponent, points }) => (
     </div>
 );
 
-export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, onClose, onSubstitute,  onSetArmband }) => {
+export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, onClose, onSubstitute,  onSetArmband, onViewProfile }) => {
   if (!player) return null;
 
   const jerseySrc = TEAM_JERSEYS[player.team] || tshirtRed;
@@ -62,11 +53,11 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
         <Card className="border-2 border-gray-300">
           <CardHeader className="bg-gray-100 p-4">
             <div className="flex items-center space-x-4">
-                <img src={jerseySrc} alt={`${player.team} jersey`} className="w-16 h-auto" />
+               <img src={jerseySrc} alt={`${player.team} jersey`} className="w-16 h-auto" />
                 <div>
                     <p className="text-xs text-gray-500 font-bold">{player.position}</p>
-<CardTitle className="text-2xl font-bold">{player.full_name}</CardTitle>
-<p className="text-md font-semibold text-gray-700">{player.team?.name}</p>
+                    <CardTitle className="text-2xl font-bold">{player.full_name}</CardTitle>
+                    <p className="text-md font-semibold text-gray-700">{player.team?.name}</p>
                 </div>
             </div>
           </CardHeader>
@@ -74,7 +65,7 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
             <div className="grid grid-cols-3 gap-4 text-center mb-4">
                 <div>
                    <p className="font-bold text-lg">£{Number(player?.price ?? 0).toFixed(1)}m</p>
-                    <p className="text-xs text-gray-500">Price</p>
+                   <p className="text-xs text-gray-500">Price</p>
                 </div>
                  <div>
                     <p className="font-bold text-lg">9.0</p>
@@ -83,22 +74,22 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
                  <div>
                     <p className="font-bold text-lg">4.0%</p>
                     <p className="text-xs text-gray-500">TSB %</p>
-                </div>
+                 </div>
             </div>
             
             <div>
                 <h4 className="font-bold text-md mb-2">Fixtures</h4>
-                <div className="space-y-1">
+                 <div className="space-y-1">
                      {(player.recent_fixtures ?? []).map((fx: any) => (
-    <FixtureRow
-      key={`gw-${fx.gw}`}
-      gameweek={`GW${fx.gw}`}
-      opponent={`${fx.opp} (${fx.ha})`}
-      points={fx.points ?? 0}
-    />
-  ))}
+                        <FixtureRow
+                          key={`gw-${fx.gw}`}
+                          gameweek={`GW${fx.gw}`}
+                          opponent={`${fx.opp} (${fx.ha})`}
+                          points={fx.points ?? 0}
+                        />
+                      ))}
                 </div>
-            </div>
+             </div>
 
             <div className="grid grid-cols-2 gap-2 mt-6">
                <Button
@@ -107,30 +98,31 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
                 disabled={isCaptain}
               >
                 <Star className="w-4 h-4 mr-2" />
-                {isCaptain ? 'Captain (current)' : 'Captain'}
+                {isCaptain ? 'Captain (current)' : 'Make Captain'}
               </Button>
-                <Button
+               <Button
                 variant="outline"
                 onClick={() => onSetArmband(player.id, 'VC')}
                 disabled={isVice}
               >
-                <Star className="w-4 h-4 mr-2" />
-                {isVice ? 'Vice (current)' : 'Vice-Captain'}
+                 <Star className="w-4 h-4 mr-2" />
+                {isVice ? 'Vice (current)' : 'Make Vice-Captain'}
               </Button>
-               <Button variant="outline" className="col-span-2">
+              {/* --- MODIFIED: Added onClick handler --- */}
+               <Button variant="outline" className="col-span-2" onClick={onViewProfile}>
                 <User className="w-4 h-4 mr-2" />
-                Full Profile
+                 Full Profile
               </Button>
                 <Button
                 variant="destructive"
                 className="col-span-2"
-                onClick={() => onSubstitute(player)}
+                 onClick={() => onSubstitute(player)}
               >
                 <ChevronsRight className="w-4 h-4 mr-2" />
                 Substitute
               </Button>
             </div>
-          </CardContent>
+           </CardContent>
           <button onClick={onClose} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">
             <X className="w-5 h-5 text-gray-500" />
           </button>

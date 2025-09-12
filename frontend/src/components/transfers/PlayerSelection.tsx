@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Search, Filter, ArrowUpDown, DollarSign, RotateCcw } from 'lucide-react';
+import { X, Search, Filter, ArrowUpDown, DollarSign, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -28,7 +28,6 @@ const TEAM_JERSEYS = {
 
 // ============================================================================
 // SUB-COMPONENT: FilterModal
-// A generic, reusable modal for displaying filter options.
 // ============================================================================
 const FilterModal = ({ isOpen, onClose, title, children }) => (
     <AnimatePresence>
@@ -63,7 +62,6 @@ const FilterModal = ({ isOpen, onClose, title, children }) => (
 
 // ============================================================================
 // SUB-COMPONENT: PlayerTable
-// Renders the table view for a list of players.
 // ============================================================================
 const PlayerTable = ({ players, onPlayerSelect }) => (
     <table className="w-full text-left">
@@ -86,7 +84,7 @@ const PlayerTable = ({ players, onPlayerSelect }) => (
                 </td>
                 <td className="p-3 text-right font-bold text-sm">£{player.price.toFixed(1)}m</td>
                 <td className="p-3 text-right font-bold text-sm">{player.points}</td>
-            </tr>
+             </tr>
             ))}
         </tbody>
     </table>
@@ -94,7 +92,6 @@ const PlayerTable = ({ players, onPlayerSelect }) => (
 
 // ============================================================================
 // SUB-COMPONENT: PlayerFilterControls
-// Manages the UI and state for the filter/sort buttons and their modals.
 // ============================================================================
 const PlayerFilterControls = ({ filters, setFilters, resetFilters }) => {
     const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -109,42 +106,42 @@ const PlayerFilterControls = ({ filters, setFilters, resetFilters }) => {
             <div className="grid grid-cols-4 gap-2">
                 <Button variant="outline" onClick={() => setIsFilterOpen(true)}><Filter className="w-4 h-4 mr-2" /> Filter</Button>
                 <Button variant="outline" onClick={() => setIsSortOpen(true)}><ArrowUpDown className="w-4 h-4 mr-2" /> Sort by</Button>
-                <Button variant="outline" onClick={() => setIsPriceOpen(true)}><DollarSign className="w-4 h-4 mr-2" /> Price</Button>
+                 <Button variant="outline" onClick={() => setIsPriceOpen(true)}><DollarSign className="w-4 h-4 mr-2" /> Price</Button>
                 <Button variant="destructive" onClick={resetFilters}><RotateCcw className="w-4 h-4 mr-2" /> Reset</Button>
             </div>
 
             <FilterModal isOpen={isFilterOpen} onClose={() => setIsFilterOpen(false)} title="Filter Players">
-                <div className="space-y-4">
+                 <div className="space-y-4">
                     <div>
                         <h4 className="font-bold mb-2">Position</h4>
                         <div className="grid grid-cols-2 gap-2">
-                            {['GK', 'DEF', 'MID', 'FWD'].map(pos => (
+                             {['GK', 'DEF', 'MID', 'FWD'].map(pos => (
                                 <div key={pos} className="flex items-center space-x-2">
-                                    <Checkbox id={pos} checked={selectedPositions.includes(pos)} onCheckedChange={(checked) => {
+                                     <Checkbox id={pos} checked={selectedPositions.includes(pos)} onCheckedChange={(checked) => {
                                         setSelectedPositions(prev => checked ? [...prev, pos] : prev.filter(p => p !== pos));
                                     }}/>
-                                    <Label htmlFor={pos}>{pos}</Label>
+                                     <Label htmlFor={pos}>{pos}</Label>
                                 </div>
                             ))}
-                        </div>
+                         </div>
                     </div>
                     <div>
                         <h4 className="font-bold mb-2">Club</h4>
                         <div className="grid grid-cols-2 gap-2">
                             {Object.keys(TEAM_JERSEYS).map(club => (
-                                <div key={club} className="flex items-center space-x-2">
+                                 <div key={club} className="flex items-center space-x-2">
                                     <Checkbox id={club} checked={selectedClubs.includes(club)} onCheckedChange={(checked) => {
-                                        setSelectedClubs(prev => checked ? [...prev, club] : prev.filter(c => c !== club));
+                                         setSelectedClubs(prev => checked ? [...prev, club] : prev.filter(c => c !== club));
                                     }}/>
-                                    <Label htmlFor={club}>{club}</Label>
+                                     <Label htmlFor={club}>{club}</Label>
                                 </div>
                             ))}
-                        </div>
+                         </div>
                     </div>
                 </div>
             </FilterModal>
             <FilterModal isOpen={isSortOpen} onClose={() => setIsSortOpen(false)} title="Sort Players By">
-                <RadioGroup value={sortBy} onValueChange={setSortBy}>
+                 <RadioGroup value={sortBy} onValueChange={setSortBy}>
                     <div className="space-y-2">
                         <div className="flex items-center space-x-2"><RadioGroupItem value="points" id="points" /><Label htmlFor="points">Total Points</Label></div>
                         <div className="flex items-center space-x-2"><RadioGroupItem value="price" id="price" /><Label htmlFor="price">Price</Label></div>
@@ -152,14 +149,14 @@ const PlayerFilterControls = ({ filters, setFilters, resetFilters }) => {
                     </div>
                 </RadioGroup>
             </FilterModal>
-            <FilterModal isOpen={isPriceOpen} onClose={() => setIsPriceOpen(false)} title="Filter by Price">
+             <FilterModal isOpen={isPriceOpen} onClose={() => setIsPriceOpen(false)} title="Filter by Price">
                 <div className="p-4">
                     <Slider defaultValue={[3.5, 14.0]} min={3.5} max={14.0} step={0.1} value={priceRange} onValueChange={setPriceRange} />
                     <div className="flex justify-between mt-2 text-sm font-bold">
                         <span>£{priceRange[0].toFixed(1)}m</span>
                         <span>£{priceRange[1].toFixed(1)}m</span>
                     </div>
-                </div>
+                 </div>
             </FilterModal>
         </>
     );
@@ -167,8 +164,6 @@ const PlayerFilterControls = ({ filters, setFilters, resetFilters }) => {
 
 // ============================================================================
 // MAIN COMPONENT: PlayerSelectionList
-// Fetches player data and manages the state for filtering and sorting.
-// Composes the sub-components to build the final UI.
 // ============================================================================
 export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, positionFilter, squad }) => {
     // State for all available players
@@ -180,6 +175,9 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     const [selectedClubs, setSelectedClubs] = useState<string[]>([]);
     const [sortBy, setSortBy] = useState('points');
     const [priceRange, setPriceRange] = useState([3.5, 14.0]);
+    // --- ADDED: State for pagination ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15;
 
     // Fetch all players from the API on component mount
     useEffect(() => {
@@ -202,7 +200,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
             console.warn('API fetch failed:', err.message);
           }
         };
-        fetchPlayers();
+         fetchPlayers();
     }, []);
 
     // Set initial position filter when the component opens (for mobile view)
@@ -212,7 +210,12 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
         } else {
             setSelectedPositions([]);
         }
-    }, [positionFilter]);
+     }, [positionFilter]);
+     
+    // --- ADDED: Reset to page 1 whenever filters change ---
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedPositions, selectedClubs, sortBy, priceRange]);
 
     // Memoize the list of player IDs already in the user's squad
     const squadPlayerIds = useMemo(() => {
@@ -229,6 +232,17 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
         setPriceRange([3.5, 14.0]);
     };
 
+    // --- ADDED: Determine if any filters are active to change the view ---
+    const isFiltered = useMemo(() => {
+        return (
+            searchQuery.trim() !== '' ||
+            selectedPositions.length > 0 ||
+            selectedClubs.length > 0 ||
+            priceRange[0] !== 3.5 ||
+            priceRange[1] !== 14.0
+        );
+    }, [searchQuery, selectedPositions, selectedClubs, priceRange]);
+
     // Memoize the filtered and sorted list of players to display
     const filteredAndSortedPlayers = useMemo(() => {
         return players
@@ -238,12 +252,12 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                 const positionMatch = selectedPositions.length === 0 || selectedPositions.includes(p.pos);
                 const clubMatch = selectedClubs.length === 0 || selectedClubs.includes(p.club);
                 const priceMatch = p.price >= priceRange[0] && p.price <= priceRange[1];
-                return searchMatch && positionMatch && clubMatch && priceMatch;
+                 return searchMatch && positionMatch && clubMatch && priceMatch;
             })
             .sort((a, b) => b[sortBy] - a[sortBy]);
     }, [searchQuery, selectedPositions, selectedClubs, sortBy, priceRange, squadPlayerIds, players]);
 
-    // Group players by position for the desktop view
+    // Group players by position for the default (unfiltered) desktop view
     const playersByPosition = useMemo(() => {
         const grouped = { GK: [], DEF: [], MID: [], FWD: [] };
         filteredAndSortedPlayers.forEach(p => {
@@ -254,22 +268,31 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
         return grouped;
     }, [filteredAndSortedPlayers]);
 
+    // --- ADDED: Calculate paginated data and total pages ---
+    const paginatedPlayers = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredAndSortedPlayers.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredAndSortedPlayers, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredAndSortedPlayers.length / itemsPerPage);
+
+
     return (
-        <Card className="w-full h-full flex flex-col border-gray-300 border-2 rounded-none lg:rounded-lg">
+         <Card className="w-full h-full flex flex-col border-gray-300 border-2 rounded-none lg:rounded-lg">
             <CardHeader className="border-b">
                 <div className="flex justify-between items-center">
                     <CardTitle className="text-2xl font-bold">Player Selection</CardTitle>
-                    <Button variant="ghost" size="icon" onClick={onClose} className="lg:hidden">
+                     <Button variant="ghost" size="icon" onClick={onClose} className="lg:hidden">
                         <X className="w-5 h-5" />
                     </Button>
                 </div>
-                <p className="text-sm text-gray-500">Select a maximum of 2 players from a single team or 'Auto Pick' if you're short of time.</p>
+                <p className="text-sm text-gray-500">Select a maximum of 3 players from a single team or 'Auto Pick' if you're short of time.</p>
                 <div className="pt-4">
                     <Label className="text-sm font-bold">Find a player</Label>
                     <div className="relative mt-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input type="text" placeholder="Search player..." className="w-full pl-10 pr-4 py-3 border rounded-lg" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                    </div>
+                     </div>
                 </div>
             </CardHeader>
             <CardContent className="p-4 border-b">
@@ -279,38 +302,49 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                     resetFilters={resetFilters}
                 />
             </CardContent>
+            
             <div className="p-4 border-b">
                 <p className="text-sm font-bold text-gray-600">{filteredAndSortedPlayers.length} players shown</p>
             </div>
+
+            {/* --- MODIFIED: Conditional rendering logic --- */}
             <div className="flex-1 overflow-y-auto">
-                {positionFilter ? (
-                    <PlayerTable players={filteredAndSortedPlayers} onPlayerSelect={onPlayerSelect} />
+                {isFiltered ? (
+                    <>
+                        <PlayerTable players={paginatedPlayers} onPlayerSelect={onPlayerSelect} />
+                        {totalPages > 1 && (
+                            <div className="p-4 flex justify-center items-center gap-2 sticky bottom-0 bg-white border-t">
+                                <Button variant="outline" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}><ChevronLeft className="size-4" /></Button>
+                                <span className="text-sm font-semibold">Page {currentPage} of {totalPages}</span>
+                                <Button variant="outline" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}><ChevronRight className="size-4" /></Button>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="space-y-6 p-4">
-                        {Object.entries(playersByPosition).map(([pos, players]) => (
-                            players.length > 0 && (
+                        {Object.entries(playersByPosition).map(([pos, posPlayers]) => (
+                             posPlayers.length > 0 && (
                                 <div key={pos}>
-                                    <h3 className="font-bold text-lg mb-2">{pos}</h3>
-                                    <PlayerTable players={players.slice(0, 5)} onPlayerSelect={onPlayerSelect} />
+                                     <h3 className="font-bold text-lg mb-2">{pos}</h3>
+                                    <PlayerTable players={posPlayers.slice(0, 5)} onPlayerSelect={onPlayerSelect} />
                                 </div>
-                            )
+                             )
                         ))}
                     </div>
                 )}
-            </div>
+             </div>
         </Card>
     )
 }
 
 // ============================================================================
 // EXPORTED COMPONENT: PlayerSelectionModal
-// Wraps the main list in an animated modal for mobile screens.
 // ============================================================================
 export const PlayerSelectionModal: React.FC<any> = ({ isOpen, ...props }) => (
     <AnimatePresence>
         {isOpen && (
             <motion.div
-                initial={{ y: "100%" }}
+                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ duration: 0.3, ease: 'easeInOut' }}
@@ -321,4 +355,3 @@ export const PlayerSelectionModal: React.FC<any> = ({ isOpen, ...props }) => (
         )}
     </AnimatePresence>
 )
-
