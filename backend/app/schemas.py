@@ -264,3 +264,29 @@ class FixtureStatsOut(BaseModel):
     home_score: int | None = None
     away_score: int | None = None
     player_stats: list[PlayerStatOut]
+
+
+class GameweekStatsOut(BaseModel):
+    user_points: int
+    average_points: int
+    highest_points: int
+
+class ManagerHubStats(BaseModel):
+    overall_points: int
+    gameweek_points: int
+    total_players: int
+    squad_value: float
+    in_the_bank: float
+
+class TeamOfTheWeekOut(BaseModel):
+    manager_name: str
+    team_name: str
+    points: int
+    starting: List[PlayerDisplay]
+    bench: List[PlayerDisplay]
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    team_name: str
+    manager_email: EmailStr  # Add this field
+    total_points: int

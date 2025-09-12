@@ -11,6 +11,7 @@ import { TransfersCard } from "@/components/dashboard/TransfersCard";
 import { TeamOfTheWeekCard } from "@/components/dashboard/TeamOfTheWeekCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API } from "@/lib/api";
+import { TeamResponse } from "@/types"; 
 
 type TransferStatItem = {
   player_id: number;
@@ -57,6 +58,22 @@ const teamOfTheWeek = {
 
 const Dashboard: React.FC = () => {
   const { user, isLoading } = useAuth();
+  const [squad, setSquad] = useState<TeamResponse | null>(null);
+  const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
+  const [gameweekStats, setGameweekStats] = useState({
+    user_points: 0,
+    average_points: 0,
+    highest_points: 0,
+  });
+  const [hubStats, setHubStats] = useState({
+    overall_points: 0,
+    gameweek_points: 0,
+    total_players: 0,
+    squad_value: 0.0,
+    in_the_bank: 110.0,
+  });
+
+
   const [transfersIn, setTransfersIn] = useState<
     { rank: number; name: string; club: string; pos: string; transfers: string }[]
   >([]);
@@ -123,7 +140,103 @@ const Dashboard: React.FC = () => {
   if (user && user.has_team === false) {
     return <NewUserDashboard />;
   }
+
+  useEffect(() => {
+    const fetchGameweekStats = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const response = await fetch(API.endpoints.gameweekStats
+, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setGameweekStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch gameweek stats:", error);
+      }
+    };
+
+    if (user) { // Only fetch if the user is loaded
+        fetchGameweekStats();
+    }
+  }, [user]);
   
+
+  useEffect(() => {
+    // Fetch the user's team data when the component mounts
+    const fetchTeam = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!user || !token) return;
+
+      try {
+        const response = await fetch(API.endpoints.team, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data: TeamResponse = await response.json();
+          setSquad(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch team data on dashboard:", error);
+      }
+    };
+    
+    fetchTeam();
+  }, [user]);
+
+
+
+  useEffect(() => {
+    const fetchHubStats = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const response = await fetch(API.endpoints.userStats, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setHubStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch manager hub stats:", error);
+      }
+    };
+
+    if (user) {
+      fetchHubStats();
+    }
+  }, [user]);
+
+
+  useEffect(() => {
+    const fetchTeamOfTheWeek = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const response = await fetch(API.endpoints.teamOfTheWeek, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setTeamOfTheWeek(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch Team of the Week:", error);
+      }
+    };
+    
+    if (user) {
+        fetchTeamOfTheWeek();
+    }
+  }, [user]);
+
+
+
+
   // Your Existing Dashboard Code
   return (
     <div className="bg-white min-h-screen text-black">
@@ -137,10 +250,15 @@ const Dashboard: React.FC = () => {
               {/* Left Column */}
               <div className="space-y-8">
                 <motion.div variants={itemVariants}>
-                  <GameweekHeroCard user={user} />
+                  <GameweekHeroCard user={user}
+                  points={gameweekStats.user_points}
+      averagePoints={gameweekStats.average_points}
+      highestPoints={gameweekStats.highest_points}
+      teamName={squad?.team_name}
+ />
                 </motion.div>
                 <motion.div variants={itemVariants}>
-                  <ManagerHubCard />
+                  <ManagerHubCard stats={hubStats}/>
                 </motion.div>
               </div>
 
@@ -153,7 +271,7 @@ const Dashboard: React.FC = () => {
                     <CardContent className="space-y-8">
                          <GameweekStatusCard />
                         <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
-                        <TeamOfTheWeekCard team={teamOfTheWeek} />
+                        {teamOfTheWeek && <TeamOfTheWeekCard team={teamOfTheWeek} />}
                     </CardContent>
                 </Card>
               </motion.div>

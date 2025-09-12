@@ -5,10 +5,17 @@ import { Shirt, ArrowUpDown, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
 interface GameweekHeroCardProps {
-  user: any;
+  user: {
+    full_name?: string;
+  } | null;
+  points: number;
+  averagePoints: number;
+  highestPoints: number;
+  teamName?: string; 
 }
 
-export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
+
+export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamName, points, averagePoints, highestPoints  }) => {
   const navigate = useNavigate();
   const currentGameweek = 1; // This should be dynamic in a real application
 
@@ -18,10 +25,10 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
         {/* Team and Manager Name */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-white">
-            {user?.teamName || "Aces United"}
+            {teamName || "Aces United"}
           </h2>
           <p className="text-white/90 font-semibold text-md">
-            {user?.name || "John Doe"} 🇮🇳
+            {user?.full_name || "John Doe"} 🇮🇳
           </p>
         </div>
 
@@ -35,7 +42,7 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
         {/* Points Section */}
         <div className="flex justify-around items-center text-center">
           <div>
-            <p className="text-3xl font-bold tabular-nums">58</p>
+            <p className="text-3xl font-bold tabular-nums">{averagePoints}</p>
             <p className="text-sm text-white/80 font-medium">Average</p>
           </div>
           
@@ -50,7 +57,7 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 260, damping: 20 }}
             >
-              73
+              {points}
             </motion.p>
             <div className="flex items-center justify-center">
                 <p className="text-sm text-white/80 font-medium">Your Points</p>
@@ -62,7 +69,7 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user }) => {
             onClick={() => navigate(`/gameweek/${currentGameweek}/top`)} // This can link to a top player's gameweek page
             className="cursor-pointer flex flex-col items-center"
           >
-            <p className="text-3xl font-bold tabular-nums">95</p>
+            <p className="text-3xl font-bold tabular-nums">{highestPoints}</p>
             <div className="flex items-center justify-center">
                 <p className="text-sm text-white/80 font-medium">Highest</p>
                 <ChevronRight className="w-4 h-4 text-white/80 ml-1" />

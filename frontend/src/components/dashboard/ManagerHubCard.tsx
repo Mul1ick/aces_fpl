@@ -17,8 +17,19 @@ const LinkRow = ({ label }) => (
     </div>
 );
 
+interface ManagerHubCardProps {
+  stats: {
+    overall_points: number;
+    gameweek_points: number;
+    total_players: number;
+    squad_value: number,
+    in_the_bank: number,
 
-export const ManagerHubCard: React.FC = () => {
+  };
+}
+
+
+export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats }) => {
   return (
     <Card className="h-full border-black border-2">
         <CardContent className="p-4">
@@ -26,10 +37,10 @@ export const ManagerHubCard: React.FC = () => {
             <div>
                 <h3 className="font-bold text-lg mb-2">Points & Rankings</h3>
                 <div className="space-y-1">
-                    <StatRow label="Overall points" value="70" />
+                    <StatRow label="Overall points" value={stats.overall_points} />
                     <StatRow label="Overall rank" value="958,151" />
-                    <StatRow label="Total players" value="10,499,008" />
-                    <StatRow label="Gameweek points" value="70" />
+                    <StatRow label="Total players" value={stats.total_players.toLocaleString()} />
+                    <StatRow label="Gameweek points" value={stats.gameweek_points} />
                     <LinkRow label="Gameweek History" />
                 </div>
             </div>
@@ -48,8 +59,8 @@ export const ManagerHubCard: React.FC = () => {
             <div className="mt-6">
                 <h3 className="font-bold text-lg mb-2">Finance</h3>
                 <div className="space-y-1">
-                    <StatRow label="Squad value" value="£100.1m" />
-                    <StatRow label="In the bank" value="£0.0m" />
+                    <StatRow label="Squad value" value={`£${stats.squad_value.toFixed(1)}m`} />
+                    <StatRow label="In the bank" value={`£${stats.in_the_bank.toFixed(1)}m`} />
                 </div>
             </div>
 

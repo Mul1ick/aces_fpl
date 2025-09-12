@@ -353,26 +353,63 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
 
 
 async def get_leaderboard(db: Prisma):
-    scores = await db.usergameweekscore.group_by(
-        by=['user_id'],
-        sum={'total_points': True},
-        order={'_sum': {'total_points': 'desc'}}
+    """
+    Gets all active users with a fantasy team and ranks them by their
+    total points, defaulting to 0 for users with no scores yet.
+    """
+    # 1. Get all active users who have created a fantasy team.
+    #    This is now our source of truth for who should be on the leaderboard.
+    all_users_with_teams = await db.user.find_many(
+        where={
+            'is_active': True,
+            'fantasy_team': {
+                'is_not': None
+            }
+        },
+        include={'fantasy_team': True}
     )
 
+    if not all_users_with_teams:
+        return []
+
+    # 2. Get all aggregated scores and create an efficient lookup map.
+    scores_data = await db.usergameweekscore.group_by(
+        by=['user_id'],
+        sum={'total_points': True}
+    )
+    # score_map will look like: {'user-uuid-1': 150, 'user-uuid-2': 95}
+    score_map = {
+        score['user_id']: score['_sum']['total_points'] or 0
+        for score in scores_data
+    }
+
+    # 3. Combine user data with scores, defaulting to 0 if a user has no score entry.
+    unranked_list = []
+    for user in all_users_with_teams:
+        total_points = score_map.get(str(user.id), 0)
+        unranked_list.append({
+            "user_details": user,
+            "total_points": total_points
+        })
+
+    # 4. Sort the combined list by points in descending order.
+    unranked_list.sort(key=lambda x: x['total_points'], reverse=True)
+
+    # 5. Build the final response with the correct rank.
     leaderboard = []
-    for rank, score in enumerate(scores, 1):
-        user_details = await db.user.find_unique(
-            where={'id': score['user_id']},
-            include={'fantasy_team': True}
-        )
-        if user_details and user_details.fantasy_team:
-            leaderboard.append({
-                "rank": rank,
-                "team_name": user_details.fantasy_team.name,
-                "manager_email": user_details.email,
-                "total_points": score['_sum']['total_points'] or 0
-            })
+    for rank, item in enumerate(unranked_list, 1):
+        user_details = item['user_details']
+        leaderboard.append({
+            "rank": rank,
+            "team_name": user_details.fantasy_team.name,
+            "manager_email": user_details.email,
+            "total_points": item['total_points']
+        })
+
     return leaderboard
+
+
+
 
 async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
     # 1. Check if the user already has a team for this GW
@@ -426,7 +463,6 @@ async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
 
 # app/crud.py
 
-from fastapi import HTTPException
 
 async def transfer_player(
     db: Prisma,
@@ -1041,4 +1077,142 @@ async def get_player_card(
         "raw_stats": raw_stats or None,
         "breakdown": breakdown or None,
         "recent_fixtures": recent_fixtures,
+    }
+
+# In backend/app/crud.py
+
+async def get_gameweek_stats_for_user(db: Prisma, user_id: str, gameweek_id: int):
+    """
+    Calculates the user's points, the average points, and the highest points
+    for a specific gameweek.
+    """
+    # 1. Get all scores for the specified gameweek
+    all_scores = await db.usergameweekscore.find_many(
+        where={'gameweek_id': gameweek_id}
+    )
+
+    if not all_scores:
+        # If no scores are in yet, return all zeros
+        return {"user_points": 0, "average_points": 0, "highest_points": 0}
+
+    # 2. Find the current user's score
+    user_score_entry = next((s for s in all_scores if s.user_id == user_id), None)
+    user_points = user_score_entry.total_points if user_score_entry else 0
+    
+    # 3. Calculate average and highest scores
+    total_points_sum = sum(s.total_points for s in all_scores)
+    average_points = round(total_points_sum / len(all_scores))
+    highest_points = max(s.total_points for s in all_scores)
+
+    return {
+        "user_points": user_points,
+        "average_points": average_points,
+        "highest_points": highest_points,
+    }
+
+
+async def get_manager_hub_stats(db: Prisma, user_id: str, gameweek_id: int):
+    """
+    Calculates the stats needed for the Manager Hub card on the dashboard.
+    """
+    # 1. Calculate Overall Points (sum of all gameweek scores for the user)
+    overall_scores = await db.usergameweekscore.group_by(
+        by=['user_id'],
+        where={'user_id': user_id},
+        sum={'total_points': True}
+    )
+    overall_points = overall_scores[0]['_sum']['total_points'] if overall_scores else 0
+
+    # 2. Get Gameweek Points for the current week
+    gameweek_score = await db.usergameweekscore.find_unique(
+        where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}}
+    )
+    gameweek_points = gameweek_score.total_points if gameweek_score else 0
+
+    # 3. Get Total Players (count of all active users)
+    total_players = await db.user.count(where={'is_active': True})
+
+
+    # --- 4. Calculate Squad Value ---
+    # Get all players in the user's current squad
+    user_squad_entries = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id},
+        include={'player': True} # Include the full player object to get the price
+    )
+
+    # Sum the prices of all players in the squad
+    squad_value = sum(p.player.price for p in user_squad_entries) if user_squad_entries else 0.0
+
+    # --- NEW: Calculate In The Bank ---
+    total_budget = 110.0
+    in_the_bank = total_budget - float(squad_value)
+
+    return {
+        "overall_points": overall_points or 0,
+        "gameweek_points": gameweek_points,
+        "total_players": total_players,
+        "squad_value" : float(squad_value),
+        "in_the_bank":in_the_bank
+    }
+
+# In backend/app/crud.py
+from datetime import datetime, timezone
+
+async def get_team_of_the_week(db: Prisma):
+    """
+    Finds the highest-scoring team from the most recently completed gameweek.
+    """
+    now_utc = datetime.now(timezone.utc)
+
+    # 1. Find the most recently completed gameweek
+    last_completed_gw = await db.gameweek.find_first(
+        where={'deadline': {'lt': now_utc}},
+        order={'deadline': 'desc'}
+    )
+    if not last_completed_gw:
+        return None
+    # 2. Find the highest score in that gameweek
+    top_score = await db.usergameweekscore.find_first(
+        where={'gameweek_id': last_completed_gw.id},
+        order={'total_points': 'desc'}
+    )
+    if not top_score:
+        return None
+
+    top_user_id = top_score.user_id
+
+    # 3. Fetch the manager's details (User and FantasyTeam)
+    manager = await db.user.find_unique(
+        where={'id': top_user_id},
+        include={'fantasy_team': True}
+    )
+    manager_name = manager.full_name if manager and manager.full_name else "Top Manager"
+    team_name = manager.fantasy_team.name if manager and manager.fantasy_team else "Team of the Week"
+
+    # 4. Fetch the full team of the top-scoring user
+    # This logic is now self-contained and doesn't depend on the flawed get_user_team_full
+    user_team_entries = await db.userteam.find_many(
+        where={'user_id': top_user_id, 'gameweek_id': last_completed_gw.id},
+        include={'player': {'include': {'team': True}}}
+    )
+
+    def to_display(entry):
+        return {
+            "id": entry.player.id, "full_name": entry.player.full_name,
+            "position": entry.player.position, "price": entry.player.price,
+            "is_captain": entry.is_captain, "is_vice_captain": entry.is_vice_captain,
+            "is_benched": entry.is_benched, "team": entry.player.team,
+            "points": 0, "fixture_str": "" # Points/fixture not needed for this card display
+        }
+
+    all_players = [to_display(p) for p in user_team_entries]
+    starting = [p for p in all_players if not p["is_benched"]]
+    bench = [p for p in all_players if p["is_benched"]]
+
+    return {
+        "manager_name": manager_name,
+        "team_name": team_name,
+        "points": top_score.total_points,
+        "starting": starting,
+        "bench": bench
     }
