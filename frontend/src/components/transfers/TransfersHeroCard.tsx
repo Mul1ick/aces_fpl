@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns'; // Import date-fns for formatting
+
+// Interface for the gameweek data we expect
+interface Gameweek {
+  gw_number: number;
+  deadline: string;
+}
 
 interface TransfersHeroCardProps {
   playersSelected: number;
@@ -13,12 +20,11 @@ interface TransfersHeroCardProps {
   } | null;
   view: 'pitch' | 'list';
   setView: (view: 'pitch' | 'list') => void;
+  gameweek: Gameweek | null; // Add gameweek prop
 }
 
-// Sub-component for individual stat displays
 const StatDisplay = ({ value, label }: { value: string | number; label: string }) => (
     <div className="bg-pl-white/10 p-2 rounded-lg text-center flex flex-col justify-center">
-        {/* --- MODIFIED: Standardized font sizes --- */}
         <p className="font-bold text-base text-pl-white leading-tight">{value}</p>
         <p className="text-[10px] text-pl-white/70 leading-tight mt-1">{label}</p>
     </div>
@@ -31,13 +37,19 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   notification,
   user,
   view,
-  setView
+  setView,
+  gameweek // Destructure the new prop
 }) => {
   const transfersText = user?.played_first_gameweek === false 
     ? "Unlimited" 
     : user?.free_transfers;
   
-  const transferCost = 0; // Placeholder for cost logic
+  const transferCost = 0;
+
+  // --- MODIFIED: Format the deadline date ---
+  const deadlineText = gameweek
+    ? `Deadline: ${format(new Date(gameweek.deadline), "E dd MMM, HH:mm")}`
+    : "Deadline: TBC";
 
   return (
     <Card className="overflow-hidden bg-pl-purple border-pl-border">
@@ -46,18 +58,18 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
           <div>
             <h2 className="text-2xl font-bold">Transfers</h2>
             <p className="text-sm text-pl-white/70">
-               Select a maximum of 3 players from a single team or 'Auto Pick' if you are short of time.
+               Select a maximum of 2 players from a single team or 'Auto Pick' if you are short of time.
             </p>
           </div>
 
           <div className="bg-pl-white/10 rounded-lg p-3">
+            {/* --- MODIFIED: Display dynamic gameweek data --- */}
             <p className="font-bold text-center text-sm">
-               Gameweek 4 • Deadline: Sat 13 Sep, 15:30
+               {gameweek ? `Gameweek ${gameweek.gw_number}` : 'Current Gameweek'} • {deadlineText}
             </p>
           </div>
           
           <div className="grid grid-cols-4 gap-2">
-            {/* --- MODIFIED: Removed the 'highlight' prop --- */}
             <StatDisplay value={`${playersSelected} / 15`} label="Players Selected" />
             <StatDisplay value={`£${bank.toFixed(1)}m`} label="Budget" />
             <StatDisplay value={transfersText} label="Free Transfers" />

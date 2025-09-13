@@ -19,7 +19,7 @@ import pitchBackground from '@/assets/images/pitch.svg';
 import acesLogo from "@/assets/aces-logo.png";
 
 const TeamPageSkeleton = () => (
-    <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
+    <div className="w-full min-h-screen bg-white flex flex-col lg:h-screen lg:flex-row font-sans">
         <div className="hidden lg:block lg:w-2/5 p-4 h-screen overflow-y-auto">
             <Skeleton className="h-full w-full rounded-lg" />
         </div>
@@ -214,7 +214,66 @@ const Team: React.FC = () => {
   };
 
   const handleSaveTeam = async () => {
-    // ... (existing save logic remains the same)
+    const token = localStorage.getItem("access_token");
+    if (!isDirty || !token) return;
+
+    const allPlayers = [...squad.starting, ...squad.bench];
+
+    const captain = allPlayers.find(p => p.isCaptain);
+    const viceCaptain = allPlayers.find(p => p.isVice);
+
+    if (!captain) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Please select a Captain for your team." });
+        return;
+    }
+    if (!viceCaptain) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Please select a Vice-Captain for your team." });
+        return;
+    }
+    
+    // --- THIS IS THE CORRECTED LINE ---
+    const payload = {
+        players: allPlayers.map((p) => ({
+            id: p.id,
+            position: p.pos,
+            is_captain: p.isCaptain,
+            is_vice_captain: p.isVice,
+            is_benched: p.is_benched,
+        }))
+    };
+
+    try {
+        const response = await fetch(API.endpoints.saveTeam, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+             body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Failed to save team.");
+        }
+        
+        const updatedSquadData: TeamResponse = await response.json();
+        
+        const transformBackendResponse = (players) => players.map(p => ({
+            id: p.id, name: p.full_name, team: p.team.name, pos: p.position,
+            fixture_str: p.fixture_str, points: p.points, isCaptain: p.is_captain,
+            isVice: p.is_vice_captain, is_benched: p.is_benched,
+        }));
+        
+        const newSquadState = { 
+            starting: transformBackendResponse(updatedSquadData.starting), 
+            bench: transformBackendResponse(updatedSquadData.bench) 
+        };
+        
+        setSquad(newSquadState);
+        setInitialSquadState(JSON.stringify(newSquadState));
+        setIsSavedModalOpen(true);
+
+    } catch (error) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+    }
   };
   
   const playersByPos = {
@@ -230,25 +289,30 @@ const Team: React.FC = () => {
     return <TeamPageSkeleton />;
   }
 
-  const containerVariants = { /* ... */ };
-  const itemVariants = { /* ... */ };
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 }
+  };
 
   return (
     <motion.div 
-      // --- MODIFIED: Removed lg:h-screen to allow the container to grow ---
-      className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans"
+      className="w-full min-h-screen bg-white flex flex-col lg:h-screen lg:flex-row font-sans"
       initial="hidden"
       animate="visible"
       variants={containerVariants}
     >
-      {/* --- MODIFIED: Added classes for sticky positioning --- */}
       <motion.div variants={itemVariants} className="hidden lg:block lg:w-2/5 p-4">
         <div className="lg:sticky lg:top-4">
           <ManagerInfoCard />
         </div>
       </motion.div>
-      
-       {/* --- MODIFIED: Removed lg:h-screen from the right column --- */}
        <div className="flex flex-col flex-1 lg:w-3/5">
         <motion.div variants={itemVariants} className="p-4 space-y-4">
             <div className="flex justify-between items-center">
