@@ -70,7 +70,7 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
           </div>
           
           <div className="grid grid-cols-4 gap-2">
-            <StatDisplay value={`${playersSelected} / 15`} label="Players Selected" />
+            <StatDisplay value={`${playersSelected} / 11`} label="Players Selected" />
             <StatDisplay value={`£${bank.toFixed(1)}m`} label="Budget" />
             <StatDisplay value={transfersText} label="Free Transfers" />
             <StatDisplay value={`${transferCost} pts`} label="Cost" />
