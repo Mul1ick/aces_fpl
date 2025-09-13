@@ -1,3 +1,5 @@
+// frontend/src/components/layout/PlayerCard.tsx
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -19,10 +21,11 @@ interface PlayerCardProps {
   player: Player;
   isBench?: boolean;
   displayMode?: 'points' | 'fixture';
+  showArmbands?: boolean; // New prop to control armband visibility
 }
 
 // --- PLAYER CARD COMPONENT ---
-const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displayMode = 'points' }) => {
+const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displayMode = 'points', showArmbands = true }) => {
   // --- MODIFIED: Use the new helper function ---
   const jerseySrc = getTeamJersey(player.team);
 
@@ -47,7 +50,8 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displa
             alt={`${player.team} jersey`}
             className="w-full h-full object-cover"
           />
-          {(player.isCaptain || player.isVice) && (
+          {/* MODIFIED: Armband now only shows if showArmbands is true */}
+          {showArmbands && (player.isCaptain || player.isVice) && (
             <div className={cn(
               "absolute top-0.5 left-0.5 rounded-full flex items-center justify-center font-bold text-white text-[10px] w-4 h-4 border border-black/50",
               player.isCaptain ? 'bg-[#FF2882]' : 'bg-gray-700'
