@@ -1,8 +1,8 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns'; // Import date-fns for formatting
+import { format, isValid } from 'date-fns';
 
 // Interface for the gameweek data we expect
 interface Gameweek {
@@ -20,7 +20,7 @@ interface TransfersHeroCardProps {
   } | null;
   view: 'pitch' | 'list';
   setView: (view: 'pitch' | 'list') => void;
-  gameweek: Gameweek | null; // Add gameweek prop
+  gameweek: Gameweek | null;
 }
 
 const StatDisplay = ({ value, label }: { value: string | number; label: string }) => (
@@ -38,7 +38,7 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   user,
   view,
   setView,
-  gameweek // Destructure the new prop
+  gameweek
 }) => {
   const transfersText = user?.played_first_gameweek === false 
     ? "Unlimited" 
@@ -46,9 +46,9 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   
   const transferCost = 0;
 
-  // --- MODIFIED: Format the deadline date ---
-  const deadlineText = gameweek
-    ? `Deadline: ${format(new Date(gameweek.deadline), "E dd MMM, HH:mm")}`
+  const deadlineDate = gameweek?.deadline ? new Date(gameweek.deadline) : null;
+  const deadlineText = deadlineDate && isValid(deadlineDate)
+    ? `Deadline: ${format(deadlineDate, "E dd MMM, HH:mm")}`
     : "Deadline: TBC";
 
   return (
@@ -57,13 +57,14 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
         <div className="space-y-4">
           <div>
             <h2 className="text-2xl font-bold">Transfers</h2>
+            {/* --- MODIFIED --- */}
+            {/* Updated the instructional text to reflect the new 2-player rule. */}
             <p className="text-sm text-pl-white/70">
                Select a maximum of 2 players from a single team or 'Auto Pick' if you are short of time.
             </p>
           </div>
 
           <div className="bg-pl-white/10 rounded-lg p-3">
-            {/* --- MODIFIED: Display dynamic gameweek data --- */}
             <p className="font-bold text-center text-sm">
                {gameweek ? `Gameweek ${gameweek.gw_number}` : 'Current Gameweek'} • {deadlineText}
             </p>
@@ -109,7 +110,7 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className={cn(
                "p-3 text-center font-semibold text-sm",
-              notification.type === 'error' ? 'bg-red-500 text-white' : 'bg-dashboard-gradient text-purple-900'
+              notification.type === 'error' ? 'bg-red-500 text-white' : 'bg-pl-green text-pl-purple'
             )}
           >
             {notification.message}

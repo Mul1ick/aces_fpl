@@ -1,3 +1,5 @@
+// frontend/src/components/transfers/TransferPitchView.tsx
+
 import React, { useState } from 'react';
 import { PlusCircle, X } from 'lucide-react';
 import pitchBackground from '@/assets/images/pitch.svg';
@@ -63,6 +65,7 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                                         team: player.club // Pass the team name string to PlayerCard
                                     }} 
                                      displayMode="fixture" 
+                                     showArmbands={false} 
                                  />
                             </div>
                             <button

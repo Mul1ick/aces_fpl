@@ -1,3 +1,5 @@
+// frontend/src/components/transfers/PlayerSelection.tsx
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -226,14 +228,17 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     };
 
     const isFiltered = useMemo(() => {
+        // A view is considered "filtered" if any filter is active.
+        // This is the key logic change. If a position is selected (from the pitch or modal),
+        // we switch to the paginated list view.
         return (
-             searchQuery.trim() !== '' ||
-            (positionFilter ? selectedPositions.length > 1 : selectedPositions.length > 0) ||
+            searchQuery.trim() !== '' ||
+            selectedPositions.length > 0 ||
             selectedClubs.length > 0 ||
             priceRange[0] !== 3.5 ||
             priceRange[1] !== 14.0
         );
-    }, [searchQuery, selectedPositions, selectedClubs, priceRange, positionFilter]);
+    }, [searchQuery, selectedPositions, selectedClubs, priceRange]);
     
     const allTeamNames = useMemo(() => [...new Set(players.map(p => p.club))].sort(), [players]);
 
