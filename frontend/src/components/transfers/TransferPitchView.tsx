@@ -4,7 +4,7 @@ import pitchBackground from '@/assets/images/pitch.svg';
 import PlayerCard from '@/components/layout/PlayerCard';
 import PlayerDetailModal from './PlayerDetailModal';
 
-const PlayerSlot = ({ position, onClick }) => (
+const PlayerSlot = ({ position, onClick }: { position: string; onClick: () => void; }) => (
   <button
     onClick={onClick}
     className="w-20 h-24 bg-black/20 border-2 border-dashed border-white/30 rounded-lg flex flex-col items-center justify-center text-white/50 hover:bg-white/10 hover:border-white/50 transition-all"
@@ -22,7 +22,7 @@ interface TransferPitchViewProps {
 }
 
 export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartTransfer }: TransferPitchViewProps) => {
-    const [detailedPlayer, setDetailedPlayer] = useState(null);
+    const [detailedPlayer, setDetailedPlayer] = useState<any | null>(null);
 
     const handlePlayerClick = (player: any) => {
         setDetailedPlayer(player);
@@ -33,53 +33,50 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
         setDetailedPlayer(null);
     };
     
-    // This helper function prepares the data for the PlayerCard
-    const transformPlayerForCard = (player: any) => ({
-        id: player.id,
-        name: player.full_name ?? player.name,
-        team: player.team?.name, // Safely access team name
-        pos: player.position,
-        fixture: player.fixture_str ?? '—',
-        // --- FIX: Always set captaincy to false on this page ---
-        isCaptain: false,
-        isVice: false,
-    });
+    // This helper function is no longer needed here as data is standardized on the main page
+    // const transformPlayerForCard = ...
 
     return (
         <>
+            {/* MODIFIED: Removed flex-1 from this <main> element */}
             <main
-                className="flex-1 relative flex flex-col justify-around py-4"
+                className="relative flex flex-col justify-around py-4"
                 style={{
-                backgroundImage: `url(${pitchBackground})`,
+                 backgroundImage: `url(${pitchBackground})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center top',
-                minHeight: '550px'
                 }}
             >
                 {Object.keys(squad).map((pos) => (
-                <div key={pos} className="flex justify-center items-center gap-x-4">
+                <div key={pos} className="flex justify-center items-center gap-x-4 my-2"> {/* Added my-2 for spacing */}
                     {squad[pos].map((player: any, index: number) =>
-                    player ? (
+                     player ? (
                         <div
                             key={player.id}
                             className="relative group bg-black/40 rounded-lg hover:bg-black/50 transition-colors"
                             onClick={() => handlePlayerClick(player)}
                         >
                             <div className="pointer-events-none">
-                                <PlayerCard player={transformPlayerForCard(player)} displayMode="fixture" />
+                                 <PlayerCard 
+                                     player={{
+                                        ...player,
+                                        team: player.club // Pass the team name string to PlayerCard
+                                    }} 
+                                     displayMode="fixture" 
+                                 />
                             </div>
                             <button
-                                onClick={(e) => {
+                               onClick={(e) => {
                                     e.stopPropagation();
                                     onPlayerRemove(pos, index);
                                 }}
-                                className="absolute top-1 right-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all hidden lg:flex items-center justify-center w-5 h-5"
+                                 className="absolute top-1 right-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all hidden lg:flex items-center justify-center w-5 h-5"
                             >
-                                <X className="w-3 h-3" />
+                                 <X className="w-3 h-3" />
                             </button>
                         </div>
                     ) : (
-                        <PlayerSlot key={`${pos}-${index}`} position={pos} onClick={() => onSlotClick(pos, index)} />
+                         <PlayerSlot key={`${pos}-${index}`} position={pos} onClick={() => onSlotClick(pos, index)} />
                     )
                     )}
                 </div>
@@ -89,9 +86,9 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                 player={detailedPlayer}
                 onClose={() => setDetailedPlayer(null)}
                 onRemove={() => {
-                    if (detailedPlayer) {
-                        const playerPos = detailedPlayer.pos;
-                        const playerIndex = squad[playerPos].findIndex((p: any) => p && p.id === detailedPlayer.id);
+                   if (detailedPlayer) {
+                        const playerPos = detailedPlayer.position;
+                        const playerIndex = squad[playerPos]?.findIndex((p: any) => p && p.id === detailedPlayer.id);
                         if(playerIndex !== -1) {
                             handleRemove(playerPos, playerIndex);
                         }

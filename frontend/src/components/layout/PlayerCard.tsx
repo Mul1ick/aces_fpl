@@ -1,30 +1,13 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-
-// --- ASSET IMPORTS ---
-import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
-import tshirtBlue from '@/assets/images/jerseys/tshirt-blue.png';
-import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png';
-import tshirtBlack from '@/assets/images/jerseys/tshirt-black.png';
-import tshirtNavy from '@/assets/images/jerseys/tshirt-navy.png';
-import tshirtGreen from '@/assets/images/jerseys/tshirt-green.png';
-
-// --- CONFIGURATION ---
-const TEAM_JERSEYS = {
-  'Satan': tshirtRed,
-  'Mumbai Hotspurs': tshirtWhite,
-  'Bandra United': tshirtBlue,
-  'Southside': tshirtBlack,
-  'Titans': tshirtNavy,
-  'Umaag Foundation Trust': tshirtGreen,
-};
+import { getTeamJersey } from '@/lib/player-utils'; // MODIFIED: Import from new utility file
 
 // --- TYPESCRIPT INTERFACES ---
 interface Player {
   id: number;
   name: string;
-  team: string;
+  team: string; // This will now be the full team name string
   pos: string;
   fixture?: string;
   points?: number;
@@ -35,19 +18,17 @@ interface Player {
 interface PlayerCardProps {
   player: Player;
   isBench?: boolean;
-  displayMode?: 'points' | 'fixture'; // New prop to control display
+  displayMode?: 'points' | 'fixture';
 }
 
 // --- PLAYER CARD COMPONENT ---
 const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displayMode = 'points' }) => {
-  const jerseySrc = TEAM_JERSEYS[player.team] || tshirtWhite;
+  // --- MODIFIED: Use the new helper function ---
+  const jerseySrc = getTeamJersey(player.team);
 
-  // Calculate points, handling potential undefined values
   const displayPoints = player.isCaptain 
     ? (player.points ?? 0) * 2 
-    : player.isVice 
-    ? Math.floor((player.points ?? 0) * 1.5) 
-    : player.points;
+    : player.points; // Vice-captain points are handled at the Gameweek level
 
   return (
     <motion.div
@@ -79,10 +60,10 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displa
         {/* Info Section */}
         <div className="h-[35%] flex flex-col">
           {/* Player Name */}
-          <div className="flex-1 bg-white text-black flex items-center justify-center px-1">
+           <div className="flex-1 bg-white text-black flex items-center justify-center px-1">
               <p className="font-bold truncate" style={{ fontSize: isBench ? '9px' : '11px' }}>{player.name}</p>
           </div>
-          {/* Fixture or Points - Conditionally rendered */}
+          {/* Fixture or Points */}
           <div className={cn(
             "flex-1 font-bold flex items-center justify-center",
             displayMode === 'points' ? 'bg-[#23003F] text-white' : 'bg-white text-black'
@@ -98,4 +79,3 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displa
 };
 
 export default PlayerCard;
-
