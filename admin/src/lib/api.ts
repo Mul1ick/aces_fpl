@@ -237,6 +237,12 @@ export const gameweekAPI = {
     method: 'POST',
   }, token);
 },
+async finalizeGameweek(gameweekId: number, token: string): Promise<{ message: string }> {
+    return apiRequest(`/admin/gameweeks/${gameweekId}/finalize`, {
+      method: 'POST',
+    }, token);
+  },
+
 
   async submitPlayerStats(
     gameweekId: string | number,

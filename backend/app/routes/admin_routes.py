@@ -458,3 +458,20 @@ async def calculate_gameweek_points(gameweek_id: int, db: Prisma = Depends(get_d
         alog.error(f"Error calculating gameweek points for GW {gameweek_id}: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred during point calculation.")
     
+
+@router.post("/gameweeks/{gameweek_id}/finalize", dependencies=[Depends(get_current_admin_user)])
+async def finalize_gameweek(gameweek_id: int, db: Prisma = Depends(get_db)):
+    """
+    Finalizes a gameweek, which triggers rollover tasks like
+    updating user free transfers.
+    """
+    try:
+        result_message = await crud.perform_gameweek_rollover_tasks(db, gameweek_id)
+        alog.info(f"Gameweek {gameweek_id} finalized successfully. Details: {result_message}")
+        return {"message": f"Gameweek {gameweek_id} finalized and rollover tasks completed."}
+    except Exception as e:
+        alog.error(f"Error finalizing gameweek {gameweek_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred during gameweek finalization: {e}"
+        )

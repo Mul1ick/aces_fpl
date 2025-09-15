@@ -177,11 +177,37 @@ const handleSaveStats = async (
 }, [token, gameweek, toast]);
 
 
-  const handleFinalizeGameweek = useCallback(() => {
-    setGameweek(gw => ({ ...gw, status: 'Finalized' }));
-    toast({ title: "Gameweek Finalized", description: "Gameweek 5 is now complete and scores are final." });
-    setConfirming(null);
-  }, [toast]);
+  const handleFinalizeGameweek = useCallback(async () => {
+    const t = token || localStorage.getItem("admin_token");
+    if (!t || !gameweek) return;
+
+    setConfirming(null); // Close the confirmation dialog
+
+    toast({ title: "Finalizing...", description: "Processing gameweek rollover tasks." });
+
+    try {
+      // Set a temporary "finalizing" status if you want visual feedback
+      // setGameweek(gw => ({ ...gw, status: 'Finalizing' })); // Optional
+
+      await gameweekAPI.finalizeGameweek(gameweek.id, t);
+
+      // On success, update the UI permanently
+      setGameweek(gw => ({ ...gw, status: 'Finalized' }));
+      toast({ 
+        title: "Gameweek Finalized", 
+        description: `Gameweek ${gameweek.id} is now complete and rollover tasks have been executed.` 
+      });
+      
+    } catch (error: any) {
+      // Revert status on error if you used a temporary one
+      setGameweek(gw => ({ ...gw, status: 'Points Calculated' })); // Revert to pre-finalize state
+      toast({
+        variant: "destructive",
+        title: "Finalization Failed",
+        description: error.message || "An error occurred during the finalization process.",
+      });
+    }
+  }, [token, gameweek, toast]);
 
   const MainActionButton = () => {
     if (!gameweek) return null;
@@ -203,6 +229,7 @@ const handleSaveStats = async (
     }
     return null; // Don't show a button for Calculating or Finalized statuses
   };
+
 
   return (
     <div className="space-y-6">

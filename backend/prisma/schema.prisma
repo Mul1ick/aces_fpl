@@ -17,7 +17,7 @@ model User {
   full_name       String?
   fantasy_team    FantasyTeam?
 
-  free_transfers        Int      @default(1) // Users start with 1 free transfer
+  free_transfers        Int      @default(0) // Users start with 1 free transfer
   played_first_gameweek Boolean  @default(false)
 
   user_teams      UserTeam[]
