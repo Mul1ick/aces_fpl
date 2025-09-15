@@ -433,3 +433,28 @@ async def admin_get_fixture_stats(fixture_id: int, db: Prisma = Depends(get_db))
             for r in rows
         ],
     }
+
+@router.post("/gameweeks/{gameweek_id}/calculate-points", dependencies=[Depends(get_current_admin_user)])
+async def calculate_gameweek_points(gameweek_id: int, db: Prisma = Depends(get_db)):
+    """
+    Calculates and stores the total points for every active user for a given gameweek.
+    This is the trigger for processing all scores after stats are entered.
+    """
+    try:
+        # Get all active users who have a team
+        active_users_with_teams = await db.user.find_many(
+            where={'is_active': True, 'fantasy_team': {'is_not': None}}
+        )
+
+        if not active_users_with_teams:
+            return {"message": "No active users with teams to process."}
+
+        # Run score calculation for each user
+        for user in active_users_with_teams:
+            await crud.compute_user_score_for_gw(db, str(user.id), gameweek_id)
+
+        return {"message": f"Successfully calculated points for {len(active_users_with_teams)} users in Gameweek {gameweek_id}."}
+    except Exception as e:
+        alog.error(f"Error calculating gameweek points for GW {gameweek_id}: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred during point calculation.")
+    
