@@ -479,69 +479,49 @@ async def transfer_player(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # If the user has played their first gameweek, check their transfer count
     wildcard = await is_wildcard_active(db, user_id, gameweek_id)
-    if user.played_first_gameweek and not wildcard:
-        if user.free_transfers < 1:
-            raise HTTPException(status_code=400, detail="You have no free transfers remaining.")
-    # If played_first_gameweek is false, they have unlimited transfers, so we proceed.
 
-    # 1) Find the outgoing userteam row (includes its flags)
+    # 1) Find outgoing row
     out_entry = await db.userteam.find_first(
-        where={
-            'user_id': user_id,
-            'gameweek_id': gameweek_id,
-            'player_id': out_player_id,
-        },
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': out_player_id},
         include={'player': True},
     )
     if not out_entry:
         raise HTTPException(status_code=404, detail="Outgoing player is not in your team for this GW.")
 
-    # 2) Don't duplicate
+    # 2) Prevent duplicates
     already = await db.userteam.find_first(
-        where={
-            'user_id': user_id,
-            'gameweek_id': gameweek_id,
-            'player_id': in_player_id,
-        }
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': in_player_id}
     )
     if already:
-        # Nothing to do; just return current team
         return await get_user_team_full(db, user_id, gameweek_id)
 
-    # 3) (Optional) enforce same position to keep formation valid
+    # 3) Position check
     in_player = await db.player.find_unique(where={'id': in_player_id})
     if not in_player:
         raise HTTPException(status_code=404, detail="Incoming player not found.")
     if in_player.position != out_entry.player.position:
         raise HTTPException(status_code=400, detail="Position mismatch for transfer.")
 
-    # 4) Carry over flags from the outgoing row
     flags = {
         'is_benched': out_entry.is_benched,
         'is_captain': out_entry.is_captain,
         'is_vice_captain': out_entry.is_vice_captain,
     }
 
-    # 5) Atomic swap + log
+    # Decide charge policy before tx for clarity
+    charge_transfers = bool(user.played_first_gameweek and not wildcard)
+
     async with db.tx() as tx:
+        # swap
         await tx.userteam.delete_many(
-            where={
-                'user_id': user_id,
-                'gameweek_id': gameweek_id,
-                'player_id': out_player_id,
-            }
+            where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': out_player_id}
         )
         await tx.userteam.create(
-            data={
-                'user_id': user_id,
-                'gameweek_id': gameweek_id,
-                'player_id': in_player_id,
-                **flags,
-            }
+            data={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': in_player_id, **flags}
         )
-        # Transfer log
+
+        # log the transfer action
         await tx.transfer_log.create(
             data={
                 'user_id': user_id,
@@ -550,13 +530,32 @@ async def transfer_player(
                 'in_player': in_player_id,
             }
         )
-        if user.played_first_gameweek and not wildcard:
-            await tx.user.update(
-                where={'id': user_id},
-                data={'free_transfers': {'decrement': 1}}
-    )
+
+        if charge_transfers:
+            if user.free_transfers and user.free_transfers > 0:
+                # consume one free transfer
+                await tx.user.update(
+                    where={'id': user_id},
+                    data={'free_transfers': {'decrement': 1}}
+                )
+            else:
+                # apply a -4 hit for this transfer
+                # upsert GW score row and increment hits by 4
+                await tx.usergamescore.upsert(
+                    where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
+                    create={
+                        'user_id': user_id,
+                        'gameweek_id': gameweek_id,
+                        'total_points': 0,
+                        'transfer_hits': 4,
+                    },
+                    update={'transfer_hits': {'increment': 4}},
+                )
+        # else: no cost during first GW or wildcard
 
     return await get_user_team_full(db, user_id, gameweek_id)
+
+
 
 async def set_captain(db: Prisma, user_id: str, gameweek_id: int, player_id: int):
     # make sure the player belongs to this user's team for this GW and isn't benched
@@ -919,22 +918,30 @@ async def is_triple_captain_active(db: Prisma, user_id: str, gameweek_id: int) -
     return bool(row)
 
 async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) -> int:
-    # team and flags
+    # Fetch team for the GW
     entries = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id}
     )
+
+    # If no entries, store 0 and return 0 minus any hits (usually 0)
     if not entries:
-        total = 0
+        gross = 0
         await db.usergameweekscore.upsert(
             where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
-            data={'create': {'user_id': user_id, 'gameweek_id': gameweek_id, 'total_points': total},
-                  'update': {'total_points': total}}
+            data={
+                'create': {'user_id': user_id, 'gameweek_id': gameweek_id, 'total_points': gross},
+                'update': {'total_points': gross},
+            },
         )
-        return total
+        ugws = await db.usergameweekscore.find_unique(
+            where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}}
+        )
+        hits = getattr(ugws, 'transfer_hits', 0) if ugws else 0
+        return gross - hits
 
-    # points map
+    # Build points map for the GW
     stats = await db.gameweekplayerstats.find_many(where={'gameweek_id': gameweek_id})
-    pts = {s.player_id: s.points for s in stats}  # missing => did not play
+    pts = {s.player_id: s.points for s in stats}  # missing => 0
 
     starters = [e for e in entries if not e.is_benched]
     cap = next((e for e in starters if e.is_captain), None)
@@ -943,29 +950,37 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
     base = sum(pts.get(e.player_id, 0) for e in starters)
 
     triple = await is_triple_captain_active(db, user_id, gameweek_id)
-    # choose who gets the bonus: captain if played, else vice if played, else nobody
+
+    # Choose multiplier target: captain if played else vice if played
     bonus_target = None
     if cap and (cap.player_id in pts):
         bonus_target = cap.player_id
-    elif triple and vice and (vice.player_id in pts):
+    elif vice and (vice.player_id in pts):
         bonus_target = vice.player_id
 
-    if triple and bonus_target is not None:
-        # captain already included once in base; add +2x extra to make it triple
-        total = base + 2 * pts[bonus_target]
-    else:
-        # standard double captain
-        if cap and (cap.player_id in pts):
-            total = base + pts[cap.player_id]
+    if bonus_target is not None:
+        if triple:
+            # base already counts 1x; add +2x to make triple
+            gross = base + 2 * pts[bonus_target]
         else:
-            total = base  # no appearance from cap; no standard bonus
+            # base already counts 1x; add +1x to make double
+            gross = base + pts[bonus_target]
+    else:
+        gross = base
 
-    await db.usergameweekscore.upsert(
+    # Persist gross points
+    ugws = await db.usergameweekscore.upsert(
         where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
-        data={'create': {'user_id': user_id, 'gameweek_id': gameweek_id, 'total_points': total},
-              'update': {'total_points': total}}
+        data={
+            'create': {'user_id': user_id, 'gameweek_id': gameweek_id, 'total_points': gross},
+            'update': {'total_points': gross},
+        },
     )
-    return total
+
+    # Subtract transfer hits
+    hits = getattr(ugws, 'transfer_hits', 0) if ugws else 0
+    net = gross - hits
+    return net
 
 
 async def get_player_card(
