@@ -13,6 +13,7 @@ export const API = {
     teamOfTheWeek: `${API_BASE_URL}/gameweeks/team-of-the-week`,
     gameweekStats: `${API_BASE_URL}/gameweeks/stats`,
     leaderboard: `${API_BASE_URL}/leaderboard/`,
+    transfer: `${API_BASE_URL}/teams/transfer`,
     userStats: `${API_BASE_URL}/users/stats`,
     chips: {
       status: (gw?: number) =>
