@@ -56,6 +56,9 @@ const Transfers: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [view, setView] = useState<'pitch' | 'list'>('pitch');
+const [pendingOutPlayerId, setPendingOutPlayerId] = useState<number | null>(null);
+const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
+
 
   const hasTeam = user?.has_team;
 
@@ -164,14 +167,16 @@ const Transfers: React.FC = () => {
   };
 
   const handleStartTransfer = (player: any, pos: string, index: number) => {
-    setPositionToFill({ position: pos, index: index });
-    handlePlayerRemove(pos, index);
-    if (window.innerWidth < 1024) setIsPlayerSelectionOpen(true);
-  };
+  setPositionToFill({ position: pos, index: index });
+  setPendingOutPlayerId(player?.id ?? null);    // <-- add this line
+  handlePlayerRemove(pos, index);
+  if (window.innerWidth < 1024) setIsPlayerSelectionOpen(true);
+};
   
   const handlePlayerSelect = (playerData: any) => {
     setIsPlayerSelectionOpen(false);
     const newPlayer = transformApiPlayer(playerData);
+    setPendingInPlayerId(newPlayer?.id ?? null);
     const posKey = newPlayer.pos;
 
     let targetSlot = positionToFill;
@@ -216,57 +221,69 @@ const Transfers: React.FC = () => {
 
   const handleReset = () => {
     setIsLoading(true);
+    setPendingOutPlayerId(null);
+  setPendingInPlayerId(null);
     fetchAndSetTeam();
   };
   
   const handleAutoFill = () => toast({ title: 'Coming Soon!', description: 'Autofill feature is on the way.'});
 
   const handleSaveOrSubmit = async (teamNameFromModal?: string) => {
-    if (!token) return;
+  if (!token) return;
+
+  // creating first team → still use submit-team
+  if (!hasTeam) {
     const allPlayers = Object.values(squad).flat().filter(p => p !== null);
-    
     if (allPlayers.length !== 11) {
       toast({ variant: "destructive", title: "Incomplete Squad", description: "You must select 11 players to save your team." });
       return;
     }
-
-    // --- MODIFIED ---
-    // This is the core fix. We now ALWAYS use the `/submit-team` endpoint.
-    // We determine the team name based on whether the user already has a team or is creating a new one.
-    const payload = { 
-        team_name: hasTeam ? existingTeamName : teamNameFromModal, 
-        players: allPlayers.map(p => ({
-            id: p.id,
-            position: p.pos,
-            is_captain: p.is_captain,
-            is_vice_captain: p.is_vice_captain,
-            is_benched: p.is_benched,
-        }))
+    const payload = {
+      team_name: teamNameFromModal,
+      players: allPlayers.map((p: any) => ({
+        id: p.id, position: p.pos, is_captain: p.is_captain, is_vice_captain: p.is_vice_captain, is_benched: p.is_benched
+      })),
     };
-    
-    // Always use the endpoint that correctly handles an 11-player squad.
-    const endpoint = API.endpoints.submitTeam;
-
     try {
-      const response = await fetch(endpoint, {
+      const res = await fetch(API.endpoints.submitTeam, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to save team");
-      }
-      
+      if (!res.ok) throw new Error((await res.json()).detail || "Failed to save team");
       await refreshUserStatus();
-      toast({ title: "Success!", description: `Your team ${hasTeam ? 'has been updated' : 'has been created'}.` });
-      navigate('/dashboard');
-
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error Saving Team", description: error instanceof Error ? error.message : 'An unknown error occurred.' });
+      toast({ title: "Success", description: "Your team has been created." });
+      navigate("/dashboard");
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error Saving Team", description: e instanceof Error ? e.message : "Unknown error" });
     }
-  };
+    return;
+  }
+
+  // updating existing team → use transfer endpoint to write transfer_log
+  if (!pendingOutPlayerId || !pendingInPlayerId) {
+    toast({ variant: "destructive", title: "Select a swap", description: "Choose a player to transfer out and a player to bring in." });
+    return;
+  }
+
+  try {
+    const res = await fetch(API.endpoints.transfer, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ out_player_id: pendingOutPlayerId, in_player_id: pendingInPlayerId }),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || "Transfer failed");
+
+    // optional: backend may return updated team
+    await fetchAndSetTeam();
+    setPendingOutPlayerId(null);
+    setPendingInPlayerId(null);
+    await refreshUserStatus();
+    toast({ title: "Transfer confirmed", description: "Your swap has been logged." });
+  } catch (e) {
+    toast({ variant: "destructive", title: "Transfer failed", description: e instanceof Error ? e.message : "Unknown error" });
+  }
+};
 
   // --- RENDER LOGIC ---
   if (isLoading || isAuthLoading) {
@@ -333,7 +350,11 @@ const Transfers: React.FC = () => {
             {hasTeam ? (
               <Button
                 onClick={() => handleSaveOrSubmit()}
-                disabled={!isDirty || playersSelected !== 11 || !squadValidation.isValid}
+                disabled={
+     !squadValidation.isValid ||
+     !pendingOutPlayerId ||
+     !pendingInPlayerId
+   }
               >
                 Confirm Transfers
               </Button>

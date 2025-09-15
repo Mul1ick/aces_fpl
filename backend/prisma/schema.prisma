@@ -127,7 +127,8 @@ model UserGameweekScore {
   id           Int    @id @default(autoincrement())
   user_id      String
   gameweek_id  Int
-  total_points Int
+  total_points Int    @default(0)
+  transfer_hits Int    @default(0)
 
   user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
