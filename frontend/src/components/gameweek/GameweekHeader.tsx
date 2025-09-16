@@ -17,21 +17,21 @@ interface GameweekHeaderProps {
 }
 
 export const GameweekHeader: React.FC<GameweekHeaderProps> = ({ 
-    gw, 
+     gw, 
     view, 
     setView,
-    teamName = "Eric Ten Hoes",
-    totalPoints = 70,
-    averagePoints = 54,
-    highestPoints = 127,
-    gwRank = "958,151",
-    freeTransfers = 0
+    teamName,
+    totalPoints,
+    averagePoints,
+    highestPoints,
+    gwRank,
+    freeTransfers
 }) => {
   return (
     <header className="p-4 text-white">
       {/* Header Section */}
       <div className="text-left mb-3">
-        <h1 className="font-bold text-xl text-white">{teamName}</h1>
+        <h1 className="font-bold text-xl text-white">{teamName || 'Your Team'}</h1>
       </div>
       <p className="font-bold text-center text-base mb-3 text-white">Gameweek {gw || 1}</p>
 
@@ -40,12 +40,12 @@ export const GameweekHeader: React.FC<GameweekHeaderProps> = ({
         {/* Left Column Stats */}
         <div className="space-y-2 text-center">
           <div>
-            <p className="font-bold text-xl text-white">{averagePoints}</p>
+            <p className="font-bold text-xl text-white">{averagePoints ?? '...'}</p>
             <p className="text-[10px] text-gray-300">Average Points</p>
           </div>
           <div className="border-t border-white/20 w-full"></div>
           <div>
-            <p className="font-bold text-xl text-white">{highestPoints}</p>
+            <p className="font-bold text-xl text-white">{highestPoints ?? '...'}</p>
             <p className="text-[10px] text-gray-300">Highest Points</p>
           </div>
         </div>
@@ -53,7 +53,7 @@ export const GameweekHeader: React.FC<GameweekHeaderProps> = ({
         {/* Highlight Card (Center Focus) */}
         <div className="flex flex-col items-center px-2">
             <div className="bg-gradient-to-br from-[#00d2ff] to-[#3a47d5] rounded-lg shadow-lg p-3 w-28 text-center">
-                <p className="font-bold text-4xl text-white">{totalPoints}</p>
+                <p className="font-bold text-4xl text-white">{totalPoints ?? '...'}</p>
                 <p className="text-xs text-white/80 font-semibold">Total Points</p>
             </div>
             <div className="flex items-center mt-2 cursor-pointer">
@@ -65,12 +65,12 @@ export const GameweekHeader: React.FC<GameweekHeaderProps> = ({
         {/* Right Column Stats */}
         <div className="space-y-2 text-center">
           <div>
-            <p className="font-bold text-xl text-white">{gwRank}</p>
+            <p className="font-bold text-xl text-white">{gwRank ?? '...'}</p>
             <p className="text-[10px] text-gray-300">GW Rank</p>
           </div>
           <div className="border-t border-white/20 w-full"></div>
           <div>
-            <p className="font-bold text-xl text-white">{freeTransfers}</p>
+            <p className="font-bold text-xl text-white">{freeTransfers ?? '...'}</p>
             <p className="text-[10px] text-gray-300">Transfers</p>
           </div>
         </div>

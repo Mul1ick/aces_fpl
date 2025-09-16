@@ -20,6 +20,7 @@ const Gameweek: React.FC = () => {
   const [view, setView] = useState('pitch');
   const [detailedPlayer, setDetailedPlayer] = useState(null);
   const [squad, setSquad] = useState<TeamResponse | null>(null);
+  const [gameweekStats, setGameweekStats] = useState(null); // Add this
   const [hubStats, setHubStats] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [isExtraDataLoading, setIsExtraDataLoading] = useState(true);
@@ -34,20 +35,22 @@ const Gameweek: React.FC = () => {
     const fetchAllData = async () => {
       setIsExtraDataLoading(true);
       try {
-        const [teamRes, hubRes, leaderboardRes] = await Promise.all([
+        const [teamRes, hubRes, leaderboardRes, gwStatsRes] = await Promise.all([
             fetch(API.endpoints.team, { headers: { Authorization: `Bearer ${token}` } }),
             fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
-            fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } })
+            fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(API.endpoints.gameweekStats, { headers: { Authorization: `Bearer ${token}` } })
         ]);
 
         if (!teamRes.ok) throw new Error("Failed to fetch team data");
-        if (!hubRes.ok || !leaderboardRes.ok) console.warn("Failed to fetch manager data");
+        if (!hubRes.ok || !leaderboardRes.ok || !gwStatsRes.ok) console.warn("Failed to fetch manager or gameweek data");
         
         const teamData: TeamResponse = await teamRes.json();
         setSquad(teamData);
         
         if (hubRes.ok) setHubStats(await hubRes.json());
         if (leaderboardRes.ok) setLeaderboard(await leaderboardRes.json());
+        if (gwStatsRes.ok) setGameweekStats(await gwStatsRes.json());
 
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -104,11 +107,16 @@ const Gameweek: React.FC = () => {
         <div className="lg:m-4 lg:border-2 lg:border-gray-300 lg:rounded-lg flex flex-col flex-grow">
            <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] p-4 lg:rounded-t-lg">
                 <GameweekHeader 
-                    gw={gw} 
-                    view={view} 
-                     setView={setView}
-                    teamName={squad.team_name}
-                />
+    gw={gw} 
+    view={view} 
+    setView={setView}
+    teamName={squad.team_name}
+    totalPoints={gameweekStats?.user_points}
+    averagePoints={gameweekStats?.average_points}
+    highestPoints={gameweekStats?.highest_points}
+    gwRank={userRank?.toLocaleString()}
+    freeTransfers={user?.free_transfers}
+/>
             </div>
             
             {view === 'pitch' ? (
