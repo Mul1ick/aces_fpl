@@ -4,5 +4,8 @@
   },
   "dependencies": {
     "@prisma/client": "^5.17.0"
+  },
+  "prisma": {
+    "postinstall": "prisma py fetch && prisma generate"
   }
 }

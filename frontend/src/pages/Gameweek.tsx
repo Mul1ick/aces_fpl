@@ -8,42 +8,64 @@ import { ListView } from '@/components/gameweek/ListView';
 import { ManagerInfoCard } from '@/components/gameweek/ManagerInfoCard';
 import { Card } from '@/components/ui/card';
 import { API } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { useMemo } from 'react'; // Make sure useMemo is imported
 import { PlayerDetailCard } from '@/components/gameweek/PlayerDetailCard';
 
 const Gameweek: React.FC = () => {
   const { gw } = useParams();
+  const { user } = useAuth(); // Add useAuth
+  const { toast } = useToast(); // Add useToast
   const [view, setView] = useState('pitch');
   const [detailedPlayer, setDetailedPlayer] = useState(null);
   const [squad, setSquad] = useState<TeamResponse | null>(null);
+  const [hubStats, setHubStats] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [isExtraDataLoading, setIsExtraDataLoading] = useState(true);
+
 
   useEffect(() => {
-    const fetchTeam = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        return;
-      }
-
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+       return;
+    }
+    
+    const fetchAllData = async () => {
+      setIsExtraDataLoading(true);
       try {
-        const response = await fetch(API.endpoints.team, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const [teamRes, hubRes, leaderboardRes] = await Promise.all([
+            fetch(API.endpoints.team, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
 
-        if (!response.ok) {
-           throw new Error("Failed to fetch team data");
-        }
+        if (!teamRes.ok) throw new Error("Failed to fetch team data");
+        if (!hubRes.ok || !leaderboardRes.ok) console.warn("Failed to fetch manager data");
         
-        const data: TeamResponse = await response.json();
+        const teamData: TeamResponse = await teamRes.json();
+        setSquad(teamData);
         
-        setSquad(data);
+        if (hubRes.ok) setHubStats(await hubRes.json());
+        if (leaderboardRes.ok) setLeaderboard(await leaderboardRes.json());
+
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching data:", error);
+        toast({ variant: "destructive", title: "Could not load page data." });
+      } finally {
+        setIsExtraDataLoading(false);
       }
     };
 
-    fetchTeam();
-  }, []);
+    fetchAllData();
+  }, [toast]);
+
+  const userRank = useMemo(() => {
+    if (!leaderboard || !user) return undefined;
+    const userEntry = leaderboard.find(entry => entry.manager_email === user.email);
+    return userEntry?.rank;
+  }, [leaderboard, user]);
+
 
     if (!squad) {
     return <div className="p-4 text-center">Loading your gameweek data...</div>;
@@ -64,7 +86,15 @@ const Gameweek: React.FC = () => {
        {/* --- MODIFIED: Added classes for sticky positioning --- */}
       <div className="hidden lg:block lg:w-2/5 p-4">
         <div className="lg:sticky lg:top-4">
-            <ManagerInfoCard />
+            <ManagerInfoCard 
+  isLoading={isExtraDataLoading}
+  teamName={squad.team_name}
+  managerName={user?.full_name}
+  stats={hubStats}
+  leagueStandings={leaderboard.slice(0, 5)}
+  overallRank={userRank}
+  currentUserEmail={user?.email}
+/>
         </div>
       </div>
 
@@ -91,7 +121,15 @@ const Gameweek: React.FC = () => {
       
       {/* Manager Info Card (Mobile Only) */}
       <div className="block lg:hidden p-4">
-          <ManagerInfoCard />
+          <ManagerInfoCard 
+  isLoading={isExtraDataLoading}
+  teamName={squad.team_name}
+  managerName={user?.full_name}
+  stats={hubStats}
+  leagueStandings={leaderboard.slice(0, 5)}
+  overallRank={userRank}
+  currentUserEmail={user?.email}
+/>
       </div>
 
       <AnimatePresence>
