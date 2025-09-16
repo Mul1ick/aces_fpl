@@ -18,7 +18,7 @@ Jinja2==3.1.6
 MarkupSafe==3.0.2
 nodeenv==1.9.1
 passlib==1.7.4
-prisma @ git+https://github.com/RobertCraigie/prisma-client-py.git@v0.16.3
+prisma==0.15.0
 psycopg2-binary==2.9.9
 pyasn1==0.6.1
 pycparser==2.22
