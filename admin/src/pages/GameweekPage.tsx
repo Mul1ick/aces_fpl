@@ -35,28 +35,7 @@ const DUMMY_FIXTURES = [
   { id: 2, gameweek_id: 5, home_team_id: 3, away_team_id: 4, home_team: DUMMY_TEAMS[2], away_team: DUMMY_TEAMS[3], stats_entered: false },
 ];
 
-const DUMMY_PLAYERS: Player[] = [
-    // Satan Players (Team ID 1)
-    { id: 1, full_name: 'S. Becker', position: 'GK', team: DUMMY_TEAMS[0], team_id: 1, price: 5.5, status: 'available' },
-    { id: 2, full_name: 'S. van Dijk', position: 'DEF', team: DUMMY_TEAMS[0], team_id: 1, price: 6.0, status: 'available' },
-    { id: 11, full_name: 'S. Salah', position: 'MID', team: DUMMY_TEAMS[0], team_id: 1, price: 13.0, status: 'available' },
-    { id: 12, full_name: 'S. Nunez', position: 'FWD', team: DUMMY_TEAMS[0], team_id: 1, price: 8.0, status: 'available' },
 
-    // Bandra United Players (Team ID 2)
-    { id: 3, full_name: 'B. Fernandes', position: 'MID', team: DUMMY_TEAMS[1], team_id: 2, price: 8.5, status: 'available' },
-    { id: 4, full_name: 'B. Rashford', position: 'FWD', team: DUMMY_TEAMS[1], team_id: 2, price: 9.0, status: 'available' },
-    { id: 13, full_name: 'B. Martinez', position: 'DEF', team: DUMMY_TEAMS[1], team_id: 2, price: 5.0, status: 'available' },
-
-    // Mumbai Hotspurs Players (Team ID 3)
-    { id: 5, full_name: 'M. Romero', position: 'DEF', team: DUMMY_TEAMS[2], team_id: 3, price: 5.0, status: 'available' },
-    { id: 6, full_name: 'M. Son', position: 'MID', team: DUMMY_TEAMS[2], team_id: 3, price: 9.5, status: 'available' },
-    { id: 14, full_name: 'M. Richarlison', position: 'FWD', team: DUMMY_TEAMS[2], team_id: 3, price: 8.5, status: 'available' },
-    
-    // Southside Players (Team ID 4)
-    { id: 7, full_name: 'So. Pope', position: 'GK', team: DUMMY_TEAMS[3], team_id: 4, price: 5.0, status: 'available' },
-    { id: 8, full_name: 'So. Isak', position: 'FWD', team: DUMMY_TEAMS[3], team_id: 4, price: 8.0, status: 'available' },
-    { id: 15, full_name: 'So. Trippier', position: 'DEF', team: DUMMY_TEAMS[3], team_id: 4, price: 6.5, status: 'available' },
-] as Player[];
 
 
 export function GameweekPage() {
@@ -168,21 +147,67 @@ const handleSaveStats = async (
   }
 };
 
-  const handleCalculatePoints = useCallback(() => {
-    setGameweek(gw => ({ ...gw, status: 'Calculating' }));
-    toast({ title: "Processing", description: "Calculating all player points for Gameweek 5..." });
-    setTimeout(() => {
-        setGameweek(gw => ({ ...gw, status: 'Points Calculated' }));
-        toast({ title: "Success", description: "Points calculation complete." });
-    }, 2000);
-    setConfirming(null);
-  }, [toast]);
+  const handleCalculatePoints = useCallback(async () => {
+  const t = token || localStorage.getItem("admin_token");
+  if (!t || !gameweek) return;
 
-  const handleFinalizeGameweek = useCallback(() => {
-    setGameweek(gw => ({ ...gw, status: 'Finalized' }));
-    toast({ title: "Gameweek Finalized", description: "Gameweek 5 is now complete and scores are final." });
-    setConfirming(null);
-  }, [toast]);
+  setConfirming(null); // Close the confirmation dialog immediately
+
+  toast({ title: "Processing...", description: "Calculating points for all users. This may take a moment." });
+
+  try {
+    // Set a calculating status locally for immediate UI feedback
+    setGameweek(gw => ({ ...gw, status: 'Calculating' }));
+
+    const response = await gameweekAPI.calculatePoints(gameweek.id, t);
+
+    // Update UI to reflect completion
+    setGameweek(gw => ({ ...gw, status: 'Points Calculated' }));
+    toast({ title: "Success!", description: response.message || "Points calculation complete." });
+
+  } catch (error: any) {
+    // Revert status on error
+    setGameweek(gw => ({ ...gw, status: 'Live' }));
+    toast({
+      variant: "destructive",
+      title: "Calculation Failed",
+      description: error.message || "An error occurred while calculating points.",
+    });
+  }
+}, [token, gameweek, toast]);
+
+
+  const handleFinalizeGameweek = useCallback(async () => {
+    const t = token || localStorage.getItem("admin_token");
+    if (!t || !gameweek) return;
+
+    setConfirming(null); // Close the confirmation dialog
+
+    toast({ title: "Finalizing...", description: "Processing gameweek rollover tasks." });
+
+    try {
+      // Set a temporary "finalizing" status if you want visual feedback
+      // setGameweek(gw => ({ ...gw, status: 'Finalizing' })); // Optional
+
+      await gameweekAPI.finalizeGameweek(gameweek.id, t);
+
+      // On success, update the UI permanently
+      setGameweek(gw => ({ ...gw, status: 'Finalized' }));
+      toast({ 
+        title: "Gameweek Finalized", 
+        description: `Gameweek ${gameweek.id} is now complete and rollover tasks have been executed.` 
+      });
+      
+    } catch (error: any) {
+      // Revert status on error if you used a temporary one
+      setGameweek(gw => ({ ...gw, status: 'Points Calculated' })); // Revert to pre-finalize state
+      toast({
+        variant: "destructive",
+        title: "Finalization Failed",
+        description: error.message || "An error occurred during the finalization process.",
+      });
+    }
+  }, [token, gameweek, toast]);
 
   const MainActionButton = () => {
     if (!gameweek) return null;
@@ -204,6 +229,7 @@ const handleSaveStats = async (
     }
     return null; // Don't show a button for Calculating or Finalized statuses
   };
+
 
   return (
     <div className="space-y-6">

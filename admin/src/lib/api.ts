@@ -234,6 +234,17 @@ export const gameweekAPI = {
   async getFixtures(gameweekId: string, token: string): Promise<Fixture[]> {
     return apiRequest(`/admin/gameweeks/${gameweekId}/fixtures`, { method: 'GET' }, token);
   },
+  async calculatePoints(gameweekId: number, token: string): Promise<{ message: string }> {
+  return apiRequest(`/admin/gameweeks/${gameweekId}/calculate-points`, {
+    method: 'POST',
+  }, token);
+},
+async finalizeGameweek(gameweekId: number, token: string): Promise<{ message: string }> {
+    return apiRequest(`/admin/gameweeks/${gameweekId}/finalize`, {
+      method: 'POST',
+    }, token);
+  },
+
 
   async submitPlayerStats(
     gameweekId: string | number,

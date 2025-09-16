@@ -12,15 +12,13 @@ from app.auth import hash_password
 
 
 # --- Configuration ---
-# All gameweek deadlines will be calculated relative to this date.
-# We'll set it to the next upcoming Saturday at 11:00 AM local time.
-def get_next_saturday():
-    now = datetime.now()
-    days_ahead = (5 - now.weekday() + 7) % 7  # 5 is Saturday
-    next_saturday = now + timedelta(days=days_ahead)
-    return next_saturday.replace(hour=11, minute=0, second=0, microsecond=0)
+# Start the season "now" so you can test immediately. First GW is ~1 minute from now.
+def get_season_start_now():
+    now = datetime.now().replace(second=0, microsecond=0)
+    return now + timedelta(minutes=1)
 
-SEASON_START_DATE = get_next_saturday()
+SEASON_START_DATE = get_season_start_now()
+
 
 # --- Seed Data ---
 
@@ -35,7 +33,7 @@ TEAMS = [
 
 # Real players assigned to the fictional teams
 PLAYERS = {
-    "SAT": [ # Manchester United
+    "SAT": [  # Manchester United
         {"full_name": "André Onana", "position": "GK", "price": 5.0},
         {"full_name": "Altay Bayındır", "position": "GK", "price": 4.0},
         {"full_name": "Diogo Dalot", "position": "DEF", "price": 5.0},
@@ -48,7 +46,7 @@ PLAYERS = {
         {"full_name": "Rasmus Højlund", "position": "FWD", "price": 7.5},
         {"full_name": "Alejandro Garnacho", "position": "FWD", "price": 5.0},
     ],
-    "BAN": [ # Manchester City
+    "BAN": [  # Manchester City
         {"full_name": "Ederson Moraes", "position": "GK", "price": 5.5},
         {"full_name": "Stefan Ortega", "position": "GK", "price": 4.0},
         {"full_name": "Kyle Walker", "position": "DEF", "price": 5.5},
@@ -61,7 +59,7 @@ PLAYERS = {
         {"full_name": "Erling Haaland", "position": "FWD", "price": 14.0},
         {"full_name": "Julián Álvarez", "position": "FWD", "price": 6.5},
     ],
-    "MHS": [ # Tottenham Hotspur
+    "MHS": [  # Tottenham Hotspur
         {"full_name": "Guglielmo Vicario", "position": "GK", "price": 5.0},
         {"full_name": "Fraser Forster", "position": "GK", "price": 4.0},
         {"full_name": "Pedro Porro", "position": "DEF", "price": 5.5},
@@ -74,7 +72,7 @@ PLAYERS = {
         {"full_name": "Richarlison", "position": "FWD", "price": 7.0},
         {"full_name": "Brennan Johnson", "position": "FWD", "price": 6.0},
     ],
-    "SOU": [ # Arsenal
+    "SOU": [  # Arsenal
         {"full_name": "David Raya", "position": "GK", "price": 5.0},
         {"full_name": "Aaron Ramsdale", "position": "GK", "price": 4.5},
         {"full_name": "Ben White", "position": "DEF", "price": 5.5},
@@ -87,7 +85,7 @@ PLAYERS = {
         {"full_name": "Kai Havertz", "position": "FWD", "price": 7.5},
         {"full_name": "Gabriel Jesus", "position": "FWD", "price": 8.0},
     ],
-    "TIT": [ # Liverpool
+    "TIT": [  # Liverpool
         {"full_name": "Alisson Becker", "position": "GK", "price": 5.5},
         {"full_name": "Caoimhín Kelleher", "position": "GK", "price": 4.0},
         {"full_name": "Trent Alexander-Arnold", "position": "DEF", "price": 8.0},
@@ -100,7 +98,7 @@ PLAYERS = {
         {"full_name": "Darwin Núñez", "position": "FWD", "price": 7.5},
         {"full_name": "Diogo Jota", "position": "FWD", "price": 8.0},
     ],
-    "UMA": [ # Chelsea
+    "UMA": [  # Chelsea
         {"full_name": "Robert Sánchez", "position": "GK", "price": 4.5},
         {"full_name": "Đorđe Petrović", "position": "GK", "price": 4.0},
         {"full_name": "Reece James", "position": "DEF", "price": 5.5},
@@ -115,8 +113,10 @@ PLAYERS = {
     ],
 }
 
+
 def generate_round_robin_fixtures(team_ids):
     """Generates a double round-robin schedule."""
+    team_ids = list(team_ids)  # avoid mutating caller list
     if len(team_ids) % 2 != 0:
         team_ids.append(None)  # Add a dummy team for even scheduling
 
@@ -143,7 +143,7 @@ def generate_round_robin_fixtures(team_ids):
         full_schedule.append(round_fixtures)
     for round_fixtures in schedule:
         full_schedule.append([(away, home) for home, away in round_fixtures])
-        
+
     return full_schedule
 
 
@@ -163,6 +163,24 @@ async def clear_data(db: Prisma):
     await db.fantasyteam.delete_many()
     await db.user.delete_many()
     print("✅ Data wiped successfully.")
+
+
+async def quick_simulate_gws(db: Prisma, gw_numbers=(1, 2)):
+    """Optional: mark fixtures finished with random scores for given GWs."""
+    print(f"Simulating gameweeks: {gw_numbers}")
+    for gw_no in gw_numbers:
+        gw = await db.gameweek.find_first(where={"gw_number": gw_no})
+        if not gw:
+            continue
+        fixtures = await db.fixture.find_many(where={"gameweek_id": gw.id})
+        for fx in fixtures:
+            hs = random.randint(0, 4)
+            as_ = random.randint(0, 4)
+            await db.fixture.update(
+                where={"id": fx.id},
+                data={"home_score": hs, "away_score": as_, "stats_entered": True},
+            )
+    print("Simulation done.")
 
 
 async def main() -> None:
@@ -199,61 +217,95 @@ async def main() -> None:
 
     # --- 1. Create Teams ---
     print("Seeding teams...")
-    team_records = await db.team.create_many(data=TEAMS, skip_duplicates=True)
-    print(f"✅ Created {team_records} teams.")
+    created_teams = await db.team.create_many(data=TEAMS, skip_duplicates=True)
+    print(f"✅ Created {created_teams} teams.")
 
     # --- 2. Create Players ---
     print("Seeding players...")
     all_teams = await db.team.find_many()
     team_map = {team.short_name: team.id for team in all_teams}
-    
+
     player_count = 0
     for short_name, players in PLAYERS.items():
         team_id = team_map.get(short_name)
         if not team_id:
             continue
-        
         player_data = [{"team_id": team_id, **player} for player in players]
         created = await db.player.create_many(data=player_data, skip_duplicates=True)
         player_count += created
     print(f"✅ Created {player_count} players.")
 
-    # --- 3. Create Gameweeks ---
+    # --- 3. Create Gameweeks (25 minutes apart, starting now) ---
     print("Seeding 10 gameweeks...")
     gameweek_data = [
-        {"gw_number": i, "deadline": SEASON_START_DATE + timedelta(weeks=i-1)}
+        {
+            "gw_number": i,
+            "deadline": SEASON_START_DATE + timedelta(minutes=25 * (i - 1)),
+        }
         for i in range(1, 11)
     ]
     await db.gameweek.create_many(data=gameweek_data, skip_duplicates=True)
     print("✅ Created 10 gameweeks.")
 
-    # --- 4. Create Fixtures for the whole season ---
+    # --- 4. Create Admin User + Team + Score rows ---
+    print("Creating admin user...")
+    admin_email = "admin@example.com"
+    admin_password = "admin123"  # change in prod
+    admin = await db.user.create(
+        data={
+            "email": admin_email,
+            "hashed_password": hash_password(admin_password),
+            "role": "admin",
+            "is_active": True,
+            "full_name": "League Admin",
+            "fantasy_team": {"create": {"name": "Admin XI"}},
+        },
+        include={"fantasy_team": True},
+    )
+    print(f"✅ Admin: {admin_email} / {admin_password}")
+
+    gws = await db.gameweek.find_many()
+    await db.usergameweekscore.create_many(
+        data=[{"user_id": admin.id, "gameweek_id": gw.id} for gw in gws],
+        skip_duplicates=True,
+    )
+    print("✅ Seeded admin UserGameweekScore rows.")
+
+    # --- 5. Create Fixtures for the whole season ---
     print("Generating and seeding fixtures for 10 Gameweeks...")
-    all_gws = await db.gameweek.find_many(order={"gw_number": "asc"})
+    all_gws = sorted(gws, key=lambda x: x.gw_number)
     team_ids = [team.id for team in all_teams]
-    
     fixture_schedule = generate_round_robin_fixtures(team_ids)
-    
+
     total_fixtures_created = 0
     for i, round_fixtures in enumerate(fixture_schedule):
+        if i >= len(all_gws):
+            break
         gameweek = all_gws[i]
         fixtures_data = [
             {
                 "gameweek_id": gameweek.id,
                 "home_team_id": home_id,
                 "away_team_id": away_id,
-                "kickoff": gameweek.deadline - timedelta(days=random.randint(1, 3), hours=random.randint(2, 8))
+                # Kickoff shortly before the deadline for quick sims
+                "kickoff": gameweek.deadline - timedelta(minutes=random.randint(5, 15)),
             }
             for home_id, away_id in round_fixtures
         ]
-        created_count = await db.fixture.create_many(data=fixtures_data, skip_duplicates=True)
+        created_count = await db.fixture.create_many(
+            data=fixtures_data, skip_duplicates=True
+        )
         total_fixtures_created += created_count
         print(f"  - Created {created_count} fixtures for Gameweek {gameweek.gw_number}")
-        
+
     print(f"✅ Created a total of {total_fixtures_created} fixtures.")
+
+    # --- 6. Optional: quick simulation for GW1–2 ---
+    # Uncomment to prefill scores so UI can show results immediately.
+    # await quick_simulate_gws(db, gw_numbers=(1, 2))
 
     await db.disconnect()
 
+
 if __name__ == "__main__":
     asyncio.run(main())
-
