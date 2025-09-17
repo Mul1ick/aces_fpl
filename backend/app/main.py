@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
-load_dotenv() 
+load_dotenv() # <-- MUST BE THE FIRST THING AFTER IMPORTS
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes,fixture_routes,transfer_routes,chip_routes
@@ -19,8 +20,6 @@ app = FastAPI(
 )
 
 # --- Middleware Configuration ---
-# This block now handles both production and local development
-
 origins_str = os.getenv("CORS_ORIGINS")
 if origins_str:
     # If the environment variable is set (on Render), use it
@@ -40,7 +39,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.on_event("startup")
 async def startup():
     await db_client.connect()
@@ -50,7 +48,6 @@ async def shutdown():
     await db_client.disconnect()
 
 # --- API Router Includes ---
-# Public routes for the main FPL application
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 app.include_router(user_routes.router, prefix="/users", tags=["Users"])
 app.include_router(player_routes.router)
@@ -60,9 +57,7 @@ app.include_router(leaderboard_routes.router)
 app.include_router(fixture_routes.router)
 app.include_router(transfer_routes.router)
 app.include_router(chip_routes.router)
-# Secure routes for the Admin Portal
 app.include_router(admin_routes.router)
-
 
 # --- Root Endpoint ---
 @app.get("/")
