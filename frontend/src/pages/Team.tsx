@@ -15,8 +15,8 @@ import { API } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // --- ASSET IMPORTS ---
-import pitchBackground from '@/assets/images/pitch.png';
-import acesLogo from "@/assets/aces-logo.svg";
+import pitchBackground from '@/assets/images/pitch.svg';
+import acesLogo from "@/assets/aces-logo.png";
 
 const TeamPageSkeleton = () => (
     <div className="w-full min-h-screen bg-white flex flex-col lg:h-screen lg:flex-row font-sans">
