@@ -46,7 +46,7 @@ const Transfers: React.FC = () => {
 
   // --- STATE MANAGEMENT ---
   const [squad, setSquad] = useState(initialSquad);
-  const [initialSquadState, setInitialSquadState] = useState('');
+const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
   // --- MODIFIED --- Added state to store the existing team name
   const [existingTeamName, setExistingTeamName] = useState<string>('');
   const [gameweek, setGameweek] = useState(null);
@@ -56,8 +56,7 @@ const Transfers: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [view, setView] = useState<'pitch' | 'list'>('pitch');
-const [pendingOutPlayerId, setPendingOutPlayerId] = useState<number | null>(null);
-const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
+
 
 
   const hasTeam = user?.has_team;
@@ -86,7 +85,7 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
     setIsLoading(true);
     if (hasTeam === false) {
       setSquad(initialSquad);
-      setInitialSquadState(serializeSquad(initialSquad));
+      setInitialSquadObject(initialSquad); // Store the full object
       setIsLoading(false);
       return;
     }
@@ -101,14 +100,15 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
         const populatedSquad = transformApiDataToSquad(allPlayers);
         
         setSquad(populatedSquad);
-        setInitialSquadState(serializeSquad(populatedSquad));
+        setInitialSquadObject(populatedSquad); // CORRECTED
+
         // --- MODIFIED --- Store the fetched team name
         setExistingTeamName(data.team_name || '');
       } catch (error) {
         console.error("Failed to fetch team:", error);
         toast({ variant: "destructive", title: "Error", description: "Could not load your team. Please try again." });
         setSquad(initialSquad);
-        setInitialSquadState(serializeSquad(initialSquad));
+        setInitialSquadObject(initialSquad);
       } finally {
         setIsLoading(false);
       }
@@ -127,14 +127,32 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
   }, [hasTeam, isAuthLoading, fetchAndSetTeam, token]);
 
   // --- SQUAD LOGIC & VALIDATION ---
-  const { playersSelected, bank, isDirty } = useMemo(() => {
-    const allPlayers = Object.values(squad).flat();
-    const selectedCount = allPlayers.filter(p => p !== null).length;
-    const totalCost = allPlayers.reduce((acc: number, p: any) => acc + (p?.price || 0), 0);
+  const { playersOut, playersIn, bank, transferCost, playersSelected } = useMemo(() => {
+    const initialPlayers = Object.values(initialSquadObject).flat().filter(p => p !== null);
+    const currentPlayers = Object.values(squad).flat().filter(p => p !== null);
+
+    const initialIds = new Set(initialPlayers.map(p => p.id));
+    const currentIds = new Set(currentPlayers.map(p => p.id));
+
+    const out = initialPlayers.filter(p => !currentIds.has(p.id));
+    const into = currentPlayers.filter(p => !initialIds.has(p.id));
+
+    const totalCost = currentPlayers.reduce((acc, p) => acc + (p?.price || 0), 0);
     const remainingBank = 110.0 - totalCost;
-    const dirty = serializeSquad(squad) !== initialSquadState;
-    return { playersSelected: selectedCount, bank: remainingBank, isDirty: dirty };
-  }, [squad, initialSquadState]);
+
+    const freeTransfers = user?.free_transfers ?? 1;
+    const numTransfers = out.length;
+    const paidTransfers = user?.played_first_gameweek ? Math.max(0, numTransfers - freeTransfers) : 0;
+    const cost = paidTransfers * 4;
+
+    return {
+      playersOut: out,
+      playersIn: into,
+      bank: remainingBank,
+      transferCost: cost,
+      playersSelected: currentPlayers.length
+    };
+  }, [squad, initialSquadObject, user]);
 
   const squadValidation = useMemo(() => {
     const allPlayers = Object.values(squad).flat().filter(p => p !== null);
@@ -168,7 +186,6 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
 
   const handleStartTransfer = (player: any, pos: string, index: number) => {
   setPositionToFill({ position: pos, index: index });
-  setPendingOutPlayerId(player?.id ?? null);    // <-- add this line
   handlePlayerRemove(pos, index);
   if (window.innerWidth < 1024) setIsPlayerSelectionOpen(true);
 };
@@ -176,7 +193,6 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
   const handlePlayerSelect = (playerData: any) => {
     setIsPlayerSelectionOpen(false);
     const newPlayer = transformApiPlayer(playerData);
-    setPendingInPlayerId(newPlayer?.id ?? null);
     const posKey = newPlayer.pos;
 
     let targetSlot = positionToFill;
@@ -209,7 +225,8 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
     }
   };
   
-  const handlePlayerRemove = (position: string, index: number) => {
+const handlePlayerRemove = (position: string, index: number) => {
+    setPositionToFill({ position, index });
     setSquad(current => {
       const newSquad = { ...current };
       const positionArray = [...newSquad[position]];
@@ -217,73 +234,79 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
       newSquad[position] = positionArray;
       return newSquad;
     });
+    // For mobile, automatically open the selection list
+    if (window.innerWidth < 1024) {
+      setIsPlayerSelectionOpen(true);
+    }
   };
+
 
   const handleReset = () => {
     setIsLoading(true);
-    setPendingOutPlayerId(null);
-  setPendingInPlayerId(null);
     fetchAndSetTeam();
   };
   
   const handleAutoFill = () => toast({ title: 'Coming Soon!', description: 'Autofill feature is on the way.'});
 
-  const handleSaveOrSubmit = async (teamNameFromModal?: string) => {
-  if (!token) return;
+  const handleConfirmTransfers = async (teamNameFromModal?: string) => {
+    if (!token) return;
 
-  // creating first team → still use submit-team
-  if (!hasTeam) {
-    const allPlayers = Object.values(squad).flat().filter(p => p !== null);
-    if (allPlayers.length !== 11) {
-      toast({ variant: "destructive", title: "Incomplete Squad", description: "You must select 11 players to save your team." });
+    // Logic for submitting a brand new team
+    if (!hasTeam) {
+        if (playersSelected !== 11) {
+            toast({ variant: "destructive", title: "Incomplete Squad", description: "You must select 11 players to save your team." });
+            return;
+        }
+        const allPlayers = Object.values(squad).flat().filter(p => p !== null);
+        const payload = {
+            team_name: teamNameFromModal,
+            players: allPlayers.map((p: any) => ({ id: p.id, position: p.pos, is_captain: false, is_vice_captain: false, is_benched: false })),
+        };
+        try {
+            const res = await fetch(API.endpoints.submitTeam, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error((await res.json()).detail || "Failed to save team");
+            await refreshUserStatus();
+            toast({ title: "Success", description: "Your team has been created." });
+            navigate("/dashboard");
+        } catch (e) {
+            toast({ variant: "destructive", title: "Error Saving Team", description: e instanceof Error ? e.message : "Unknown error" });
+        }
+        return;
+    }
+    
+    // Logic for confirming transfers for an existing team
+    if (playersIn.length === 0 && playersOut.length === 0) {
+      toast({ variant: "destructive", title: "No Changes", description: "You haven't made any transfers." });
       return;
     }
-    const payload = {
-      team_name: teamNameFromModal,
-      players: allPlayers.map((p: any) => ({
-        id: p.id, position: p.pos, is_captain: p.is_captain, is_vice_captain: p.is_vice_captain, is_benched: p.is_benched
+
+    const transferPayload = {
+      transfers: playersOut.map((pOut, index) => ({
+        out_player_id: pOut.id,
+        in_player_id: playersIn[index].id,
       })),
     };
+
     try {
-      const res = await fetch(API.endpoints.submitTeam, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error((await res.json()).detail || "Failed to save team");
-      await refreshUserStatus();
-      toast({ title: "Success", description: "Your team has been created." });
-      navigate("/dashboard");
+        const res = await fetch(`${API.BASE_URL}/transfers/confirm`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify(transferPayload),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || "Transfer failed");
+
+        await fetchAndSetTeam(); // Refresh squad from backend to get new initial state
+        await refreshUserStatus();
+        toast({ title: "Transfers Confirmed!", description: "Your changes have been saved." });
+
     } catch (e) {
-      toast({ variant: "destructive", title: "Error Saving Team", description: e instanceof Error ? e.message : "Unknown error" });
+        toast({ variant: "destructive", title: "Transfer Failed", description: e instanceof Error ? e.message : "Unknown error" });
     }
-    return;
-  }
-
-  // updating existing team → use transfer endpoint to write transfer_log
-  if (!pendingOutPlayerId || !pendingInPlayerId) {
-    toast({ variant: "destructive", title: "Select a swap", description: "Choose a player to transfer out and a player to bring in." });
-    return;
-  }
-
-  try {
-    const res = await fetch(API.endpoints.transfer, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ out_player_id: pendingOutPlayerId, in_player_id: pendingInPlayerId }),
-    });
-    if (!res.ok) throw new Error((await res.json()).detail || "Transfer failed");
-
-    // optional: backend may return updated team
-    await fetchAndSetTeam();
-    setPendingOutPlayerId(null);
-    setPendingInPlayerId(null);
-    await refreshUserStatus();
-    toast({ title: "Transfer confirmed", description: "Your swap has been logged." });
-  } catch (e) {
-    toast({ variant: "destructive", title: "Transfer failed", description: e instanceof Error ? e.message : "Unknown error" });
-  }
-};
+  };
 
   // --- RENDER LOGIC ---
   if (isLoading || isAuthLoading) {
@@ -326,6 +349,8 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
               view={view}
               setView={setView}
               gameweek={gameweek}
+              transferCount={playersOut.length}
+              transferCost={transferCost}
             />
           </div>
           
@@ -346,18 +371,14 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
 
           <div className="p-4 grid grid-cols-3 gap-4 border-t bg-white sticky bottom-0">
             <Button variant="outline" onClick={handleAutoFill}>Autofill</Button>
-            <Button variant="destructive" onClick={handleReset} disabled={!isDirty}>Reset</Button>
+            <Button variant="destructive" onClick={handleReset} disabled={playersOut.length === 0}>Reset</Button>
             {hasTeam ? (
-              <Button
-                onClick={() => handleSaveOrSubmit()}
-                disabled={
-     !squadValidation.isValid ||
-     !pendingOutPlayerId ||
-     !pendingInPlayerId
-   }
-              >
-                Confirm Transfers
-              </Button>
+               <Button
+                  onClick={() => handleConfirmTransfers()}
+                  disabled={!squadValidation.isValid || playersOut.length === 0}
+                >
+                  Make Transfers
+                </Button>
             ) : (
               <Button
                 onClick={() => setIsEnterSquadModalOpen(true)}
@@ -383,7 +404,7 @@ const [pendingInPlayerId, setPendingInPlayerId] = useState<number | null>(null);
         onClose={() => setIsEnterSquadModalOpen(false)}
         onConfirm={(teamName) => {
             setIsEnterSquadModalOpen(false);
-            handleSaveOrSubmit(teamName);
+            handleConfirmTransfers(teamName);
         }}
       />
     </div>

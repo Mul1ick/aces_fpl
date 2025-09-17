@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import random
 import sys
 import os
+from zoneinfo import ZoneInfo
 
 # Add the project root (`backend`) to the Python path to allow for `app` module imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -14,8 +15,9 @@ from app.auth import hash_password
 # --- Configuration ---
 # Start the season "now" so you can test immediately. First GW is ~1 minute from now.
 def get_season_start_now():
-    now = datetime.now().replace(second=0, microsecond=0)
+    now = datetime.now(ZoneInfo("Asia/Kolkata")).replace(second=0, microsecond=0)
     return now + timedelta(minutes=1)
+
 
 SEASON_START_DATE = get_season_start_now()
 

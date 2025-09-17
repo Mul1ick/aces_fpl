@@ -21,6 +21,9 @@ interface TransfersHeroCardProps {
   view: 'pitch' | 'list';
   setView: (view: 'pitch' | 'list') => void;
   gameweek: Gameweek | null;
+  transferCount: number; // --- ADD THIS ---
+  transferCost: number;  // --- ADD THIS ---
+
 }
 
 const StatDisplay = ({ value, label }: { value: string | number; label: string }) => (
@@ -38,13 +41,17 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   user,
   view,
   setView,
-  gameweek
+  gameweek,
+  transferCount, // --- ADD THIS ---
+  transferCost,  // --- ADD THIS ---
+
 }) => {
   const transfersText = user?.played_first_gameweek === false 
     ? "Unlimited" 
-    : user?.free_transfers;
+    : `${user?.free_transfers ?? 0} FT`;
+
   
-  const transferCost = 0;
+  // const transferCost = 0;
 
   const deadlineDate = gameweek?.deadline ? new Date(gameweek.deadline) : null;
   const deadlineText = deadlineDate && isValid(deadlineDate)
@@ -73,7 +80,7 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
           <div className="grid grid-cols-4 gap-2">
             <StatDisplay value={`${playersSelected} / 11`} label="Players Selected" />
             <StatDisplay value={`£${bank.toFixed(1)}m`} label="Budget" />
-            <StatDisplay value={transfersText} label="Free Transfers" />
+            <StatDisplay value={transferCount > 0 ? `${transferCount}` : transfersText} label={transferCount > 0 ? "Transfers" : "Free Transfers"} />
             <StatDisplay value={`${transferCost} pts`} label="Cost" />
           </div>
           

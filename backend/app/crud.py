@@ -6,6 +6,7 @@ from collections import Counter
 from app import schemas, auth
 from typing import Dict, List, Optional,Any
 import logging
+from decimal import Decimal
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -376,12 +377,13 @@ async def get_leaderboard(db: Prisma):
     # 2. Get all aggregated scores and create an efficient lookup map.
     scores_data = await db.usergameweekscore.group_by(
         by=['user_id'],
-        sum={'total_points': True}
+        sum={'total_points': True, 'transfer_hits': True}
     )
+
     # score_map will look like: {'user-uuid-1': 150, 'user-uuid-2': 95}
     score_map = {
-        score['user_id']: score['_sum']['total_points'] or 0
-        for score in scores_data
+        item['user_id']: (item['_sum']['total_points'] or 0) - (item['_sum']['transfer_hits'] or 0)
+        for item in scores_data
     }
 
     # 3. Combine user data with scores, defaulting to 0 if a user has no score entry.
@@ -1232,3 +1234,139 @@ async def get_team_of_the_week(db: Prisma):
         "starting": starting,
         "bench": bench
     }
+
+
+# In backend/app/crud.py
+
+from collections import Counter # Make sure this is imported at the top
+
+# ... keep other functions
+
+async def confirm_transfers(
+    db: Prisma,
+    user_id: str,
+    gameweek_id: int,
+    transfers: List[schemas.TransferItem],
+):
+    """
+    Validates and executes a batch of transfers in an atomic transaction
+    based on the custom 11-player squad rules.
+    """
+    # --- 1. PRE-FLIGHT CHECKS ---
+    if not transfers:
+        raise HTTPException(status_code=400, detail="No transfers provided.")
+
+    user = await db.user.find_unique(where={'id': user_id}, include={'fantasy_team': True})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    gw = await db.gameweek.find_unique(where={'id': gameweek_id})
+    if not gw or gw.deadline < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="The transfer deadline has passed.")
+
+    wildcard_active = await is_wildcard_active(db, user_id, gameweek_id)
+
+    # --- 2. FETCH INITIAL STATE ---
+    current_team_entries = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id},
+        include={'player': {'include': {'team': True}}}
+    )
+    current_player_ids = {entry.player_id for entry in current_team_entries}
+    
+    out_player_ids = {t.out_player_id for t in transfers}
+    in_player_ids = {t.in_player_id for t in transfers}
+
+    # --- 3. VALIDATION ---
+
+    # a) Ownership Validation
+    if not out_player_ids.issubset(current_player_ids):
+        raise HTTPException(status_code=400, detail="You are trying to transfer out a player you do not own.")
+
+    # b) Duplication & Total Player Count Validation
+    provisional_player_ids = (current_player_ids - out_player_ids).union(in_player_ids)
+    # CHANGED: Validate for a total of 11 players
+    if len(provisional_player_ids) != 11:
+        raise HTTPException(status_code=400, detail=f"Invalid transfer combination. Your squad must have exactly 11 players.")
+        
+    # c) Budget Validation
+    all_involved_players = await db.player.find_many(where={'id': {'in': list(out_player_ids.union(in_player_ids))}})
+    player_prices = {p.id: p.price for p in all_involved_players}
+    
+    value_of_outgoing_players = sum(player_prices.get(pid, 0) for pid in out_player_ids)
+    cost_of_incoming_players = sum(player_prices.get(pid, 0) for pid in in_player_ids)
+    
+    current_squad_value = sum(entry.player.price for entry in current_team_entries)
+    
+    # CHANGED: Budget is now 110.0m
+    total_budget = Decimal('110.0') 
+    bank = total_budget - current_squad_value
+    
+    new_bank = bank + value_of_outgoing_players - cost_of_incoming_players
+    if new_bank < 0:
+        raise HTTPException(status_code=400, detail=f"Insufficient funds. You are £{-new_bank:.1f}m short.")
+
+    # d) Squad Composition Validation (Team & Position Counts)
+    provisional_players = await db.player.find_many(where={'id': {'in': list(provisional_player_ids)}}, include={'team': True})
+    
+    team_counts = Counter(p.team.id for p in provisional_players if p.team)
+    for team_id, count in team_counts.items():
+        # CHANGED: Enforce a maximum of 2 players per team
+        if count > 2:
+            player_in_team = next((p for p in provisional_players if p.team and p.team.id == team_id), None)
+            team_name = player_in_team.team.name if player_in_team else "a single team"
+            raise HTTPException(status_code=400, detail=f"You can't have more than 2 players from {team_name}.")
+
+    position_counts = Counter(p.position for p in provisional_players)
+    # CHANGED: Enforce your required 2-3-3-3 formation
+    required_positions = {'GK': 2, 'DEF': 3, 'MID': 3, 'FWD': 3}
+    if position_counts != required_positions:
+        raise HTTPException(status_code=400, detail=f"Invalid squad structure. You must have 2 GKs, 3 DEFs, 3 MIDs, and 3 FWDs.")
+
+    # --- 4. CALCULATE TRANSFER COST ---
+    point_cost = 0
+    free_transfers_used = 0
+    if not wildcard_active and user.played_first_gameweek:
+        num_transfers = len(transfers)
+        available_ft = user.free_transfers or 0
+        
+        paid_transfers = max(0, num_transfers - available_ft)
+        point_cost = paid_transfers * 4
+        free_transfers_used = min(num_transfers, available_ft)
+
+
+    # --- 5. ATOMIC DATABASE TRANSACTION ---
+    async with db.tx() as tx:
+        await tx.userteam.delete_many(
+            where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': {'in': list(out_player_ids)}}
+        )
+        await tx.userteam.create_many(
+            data=[{'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': pid} for pid in in_player_ids]
+        )
+        for t in transfers:
+            await tx.transfer_log.create(data={
+                'user_id': user_id,
+                'gameweek_id': gameweek_id,
+                'out_player': t.out_player_id,
+                'in_player': t.in_player_id,
+            })
+        if point_cost > 0:
+            await tx.usergameweekscore.upsert(
+                where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
+                data={  # <-- Wrap with a 'data' dictionary
+                    'create': {
+                        'user_id': user_id,
+                        'gameweek_id': gameweek_id,
+                        'transfer_hits': point_cost
+                    },
+                    'update': {
+                        'transfer_hits': {'increment': point_cost}
+                    },
+                }
+            )
+        if free_transfers_used > 0:
+            await tx.user.update(
+                where={'id': user_id},
+                data={'free_transfers': {'decrement': free_transfers_used}}
+            )
+
+    return {"message": "Transfers confirmed successfully!", "cost": point_cost}

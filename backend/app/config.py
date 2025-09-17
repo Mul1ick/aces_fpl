@@ -15,7 +15,9 @@ load_dotenv()
 DEFAULT_ORIGINS = [
     "https://aces-fpl.vercel.app/",  # Default for main FPL React App
     "https://acesfpl.vercel.app/",
-    "https://admin-acesfpl.vercel.app"  # Default for new Admin Portal React App
+    "https://admin-acesfpl.vercel.app"  # Default for new Admin Portal React App,
+    "http://localhost:3000",  # Default for main FPL React App
+    "http://localhost:8080",
 ]
 
 # --- UPDATED: Safer parsing of the CORS_ORIGINS environment variable ---
