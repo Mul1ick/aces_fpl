@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { API } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext'; // Add this import
 import { Skeleton } from '@/components/ui/skeleton';
 
 // --- ASSET IMPORTS ---
@@ -57,12 +58,17 @@ const TeamPageSkeleton = () => (
 const Team: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth(); // Add this
   const [squad, setSquad] = useState<{ starting: any[], bench: any[] }>({ starting: [], bench: [] });
   const [initialSquadState, setInitialSquadState] = useState<string>('');
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [detailedPlayer, setDetailedPlayer] = useState<any | null>(null);
   const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hubStats, setHubStats] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [isExtraDataLoading, setIsExtraDataLoading] = useState(true);
+
 
   const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") || "" : "";
 
@@ -71,51 +77,58 @@ const Team: React.FC = () => {
     if (!token) return;
 
     setIsLoading(true);
-    fetch(API.endpoints.team, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-     .then(async res => {
-        if (!res.ok) throw new Error(`Fetch failed with status ${res.status}`);
-        const data: TeamResponse = await res.json();
-        if (!data.starting || !data.bench) throw new Error("Malformed team data");
+    setIsExtraDataLoading(true);
 
-      const transformPlayer = (p: any) => ({
-      id: p.id,
-      name: p.full_name,
-      full_name: p.full_name,
-      pos: p.position,
-      position: p.position,
-      team: p.team?.name,
-      team_obj: p.team,
-      price: p.price,
-      points: p.points,
-      fixture: p.fixture_str,
-      fixture_str: p.fixture_str,
-      isCaptain: p.is_captain,
-      isVice: p.is_vice_captain,
-      is_captain: p.is_captain,
-      is_vice_captain: p.is_vice_captain,
-      is_benched: p.is_benched,
-      recent_fixtures: p.recent_fixtures,
-      raw_stats: p.raw_stats,
-      breakdown: p.breakdown,
-    });
+    const fetchAllData = async () => {
+        try {
+            const [teamRes, hubRes, leaderboardRes] = await Promise.all([
+                fetch(API.endpoints.team, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } })
+            ]);
 
-        const starting = data.starting.map(transformPlayer);
-        const bench = data.bench.map(transformPlayer);
-        
-        const currentSquad = { starting, bench };
-        setSquad(currentSquad);
-        setInitialSquadState(JSON.stringify(currentSquad));
-      })
-      .catch(err => {
-        console.error("Failed to fetch team:", err);
-         setSquad({ starting: [], bench: [] });
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, []);
+            if (!teamRes.ok) throw new Error("Failed to fetch team data");
+            if (!hubRes.ok || !leaderboardRes.ok) console.warn("Failed to fetch manager data");
+
+            // Process Team Data
+            const teamData: TeamResponse = await teamRes.json();
+            const transformPlayer = (p: any) => ({
+                id: p.id, name: p.full_name, full_name: p.full_name, pos: p.position,
+                position: p.position, team: p.team?.name, team_obj: p.team,
+                price: p.price, points: p.points, fixture: p.fixture_str, fixture_str: p.fixture_str,
+                isCaptain: p.is_captain, isVice: p.is_vice_captain, is_captain: p.is_captain,
+                is_vice_captain: p.is_vice_captain, is_benched: p.is_benched,
+                recent_fixtures: p.recent_fixtures, raw_stats: p.raw_stats, breakdown: p.breakdown,
+            });
+            const starting = teamData.starting.map(transformPlayer);
+            const bench = teamData.bench.map(transformPlayer);
+            const currentSquad = { starting, bench, team_name: teamData.team_name };
+            setSquad(currentSquad);
+            setInitialSquadState(JSON.stringify(currentSquad));
+            
+            // Process Hub and Leaderboard Data
+            if (hubRes.ok) setHubStats(await hubRes.json());
+            if (leaderboardRes.ok) setLeaderboard(await leaderboardRes.json());
+
+        } catch (err) {
+            console.error("Failed to fetch initial data:", err);
+            setSquad({ starting: [], bench: [] });
+            toast({ variant: "destructive", title: "Could not load your team." });
+        } finally {
+            setIsLoading(false);
+            setIsExtraDataLoading(false);
+        }
+    };
+    
+    fetchAllData();
+  }, [toast]);
+
+  const userRank = useMemo(() => {
+    if (!leaderboard || !user) return undefined;
+    const userEntry = leaderboard.find(entry => entry.manager_email === user.email);
+    return userEntry?.rank;
+  }, [leaderboard, user]);
+
 
   const isDirty = useMemo(() => {
     return JSON.stringify(squad) !== initialSquadState;
@@ -310,7 +323,15 @@ const Team: React.FC = () => {
     >
       <motion.div variants={itemVariants} className="hidden lg:block lg:w-2/5 p-4">
         <div className="lg:sticky lg:top-4">
-          <ManagerInfoCard />
+          <ManagerInfoCard 
+  isLoading={isExtraDataLoading}
+  teamName={squad.team_name}
+  managerName={user?.full_name}
+  stats={hubStats}
+  leagueStandings={leaderboard.slice(0, 5)}
+  overallRank={userRank}
+  currentUserEmail={user?.email}
+/>
         </div>
       </motion.div>
        <div className="flex flex-col flex-1 lg:w-3/5">
@@ -384,7 +405,15 @@ const Team: React.FC = () => {
       </div>
       
       <motion.div variants={itemVariants} className="block lg:hidden p-4">
-          <ManagerInfoCard />
+          <ManagerInfoCard 
+  isLoading={isExtraDataLoading}
+  teamName={squad.team_name}
+  managerName={user?.full_name}
+  stats={hubStats}
+  leagueStandings={leaderboard.slice(0, 5)}
+  overallRank={userRank}
+  currentUserEmail={user?.email}
+/>
       </motion.div>
 
       <AnimatePresence>

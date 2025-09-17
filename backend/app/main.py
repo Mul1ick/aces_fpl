@@ -19,10 +19,18 @@ app = FastAPI(
 )
 
 # --- Middleware Configuration ---
+# This block now handles both production and local development
 
-# Manually read and parse the CORS_ORIGINS environment variable
-origins_str = os.getenv("CORS_ORIGINS", "")
-allowed_origins = [origin.strip() for origin in origins_str.split(",") if origin]
+origins_str = os.getenv("CORS_ORIGINS")
+if origins_str:
+    # If the environment variable is set (on Render), use it
+    allowed_origins = [origin.strip() for origin in origins_str.split(",")]
+else:
+    # If not set (for local development), use a default list
+    allowed_origins = [
+        "http://localhost:3000", # Frontend App
+        "http://localhost:8080", # Admin Portal
+    ]
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,7 +61,7 @@ app.include_router(fixture_routes.router)
 app.include_router(transfer_routes.router)
 app.include_router(chip_routes.router)
 # Secure routes for the Admin Portal
-app.include_router(admin_routes.router) # Prefix is already defined in admin_routes.py
+app.include_router(admin_routes.router)
 
 
 # --- Root Endpoint ---

@@ -60,6 +60,7 @@ const Dashboard: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [squad, setSquad] = useState<TeamResponse | null>(null);
   const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
+  const [gameweek, setGameweek] = useState<{ gw_number: number } | null>(null); // Add this line
   const [gameweekStats, setGameweekStats] = useState({
     user_points: 0,
     average_points: 0,
@@ -130,6 +131,28 @@ const Dashboard: React.FC = () => {
       })();
     }
   }, [user]);
+
+  useEffect(() => {
+    const fetchCurrentGameweek = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const response = await fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setGameweek(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch current gameweek:", error);
+      }
+    };
+
+    if (user) {
+        fetchCurrentGameweek();
+    }
+}, [user]);
 
   // Show a loading state while checking auth
   if (isLoading) {
@@ -255,6 +278,7 @@ const Dashboard: React.FC = () => {
       averagePoints={gameweekStats.average_points}
       highestPoints={gameweekStats.highest_points}
       teamName={squad?.team_name}
+      currentGameweekNumber={gameweek?.gw_number || 1}
  />
                 </motion.div>
                 <motion.div variants={itemVariants}>

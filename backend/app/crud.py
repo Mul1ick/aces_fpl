@@ -88,7 +88,7 @@ async def bulk_approve_users(db: Prisma, user_ids: List[UUID]):
 
 async def get_dashboard_stats(db: Prisma):
     pending_users_count = await db.user.count(where={'is_active': False})
-    total_users_count = await db.user.count()
+    total_users_count = await db.user.count(where={'role': 'user'})
     total_players_count = await db.player.count()
     current_gw = await get_current_gameweek(db)
     
@@ -360,14 +360,15 @@ async def get_leaderboard(db: Prisma):
     # 1. Get all active users who have created a fantasy team.
     #    This is now our source of truth for who should be on the leaderboard.
     all_users_with_teams = await db.user.find_many(
-        where={
-            'is_active': True,
-            'fantasy_team': {
-                'is_not': None
-            }
-        },
-        include={'fantasy_team': True}
-    )
+    where={
+        'is_active': True,
+        'role': 'user',
+        'fantasy_team': {
+            'is_not': None
+        }
+    },
+    include={'fantasy_team': True}
+)
 
     if not all_users_with_teams:
         return []
@@ -1145,7 +1146,7 @@ async def get_manager_hub_stats(db: Prisma, user_id: str, gameweek_id: int):
     gameweek_points = gameweek_score.total_points if gameweek_score else 0
 
     # 3. Get Total Players (count of all active users)
-    total_players = await db.user.count(where={'is_active': True})
+    total_players = await db.user.count(where={'is_active': True, 'role': 'user'})
 
 
     # --- 4. Calculate Squad Value ---
