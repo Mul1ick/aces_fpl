@@ -3,12 +3,12 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes,fixture_routes,transfer_routes,chip_routes
-from app.config import CORS_ORIGINS
 import logging
 from app.database import db_client
+import os
 
 logging.basicConfig(
-    level=logging.INFO,  # or DEBUG if you want the detailed logs
+    level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
 )
 
@@ -19,10 +19,14 @@ app = FastAPI(
 )
 
 # --- Middleware Configuration ---
-# This is a crucial step for allowing your React frontends to communicate with the backend.
+
+# Manually read and parse the CORS_ORIGINS environment variable
+origins_str = os.getenv("CORS_ORIGINS", "")
+allowed_origins = [origin.strip() for origin in origins_str.split(",") if origin]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,  # Use the dynamic list from config.py
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,4 +63,3 @@ def root():
     Root endpoint for health checks.
     """
     return {"message": "Aces FPL backend is running successfully."}
-
