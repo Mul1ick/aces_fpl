@@ -25,102 +25,103 @@ SEASON_START_DATE = get_season_start_now()
 # --- Seed Data ---
 
 TEAMS = [
-    {"name": "Satan", "short_name": "SAT"},
-    {"name": "Bandra United", "short_name": "BAN"},
-    {"name": "Mumbai Hotspurs", "short_name": "MHS"},
+    {"name": "Umang Foundation Trust", "short_name": "UMA"},
+    {"name": "Satans", "short_name": "SAT"},
+    {"name": "Roarers", "short_name": "ROA"},
     {"name": "Southside", "short_name": "SOU"},
+    {"name": "Traana", "short_name": "TRA"},
     {"name": "Titans", "short_name": "TIT"},
-    {"name": "Umaag Foundation Trust", "short_name": "UMA"},
 ]
 
-# Real players assigned to the fictional teams
-PLAYERS = {
-    "SAT": [  # Manchester United
-        {"full_name": "André Onana", "position": "GK", "price": 5.0},
-        {"full_name": "Altay Bayındır", "position": "GK", "price": 4.0},
-        {"full_name": "Diogo Dalot", "position": "DEF", "price": 5.0},
-        {"full_name": "Raphaël Varane", "position": "DEF", "price": 5.5},
-        {"full_name": "Lisandro Martínez", "position": "DEF", "price": 5.0},
-        {"full_name": "Casemiro", "position": "MID", "price": 5.5},
-        {"full_name": "Bruno Fernandes", "position": "MID", "price": 10.0},
-        {"full_name": "Mason Mount", "position": "MID", "price": 7.0},
-        {"full_name": "Marcus Rashford", "position": "FWD", "price": 8.5},
-        {"full_name": "Rasmus Højlund", "position": "FWD", "price": 7.5},
-        {"full_name": "Alejandro Garnacho", "position": "FWD", "price": 5.0},
-    ],
-    "BAN": [  # Manchester City
-        {"full_name": "Ederson Moraes", "position": "GK", "price": 5.5},
-        {"full_name": "Stefan Ortega", "position": "GK", "price": 4.0},
-        {"full_name": "Kyle Walker", "position": "DEF", "price": 5.5},
-        {"full_name": "Rúben Dias", "position": "DEF", "price": 6.0},
-        {"full_name": "Nathan Aké", "position": "DEF", "price": 5.0},
-        {"full_name": "Rodri", "position": "MID", "price": 6.0},
-        {"full_name": "Kevin De Bruyne", "position": "MID", "price": 12.5},
-        {"full_name": "Phil Foden", "position": "MID", "price": 8.0},
-        {"full_name": "Bernardo Silva", "position": "MID", "price": 6.5},
-        {"full_name": "Erling Haaland", "position": "FWD", "price": 14.0},
-        {"full_name": "Julián Álvarez", "position": "FWD", "price": 6.5},
-    ],
-    "MHS": [  # Tottenham Hotspur
-        {"full_name": "Guglielmo Vicario", "position": "GK", "price": 5.0},
-        {"full_name": "Fraser Forster", "position": "GK", "price": 4.0},
-        {"full_name": "Pedro Porro", "position": "DEF", "price": 5.5},
-        {"full_name": "Cristian Romero", "position": "DEF", "price": 5.0},
-        {"full_name": "Micky van de Ven", "position": "DEF", "price": 4.5},
-        {"full_name": "James Maddison", "position": "MID", "price": 8.0},
-        {"full_name": "Son Heung-min", "position": "MID", "price": 10.0},
-        {"full_name": "Dejan Kulusevski", "position": "MID", "price": 7.0},
-        {"full_name": "Yves Bissouma", "position": "MID", "price": 5.0},
-        {"full_name": "Richarlison", "position": "FWD", "price": 7.0},
-        {"full_name": "Brennan Johnson", "position": "FWD", "price": 6.0},
-    ],
-    "SOU": [  # Arsenal
-        {"full_name": "David Raya", "position": "GK", "price": 5.0},
-        {"full_name": "Aaron Ramsdale", "position": "GK", "price": 4.5},
-        {"full_name": "Ben White", "position": "DEF", "price": 5.5},
-        {"full_name": "William Saliba", "position": "DEF", "price": 5.5},
-        {"full_name": "Gabriel Magalhães", "position": "DEF", "price": 5.0},
-        {"full_name": "Declan Rice", "position": "MID", "price": 5.5},
-        {"full_name": "Martin Ødegaard", "position": "MID", "price": 8.5},
-        {"full_name": "Bukayo Saka", "position": "MID", "price": 9.0},
-        {"full_name": "Gabriel Martinelli", "position": "MID", "price": 8.0},
-        {"full_name": "Kai Havertz", "position": "FWD", "price": 7.5},
-        {"full_name": "Gabriel Jesus", "position": "FWD", "price": 8.0},
-    ],
-    "TIT": [  # Liverpool
-        {"full_name": "Alisson Becker", "position": "GK", "price": 5.5},
-        {"full_name": "Caoimhín Kelleher", "position": "GK", "price": 4.0},
-        {"full_name": "Trent Alexander-Arnold", "position": "DEF", "price": 8.0},
-        {"full_name": "Virgil van Dijk", "position": "DEF", "price": 6.0},
-        {"full_name": "Ibrahima Konaté", "position": "DEF", "price": 5.0},
-        {"full_name": "Alexis Mac Allister", "position": "MID", "price": 6.0},
-        {"full_name": "Dominik Szoboszlai", "position": "MID", "price": 7.0},
-        {"full_name": "Mohamed Salah", "position": "FWD", "price": 13.0},
-        {"full_name": "Luis Díaz", "position": "FWD", "price": 7.5},
-        {"full_name": "Darwin Núñez", "position": "FWD", "price": 7.5},
-        {"full_name": "Diogo Jota", "position": "FWD", "price": 8.0},
-    ],
-    "UMA": [  # Chelsea
-        {"full_name": "Robert Sánchez", "position": "GK", "price": 4.5},
-        {"full_name": "Đorđe Petrović", "position": "GK", "price": 4.0},
-        {"full_name": "Reece James", "position": "DEF", "price": 5.5},
-        {"full_name": "Wesley Fofana", "position": "DEF", "price": 4.5},
-        {"full_name": "Levi Colwill", "position": "DEF", "price": 4.5},
-        {"full_name": "Enzo Fernández", "position": "MID", "price": 5.0},
-        {"full_name": "Moisés Caicedo", "position": "MID", "price": 5.0},
-        {"full_name": "Raheem Sterling", "position": "FWD", "price": 7.0},
-        {"full_name": "Cole Palmer", "position": "FWD", "price": 6.0},
-        {"full_name": "Christopher Nkunku", "position": "FWD", "price": 7.5},
-        {"full_name": "Nicolas Jackson", "position": "FWD", "price": 7.0},
-    ],
-}
+def get_player_data():
+    """
+    Extracts, normalizes, and assigns positions to all players.
+    """
+    
+    # Raw data extracted from the image
+    raw_data = {
+        "UMA": [
+            ("Shalibhadra Daga", 3), ("Kaif Munee", 25), ("Kanav Sachdev", 15),
+            ("Siddharth Castelino (Casta)", 10), ("Mohit Thakurel", 10), ("Krish Sharma", 9),
+            ("Manav Gagvani", 17), ("Varun Chandiramani", 7), ("Vishal devadiga", 1),
+            ("Aneesh Malankar", 1), ("Joel Fernandes", 5), ("Virgil Braganza (GK)", 8),
+            ("Gautam G", 1)
+        ],
+        "SAT": [
+            ("Dharmendra Bhurj", 8), ("Pranit Vyas", 25), ("Ross O'Rely", 15),
+            ("Jagdish Lobo", 10), ("Pawan Rai", 10), ("Gerard A", 8),
+            ("Sahaj (Guru)", 7), ("Anmol", 24), ("Sahaj", 5),
+            ("Nisheet k", 5), ("Rajeev Asija", 5), ("Rahul Kakad", 2),
+            ("Sachin K", 1)
+        ],
+        "ROA": [ # Previously Mumbai Hotspurs
+            ("Dane", 9), ("Vrushabh Sikarwar", 25), ("Puneet Chadha", 15),
+            ("Shaurya Bhandari", 10), ("Pritish Roongta", 5), ("Dave Deohans", 14),
+            ("Joshua Samuel", 14), ("Aman K", 26), ("Manav SK", 1),
+            ("Ibadur Haque", 5), ("Jeff Bhatija", 5), ("Akshay Karwa", 1),
+            ("Abhishek Negi", 1)
+        ],
+        "TIT": [
+            ("Yash Patwa", 9), ("Yash Pathak", 25), ("Raj Badhuria", 15),
+            ("Yug Nair", 10), ("Rahul Laud", 10), ("Kabir Khan", 11),
+            ("Param Sabnani", 14), ("Jeet Antani", 1), ("Shrineel Belgaon", 11),
+            ("Tanish Jain", 5), ("Rishabh Lunia", 5), ("Khushal D", 10),
+            ("Harish", 1)
+        ],
+        "TRA": [ # Previously Bandra United FC
+            ("Wren Dabreo", 12), ("Raunak Killinger", 25), ("Joshua Vessoakar", 15),
+            ("Sushant Pawar", 10), ("Rohan Jadhav", 11), ("Mathais Coutinho", 11),
+            ("Tabish Amrar", 10), ("Kurt Baptista", 26), ("Aamir Petiwala", 1),
+            ("Randell Dsouza", 1), ("MM", 5), ("Joywin Fernandes", 1),
+            ("Kapil B", 1)
+        ],
+        "SOU": [
+            ("Rushab Lakhwani", 4), ("Miguel", 25), ("Alvro", 15),
+            ("Pranal Shetty", 10), ("Shubham P", 7), ("Aarav Hazari", 1),
+            ("Pratham PM", 1), ("Anish Bhabdha", 9), ("Tejas More", 2),
+            ("Puneet Samra", 1), ("Karan", 5), ("Divya Mulani", 7),
+            ("Amweeshak", 1)
+        ]
+    }
+
+    normalized_players = {}
+    
+    # Define a balanced outfield distribution for a 13-player squad
+    outfield_positions = ['DEF'] * 4 + ['MID'] * 5 + ['FWD'] * 3
+
+    for short_name, player_list in raw_data.items():
+        # Shuffle positions for each team to ensure randomness
+        random.shuffle(outfield_positions)
+        
+        team_players = []
+        for i, (name, old_price) in enumerate(player_list):
+            # Normalize price
+            new_price = round(old_price * (110 / 132), 1)
+            
+            # Assign position
+            if i == 0:
+                position = "GK"
+            else:
+                # Pop a position from the shuffled list
+                position = outfield_positions[i-1]
+                
+            team_players.append({
+                "full_name": name,
+                "position": position,
+                "price": new_price
+            })
+        normalized_players[short_name] = team_players
+        
+    return normalized_players
+
+PLAYERS = get_player_data()
 
 
 def generate_round_robin_fixtures(team_ids):
     """Generates a double round-robin schedule."""
-    team_ids = list(team_ids)  # avoid mutating caller list
+    team_ids = list(team_ids)
     if len(team_ids) % 2 != 0:
-        team_ids.append(None)  # Add a dummy team for even scheduling
+        team_ids.append(None)
 
     n = len(team_ids)
     schedule = []
@@ -135,11 +136,8 @@ def generate_round_robin_fixtures(team_ids):
             if l1[i] is not None and l2[i] is not None:
                 round_fixtures.append((l1[i], l2[i]))
         schedule.append(round_fixtures)
-
-        # Rotate teams
         team_ids.insert(1, team_ids.pop())
 
-    # Create home and away fixtures
     full_schedule = []
     for round_fixtures in schedule:
         full_schedule.append(round_fixtures)
@@ -152,7 +150,6 @@ def generate_round_robin_fixtures(team_ids):
 async def clear_data(db: Prisma):
     """Wipes all data from the database to ensure a clean slate."""
     print("🧹 Wiping existing data...")
-    # The order is important to respect foreign key constraints
     await db.userchip.delete_many()
     await db.transfer_log.delete_many()
     await db.usergameweekscore.delete_many()
@@ -167,35 +164,17 @@ async def clear_data(db: Prisma):
     print("✅ Data wiped successfully.")
 
 
-async def quick_simulate_gws(db: Prisma, gw_numbers=(1, 2)):
-    """Optional: mark fixtures finished with random scores for given GWs."""
-    print(f"Simulating gameweeks: {gw_numbers}")
-    for gw_no in gw_numbers:
-        gw = await db.gameweek.find_first(where={"gw_number": gw_no})
-        if not gw:
-            continue
-        fixtures = await db.fixture.find_many(where={"gameweek_id": gw.id})
-        for fx in fixtures:
-            hs = random.randint(0, 4)
-            as_ = random.randint(0, 4)
-            await db.fixture.update(
-                where={"id": fx.id},
-                data={"home_score": hs, "away_score": as_, "stats_entered": True},
-            )
-    print("Simulation done.")
-
-
 async def main() -> None:
     db = Prisma()
     await db.connect()
 
     await clear_data(db)
 
-        # --- Admin User ---
+    # --- Admin User ---
     print("Seeding admin user...")
     ADMIN_EMAIL = "admin@acesfpl.com"
-    ADMIN_PASSWORD = "adminPassword"  # rotate in prod
-    pwd_hash = hash_password(ADMIN_PASSWORD)  # -> stores into `hashed_password`
+    ADMIN_PASSWORD = "adminPassword"
+    pwd_hash = hash_password(ADMIN_PASSWORD)
 
     admin = await db.user.upsert(
         where={"email": ADMIN_EMAIL},
@@ -237,44 +216,44 @@ async def main() -> None:
         player_count += created
     print(f"✅ Created {player_count} players.")
 
-    # --- 3. Create Gameweeks (25 minutes apart, starting now) ---
-    print("Seeding 10 gameweeks...")
+    # --- 3. Create Gameweeks (spread over 7 days) ---
+    print("Seeding 10 gameweeks over 7 days...")
     gameweek_data = [
         {
             "gw_number": i,
-            "deadline": SEASON_START_DATE + timedelta(minutes=25 * (i - 1)),
+            "deadline": SEASON_START_DATE + timedelta(minutes=1120 * (i - 1)),
         }
         for i in range(1, 11)
     ]
     await db.gameweek.create_many(data=gameweek_data, skip_duplicates=True)
     print("✅ Created 10 gameweeks.")
 
-    # --- 4. Create Admin User + Team + Score rows ---
-    print("Creating admin user...")
-    admin_email = "admin@example.com"
-    admin_password = "admin123"  # change in prod
-    admin = await db.user.create(
+    # --- 4. Create Test User + Team + Score rows ---
+    print("Creating test user...")
+    test_email = "test@example.com"
+    test_password = "password"
+    test_user = await db.user.create(
         data={
-            "email": admin_email,
-            "hashed_password": hash_password(admin_password),
-            "role": "admin",
+            "email": test_email,
+            "hashed_password": hash_password(test_password),
+            "role": "user",
             "is_active": True,
-            "full_name": "League Admin",
-            "fantasy_team": {"create": {"name": "Admin XI"}},
+            "full_name": "Test User",
+            "fantasy_team": {"create": {"name": "Test FC"}},
         },
         include={"fantasy_team": True},
     )
-    print(f"✅ Admin: {admin_email} / {admin_password}")
+    print(f"✅ Test User: {test_email} / {test_password}")
 
     gws = await db.gameweek.find_many()
     await db.usergameweekscore.create_many(
-        data=[{"user_id": admin.id, "gameweek_id": gw.id} for gw in gws],
+        data=[{"user_id": test_user.id, "gameweek_id": gw.id} for gw in gws],
         skip_duplicates=True,
     )
-    print("✅ Seeded admin UserGameweekScore rows.")
+    print("✅ Seeded test user UserGameweekScore rows.")
 
-    # --- 5. Create Fixtures for the whole season ---
-    print("Generating and seeding fixtures for 10 Gameweeks...")
+    # --- 5. Create Fixtures for the season ---
+    print("Generating and seeding fixtures...")
     all_gws = sorted(gws, key=lambda x: x.gw_number)
     team_ids = [team.id for team in all_teams]
     fixture_schedule = generate_round_robin_fixtures(team_ids)
@@ -289,7 +268,6 @@ async def main() -> None:
                 "gameweek_id": gameweek.id,
                 "home_team_id": home_id,
                 "away_team_id": away_id,
-                # Kickoff shortly before the deadline for quick sims
                 "kickoff": gameweek.deadline - timedelta(minutes=random.randint(5, 15)),
             }
             for home_id, away_id in round_fixtures
@@ -300,11 +278,7 @@ async def main() -> None:
         total_fixtures_created += created_count
         print(f"  - Created {created_count} fixtures for Gameweek {gameweek.gw_number}")
 
-    print(f"✅ Created a total of {total_fixtures_created} fixtures.")
-
-    # --- 6. Optional: quick simulation for GW1–2 ---
-    # Uncomment to prefill scores so UI can show results immediately.
-    # await quick_simulate_gws(db, gw_numbers=(1, 2))
+    print(f"✅ Created a total of {total_fixtures_created} fixtures across {len(fixture_schedule)} gameweeks.")
 
     await db.disconnect()
 

@@ -2,28 +2,7 @@ import React, { useState } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
-
-// --- MOCK DATA & ASSETS ---
-import redLogo from '@/assets/images/team-logos/red.png';
-import blueLogo from '@/assets/images/team-logos/blue.png';
-import blackLogo from '@/assets/images/team-logos/black.png';
-import whiteLogo from '@/assets/images/team-logos/white.png';
-
-const teamLogos = {
-    'Arsenal': redLogo,
-    'Man City': blueLogo,
-    'Liverpool': redLogo,
-    'Spurs': whiteLogo,
-    'Chelsea': blueLogo,
-    'Newcastle': blackLogo,
-};
-
-const shortTeamLogos = {
-    'ARS': redLogo, 'CHE': blueLogo, 'LIV': redLogo,
-    'MCI': blueLogo, 'MUN': redLogo, 'NEW': blackLogo,
-    'BOU': redLogo, 'WHU': redLogo, 'BHA': blueLogo,
-    'EVE': blueLogo, 'CRY': blueLogo, 'LEE': whiteLogo
-};
+import { getTeamLogo } from '@/lib/player-utils'; // --- MODIFIED: Import central utility ---
 
 // --- SUB-COMPONENTS for the Modal ---
 
@@ -38,7 +17,8 @@ const FixtureBox = ({ opponent, isHome, gw }) => (
     <div className="text-center space-y-1 flex flex-col items-center">
         <p className="text-xs font-bold text-gray-700">{opponent} {isHome ? '(H)' : '(A)'}</p>
         <div className='w-10 h-10 flex items-center justify-center p-1'>
-            <img src={shortTeamLogos[opponent] || whiteLogo} alt={opponent} className="w-full h-full object-contain" />
+            {/* --- MODIFIED: Use central utility --- */}
+            <img src={getTeamLogo(opponent)} alt={opponent} className="w-full h-full object-contain" />
         </div>
         <p className="text-xs text-gray-500">GW{gw}</p>
     </div>
@@ -52,7 +32,8 @@ const HistoryRow = ({ gw, opp, result, pts, ...stats }) => {
             <td className="p-2 font-bold">{gw}</td>
             <td className="p-2 text-left">
                 <div className="flex items-center gap-x-2">
-                    <img src={shortTeamLogos[opponentShortName] || whiteLogo} alt={opponentShortName} className="w-5 h-5" />
+                    {/* --- MODIFIED: Use central utility --- */}
+                    <img src={getTeamLogo(opponentShortName)} alt={opponentShortName} className="w-5 h-5" />
                     <span>{opp} <span className={`font-bold ${result === 'W' ? 'text-green-500' : result === 'L' ? 'text-red-500' : 'text-gray-500'}`}>{result}</span></span>
                 </div>
             </td>
@@ -107,15 +88,16 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ player, is
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent 
-        hideCloseButton // <-- Added the prop here to hide the default button
+        hideCloseButton
         className="bg-white text-black w-full md:w-1/2 p-0 flex flex-col overflow-hidden md:max-w-none"
       >
         {/* Header */}
         <div className="flex-shrink-0 p-6 bg-dashboard-gradient text-white relative">
             <div className="flex items-center space-x-4">
                 <div className="w-24 h-24 flex items-center justify-center">
+                    {/* --- MODIFIED: Use central utility (assuming player.pos has short name) --- */}
                     <img 
-                        src={teamLogos[player.team] || whiteLogo} 
+                        src={getTeamLogo(player.pos)} 
                         alt={`${player.team} logo`} 
                         className="w-20 h-20 object-contain" 
                     />

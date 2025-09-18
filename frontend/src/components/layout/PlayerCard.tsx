@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { getTeamJersey } from '@/lib/player-utils'; // MODIFIED: Import from new utility file
+import { getTeamJersey } from '@/lib/player-utils';
 
 // --- TYPESCRIPT INTERFACES ---
 interface Player {
@@ -21,17 +21,16 @@ interface PlayerCardProps {
   player: Player;
   isBench?: boolean;
   displayMode?: 'points' | 'fixture';
-  showArmbands?: boolean; // New prop to control armband visibility
+  showArmbands?: boolean;
 }
 
 // --- PLAYER CARD COMPONENT ---
 const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displayMode = 'points', showArmbands = true }) => {
-  // --- MODIFIED: Use the new helper function ---
   const jerseySrc = getTeamJersey(player.team);
 
   const displayPoints = player.isCaptain 
     ? (player.points ?? 0) * 2 
-    : player.points; // Vice-captain points are handled at the Gameweek level
+    : player.points;
 
   return (
     <motion.div
@@ -44,19 +43,19 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displa
     >
       <div className="w-full overflow-hidden shadow-lg border border-white/10 flex flex-col" style={{ height: isBench ? '90px' : '115px' }}>
         {/* Jersey Section */}
-        <div className="relative h-[65%]">
+        {/* --- MODIFIED LINE BELOW --- */}
+        <div className="relative h-[65%] p-0">
           <img
             src={jerseySrc}
             alt={`${player.team} jersey`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
           />
-          {/* MODIFIED: Armband now only shows if showArmbands is true */}
           {showArmbands && (player.isCaptain || player.isVice) && (
             <div className={cn(
               "absolute top-0.5 left-0.5 rounded-full flex items-center justify-center font-bold text-white text-[10px] w-4 h-4 border border-black/50",
               player.isCaptain ? 'bg-[#FF2882]' : 'bg-gray-700'
             )}>
-              {player.isCaptain ? 'C' : 'V'}
+               {player.isCaptain ? 'C' : 'V'}
             </div>
           )}
         </div>
@@ -65,7 +64,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displa
         <div className="h-[35%] flex flex-col">
           {/* Player Name */}
            <div className="flex-1 bg-white text-black flex items-center justify-center px-1">
-              <p className="font-bold truncate" style={{ fontSize: isBench ? '9px' : '11px' }}>{player.name}</p>
+             <p className="font-bold truncate" style={{ fontSize: isBench ? '9px' : '11px' }}>{player.name}</p>
           </div>
           {/* Fixture or Points */}
           <div className={cn(

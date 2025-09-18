@@ -12,22 +12,22 @@ import { Label } from '@/components/ui/label';
 import { API } from '@/lib/api';
 import { Slider } from '@/components/ui/slider';
 
-// --- ASSET IMPORTS & CONSTANTS ---
-import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
-import tshirtBlue from '@/assets/images/jerseys/tshirt-blue.png';
-import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png';
-import tshirtBlack from '@/assets/images/jerseys/tshirt-black.png';
-import tshirtNavy from '@/assets/images/jerseys/tshirt-navy.png';
-import tshirtGreen from '@/assets/images/jerseys/tshirt-green.png';
+import satansJersey from '@/assets/images/jerseys/satans.png';
+import traanaJersey from '@/assets/images/jerseys/traana.png';
+import roarersJersey from '@/assets/images/jerseys/roarers.png';
+import southsideJersey from '@/assets/images/jerseys/southside.png';
+import titansJersey from '@/assets/images/jerseys/titans.png';
+import umaagJersey from '@/assets/images/jerseys/umang.png';
+import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png'
 
 // --- MODIFIED: The jersey mapping is now complete ---
 const TEAM_JERSEYS: Record<string, string> = {
-  'Satan': tshirtRed,
-  'Bandra United': tshirtBlue,
-  'Mumbai Hotspurs': tshirtWhite,
-  'Southside': tshirtBlack,
-  'Titans': tshirtNavy,
-  'Umaag Foundation Trust': tshirtGreen,
+ 'Satans': satansJersey,
+  'Roarers': roarersJersey,
+  'Traana': traanaJersey,
+  'Southside': southsideJersey,
+  'Titans': titansJersey,
+  'Umang Foundation Trust': umaagJersey,
 };
 
 // ============================================================================

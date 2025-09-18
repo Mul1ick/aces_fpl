@@ -1,24 +1,49 @@
 // frontend/src/lib/player-utils.ts
 
-import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
-import tshirtBlue from '@/assets/images/jerseys/tshirt-blue.png';
-import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png';
-import tshirtBlack from '@/assets/images/jerseys/tshirt-black.png';
-import tshirtNavy from '@/assets/images/jerseys/tshirt-navy.png';
-import tshirtGreen from '@/assets/images/jerseys/tshirt-green.png';
+import satansJersey from '@/assets/images/jerseys/satans.png';
+import traanaJersey from '@/assets/images/jerseys/traana.png';
+import roarersJersey from '@/assets/images/jerseys/roarers.png';
+import southsideJersey from '@/assets/images/jerseys/southside.png';
+import titansJersey from '@/assets/images/jerseys/titans.png';
+import umaagJersey from '@/assets/images/jerseys/umang.png';
+import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png'
+
+import umaLogo from '@/assets/images/team-logos/umang-logo.png';
+import satansLogo from '@/assets/images/team-logos/satans-logo.png';
+import roarersLogo from '@/assets/images/team-logos/roarers-logo.png';
+import southsideLogo from '@/assets/images/team-logos/southside-logo.png';
+import traanaLogo from '@/assets/images/team-logos/trana-logo.png';
+import titansLogo from '@/assets/images/team-logos/titans-logo.png';
+import defaultLogo from '@/assets/images/team-logos/yellow.png';
+
 
 /**
  * A complete and centralized mapping of team names to their jersey images.
  */
 export const TEAM_JERSEYS: Record<string, string> = {
-  'Satan': tshirtRed,
-  'Bandra United': tshirtBlue,
-  'Mumbai Hotspurs': tshirtWhite,
-  'Southside': tshirtBlack,
-  'Titans': tshirtNavy,
-  'Umaag Foundation Trust': tshirtGreen,
+  'Satans': satansJersey,
+  'Roarers': roarersJersey,
+  'Traana': traanaJersey,
+  'Southside': southsideJersey,
+  'Titans': titansJersey,
+  'Umang Foundation Trust': umaagJersey,
 };
 
+
+// Add this new mapping for logos (using short names as keys)
+export const TEAM_LOGOS: Record<string, string> = {
+  'UMA': umaLogo,
+  'SAT': satansLogo,
+  'ROA': roarersLogo,
+  'SOU': southsideLogo,
+  'TRA': traanaLogo,
+  'TIT': titansLogo,
+};
+
+export const getTeamLogo = (shortName: string | undefined): string => {
+  if (!shortName) return defaultLogo;
+  return TEAM_LOGOS[shortName] || defaultLogo;
+};
 /**
  * A helper function to safely get a jersey, with a default fallback.
  * @param teamName The full name of the team.

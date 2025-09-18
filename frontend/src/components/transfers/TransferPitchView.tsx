@@ -35,22 +35,19 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
         setDetailedPlayer(null);
     };
     
-    // This helper function is no longer needed here as data is standardized on the main page
-    // const transformPlayerForCard = ...
-
     return (
         <>
-            {/* MODIFIED: Removed flex-1 from this <main> element */}
             <main
                 className="relative flex flex-col justify-around py-4"
                 style={{
                  backgroundImage: `url(${pitchBackground})`,
                 backgroundSize: 'cover',
-                backgroundPosition: 'center top',
+                 backgroundPosition: 'center top',
                 }}
             >
                 {Object.keys(squad).map((pos) => (
-                <div key={pos} className="flex justify-center items-center gap-x-4 my-2"> {/* Added my-2 for spacing */}
+                // --- MODIFIED LINE BELOW ---
+                <div key={pos} className="flex justify-center items-center gap-x-8 sm:gap-x-12 my-2">
                     {squad[pos].map((player: any, index: number) =>
                      player ? (
                         <div
@@ -59,10 +56,10 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                             onClick={() => handlePlayerClick(player)}
                         >
                             <div className="pointer-events-none">
-                                 <PlayerCard 
+                                  <PlayerCard 
                                      player={{
                                         ...player,
-                                        team: player.club // Pass the team name string to PlayerCard
+                                         team: player.club 
                                     }} 
                                      displayMode="fixture" 
                                      showArmbands={false} 
@@ -70,16 +67,16 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                             </div>
                             <button
                                onClick={(e) => {
-                                    e.stopPropagation();
+                                   e.stopPropagation();
                                     onPlayerRemove(pos, index);
                                 }}
                                  className="absolute top-1 right-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all hidden lg:flex items-center justify-center w-5 h-5"
                             >
-                                 <X className="w-3 h-3" />
+                          <X className="w-3 h-3" />
                             </button>
                         </div>
                     ) : (
-                         <PlayerSlot key={`${pos}-${index}`} position={pos} onClick={() => onSlotClick(pos, index)} />
+                        <PlayerSlot key={`${pos}-${index}`} position={pos} onClick={() => onSlotClick(pos, index)} />
                     )
                     )}
                 </div>
@@ -98,7 +95,7 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                     }
                 }}
                 onTransfer={(p) => {
-                    if (!p) return;
+                   if (!p) return;
                     const posKey = String(p.pos ?? p.position ?? '').toUpperCase();
                     const idx = squad[posKey]?.findIndex((x:any) => x && x.id === p.id) ?? -1;
                     if (idx >= 0) {

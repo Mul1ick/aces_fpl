@@ -33,7 +33,7 @@ export const FixtureRow: React.FC<FixtureRowProps> = ({ match }) => {
       <span className="font-semibold text-text text-right hidden sm:block truncate">{homeTeam.name}</span>
       
       {/* Home Team Logo */}
-      <img src={homeTeam.logo} alt={`${homeTeam.name} logo`} className="w-6 h-6 object-contain justify-self-end" />
+      <img src={homeTeam.logo} alt={`${homeTeam.name} logo`} className="w-12 h-12 object-contain justify-self-end" />
 
       {/* Time or Score in the middle */}
       <div className="text-center">
@@ -47,7 +47,7 @@ export const FixtureRow: React.FC<FixtureRowProps> = ({ match }) => {
       </div>
 
       {/* Away Team Logo */}
-      <img src={awayTeam.logo} alt={`${awayTeam.name} logo`} className="w-6 h-6 object-contain justify-self-start" />
+      <img src={awayTeam.logo} alt={`${awayTeam.name} logo`} className="w-12 h-12 object-contain justify-self-start" />
       
       {/* Away Team Name */}
       <span className="font-semibold text-text text-left hidden sm:block truncate">{awayTeam.name}</span>

@@ -5,21 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 // --- ASSET IMPORTS ---
-import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
-import tshirtBlue from '@/assets/images/jerseys/tshirt-blue.png';
-import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png';
-import tshirtBlack from '@/assets/images/jerseys/tshirt-black.png';
-import tshirtNavy from '@/assets/images/jerseys/tshirt-navy.png';
-import tshirtGreen from '@/assets/images/jerseys/tshirt-green.png';
+import satansJersey from '@/assets/images/jerseys/satans.png';
+import traanaJersey from '@/assets/images/jerseys/traana.png';
+import roarersJersey from '@/assets/images/jerseys/roarers.png';
+import southsideJersey from '@/assets/images/jerseys/southside.png';
+import titansJersey from '@/assets/images/jerseys/titans.png';
+import umaagJersey from '@/assets/images/jerseys/umang.png';
+import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png'
 
 // --- CONFIGURATION ---
 const TEAM_JERSEYS = {
-  'Satan': tshirtRed,
-  'Bandra United': tshirtBlue,
-  'Mumbai Hotspurs': tshirtWhite,
-  'Southside': tshirtBlack,
-  'Titans': tshirtNavy,
-  'Umaag Foundation Trust': tshirtGreen,
+  'Satans': satansJersey,
+  'Roarers': roarersJersey,
+  'Traana': traanaJersey,
+  'Southside': southsideJersey,
+  'Titans': titansJersey,
+  'Umang Foundation Trust': umaagJersey,
 };
 
 const getPos = (p: any) => String(p?.pos ?? p?.position ?? '').toUpperCase();

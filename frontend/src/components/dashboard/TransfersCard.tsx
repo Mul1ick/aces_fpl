@@ -1,20 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft } from 'lucide-react';
-
-// --- ASSET IMPORTS ---
-import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
-import tshirtBlue from '@/assets/images/jerseys/tshirt-blue.png';
-import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png';
-import tshirtBlack from '@/assets/images/jerseys/tshirt-black.png';
-import tshirtNavy from '@/assets/images/jerseys/tshirt-navy.png';
-import tshirtGreen from '@/assets/images/jerseys/tshirt-green.png';
-
-const TEAM_JERSEYS = {
-  'LIV': tshirtRed, 'TOT': tshirtWhite, 'AVL': tshirtNavy,
-  'BRE': tshirtRed, 'ARS': tshirtRed, 'NEW': tshirtBlack,
-  'CHE': tshirtBlue, 'MCI': tshirtBlue,
-};
+import { getTeamJersey } from '@/lib/player-utils'; // --- MODIFIED: Import the central utility ---
 
 interface TransferPlayer {
   rank: number;
@@ -41,7 +28,8 @@ export const TransfersCard: React.FC<TransfersCardProps> = ({ transfersIn, trans
             {transfersIn.map(player => (
               <div key={player.rank} className="flex items-center space-x-2">
                 <span className="font-bold text-black">{player.rank}</span>
-                <img src={TEAM_JERSEYS[player.club]} alt={`${player.club} jersey`} className="w-8 h-10 object-contain"/>
+                {/* --- MODIFIED: Use the getTeamJersey function --- */}
+                <img src={getTeamJersey(player.club)} alt={`${player.club} jersey`} className="w-8 h-10 object-contain"/>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-black truncate">{player.name}</p>
                   <p className="text-xs text-gray-500 truncate">{player.club} · {player.pos}</p>
@@ -65,7 +53,8 @@ export const TransfersCard: React.FC<TransfersCardProps> = ({ transfersIn, trans
             {transfersOut.map(player => (
               <div key={player.rank} className="flex items-center space-x-2">
                 <span className="font-bold text-black">{player.rank}</span>
-                <img src={TEAM_JERSEYS[player.club]} alt={`${player.club} jersey`} className="w-8 h-10 object-contain"/>
+                {/* --- MODIFIED: Use the getTeamJersey function --- */}
+                <img src={getTeamJersey(player.club)} alt={`${player.club} jersey`} className="w-8 h-10 object-contain"/>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-black truncate">{player.name}</p>
                   <p className="text-xs text-gray-500 truncate">{player.club} · {player.pos}</p>

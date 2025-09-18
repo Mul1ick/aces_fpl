@@ -98,7 +98,8 @@ const Dashboard: React.FC = () => {
   rows.map((row, idx) => ({
     rank: idx + 1,
     name: row.full_name ?? `Player #${row.player_id}`,
-    club: row.team?.short_name ?? row.team?.name ?? "—",
+    // --- MODIFIED LINE BELOW ---
+    club: row.team?.name ?? row.team?.short_name ?? "—",
     pos: row.position ?? "—",
     transfers: (row.count ?? 0).toLocaleString(),
   }));
@@ -263,7 +264,7 @@ const Dashboard: React.FC = () => {
   // Your Existing Dashboard Code
   return (
     <div className="bg-white min-h-screen text-black">
-        <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
+          <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
             <motion.div
                variants={containerVariants}
               initial="hidden"
