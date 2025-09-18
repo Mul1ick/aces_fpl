@@ -18,6 +18,7 @@ export const API = {
     leaderboard: `${API_BASE_URL}/leaderboard/`,
     transfer: `${API_BASE_URL}/teams/transfer`,
     userStats: `${API_BASE_URL}/users/stats`,
+    playerStats: `${API_BASE_URL}/players/stats`,
     chips: {
       status: (gw?: number) =>
         gw
