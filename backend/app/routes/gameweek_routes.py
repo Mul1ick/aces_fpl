@@ -36,16 +36,28 @@ async def get_current_gameweek(db: Prisma = Depends(get_db)):
         
     return gameweek
 
-@router.get("/stats", response_model=schemas.GameweekStatsOut)
+@router.get("/{gameweek_number}/stats", response_model=schemas.GameweekStatsOut)
+@router.get("/stats", response_model=schemas.GameweekStatsOut, include_in_schema=False)
 async def get_gameweek_stats(
+    gameweek_number: int | None = None,
     db: Prisma = Depends(get_db),
     current_user: PrismaModels.User = Depends(get_current_user)
 ):
-    current_gameweek = await crud.get_current_gameweek(db)
+    gameweek_id: int
+    if gameweek_number is None:
+        current_gameweek = await crud.get_current_gameweek(db)
+        gameweek_id = current_gameweek.id
+    else:
+        # --- MODIFIED: Find the gameweek by its number to get the ID ---
+        gw = await db.gameweek.find_unique(where={'gw_number': gameweek_number})
+        if not gw:
+            raise HTTPException(status_code=404, detail=f"Gameweek {gameweek_number} not found.")
+        gameweek_id = gw.id
+        
     return await crud.get_gameweek_stats_for_user(
         db,
         user_id=str(current_user.id),
-        gameweek_id=current_gameweek.id
+        gameweek_id=gameweek_id
     )
 
 @router.get("/team-of-the-week", response_model=Optional[schemas.TeamOfTheWeekOut]) # You will need to create this schema

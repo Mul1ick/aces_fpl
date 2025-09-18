@@ -1,6 +1,6 @@
 import React, { useState,useEffect } from 'react';
 import { TeamResponse } from "@/types";
-import { useParams } from 'react-router-dom';
+import { useParams,useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { GameweekHeader } from '@/components/gameweek/GameweekHeader';
 import { PitchView } from '@/components/gameweek/PitchView';
@@ -15,6 +15,7 @@ import { PlayerDetailCard } from '@/components/gameweek/PlayerDetailCard';
 
 const Gameweek: React.FC = () => {
   const { gw } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth(); // Add useAuth
   const { toast } = useToast(); // Add useToast
   const [view, setView] = useState('pitch');
@@ -28,18 +29,20 @@ const Gameweek: React.FC = () => {
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
-    if (!token) {
+    if (!token || !gw) {
        return;
     }
     
+    const gameweekNumber = parseInt(gw, 10);
+
     const fetchAllData = async () => {
       setIsExtraDataLoading(true);
       try {
         const [teamRes, hubRes, leaderboardRes, gwStatsRes] = await Promise.all([
-            fetch(API.endpoints.team, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(API.endpoints.team(gameweekNumber), { headers: { Authorization: `Bearer ${token}` } }),
             fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
             fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } }),
-            fetch(API.endpoints.gameweekStats, { headers: { Authorization: `Bearer ${token}` } })
+            fetch(`${API.endpoints.gameweek}/${gameweekNumber}/stats`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
 
         if (!teamRes.ok) throw new Error("Failed to fetch team data");
@@ -61,13 +64,22 @@ const Gameweek: React.FC = () => {
     };
 
     fetchAllData();
-  }, [toast]);
+  }, [toast, gw]);
+
 
   const userRank = useMemo(() => {
     if (!leaderboard || !user) return undefined;
     const userEntry = leaderboard.find(entry => entry.manager_email === user.email);
     return userEntry?.rank;
   }, [leaderboard, user]);
+
+  const handleNavigation = (direction: 'next' | 'prev') => {
+    const currentGw = parseInt(gw || '1', 10);
+    const newGw = direction === 'next' ? currentGw + 1 : currentGw - 1;
+    if (newGw > 0) { // Add any upper bound checks if necessary
+      navigate(`/gameweek/${newGw}`);
+    }
+  };
 
 
     if (!squad) {
@@ -116,6 +128,8 @@ const Gameweek: React.FC = () => {
     highestPoints={gameweekStats?.highest_points}
     gwRank={userRank?.toLocaleString()}
     freeTransfers={user?.free_transfers}
+    onNavigate={handleNavigation}
+
 />
             </div>
             

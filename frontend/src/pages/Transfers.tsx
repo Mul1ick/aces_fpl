@@ -92,7 +92,7 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
 
     if (hasTeam === true && token) {
       try {
-        const response = await fetch(API.endpoints.team, { headers: { Authorization: `Bearer ${token}` } });
+        const response = await fetch(API.endpoints.team(), { headers: { Authorization: `Bearer ${token}` } });
         if (!response.ok) throw new Error("Could not fetch team data.");
         
         const data: TeamResponse = await response.json();

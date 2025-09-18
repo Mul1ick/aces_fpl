@@ -29,23 +29,35 @@ async def submit_team(
 
     return {"message": "Team submitted successfully"}
 
-@router.get("/team", response_model=schemas.GetTeamResponse)
+@router.get("/team/by-gameweek-number/{gameweek_number}", response_model=schemas.GetTeamResponse)
+@router.get("/team", response_model=schemas.GetTeamResponse, include_in_schema=False)
 async def get_team(
+    gameweek_number: int | None = None,
     db: Prisma = Depends(get_db),
-    # CORRECT: Use the Prisma model for the type hint
     current_user: PrismaModels.User = Depends(get_current_user)
 ):
-    current_gameweek = await crud.get_current_gameweek(db)
-    print(f"✅ LOG: Current Gameweek ID is {current_gameweek.id}")
+    gameweek_id: int
+    if gameweek_number is None:
+        gw = await crud.get_current_gameweek(db)
+        gameweek_id = gw.id
+    else:
+        # --- MODIFIED: Find the gameweek by its number to get the ID ---
+        gw = await db.gameweek.find_unique(where={'gw_number': gameweek_number})
+        if not gw:
+            raise HTTPException(status_code=404, detail=f"Gameweek {gameweek_number} not found.")
+        gameweek_id = gw.id
+    
+    print(f"✅ LOG: Gameweek Number {gameweek_number} corresponds to ID {gameweek_id}")
     
     try:
-        result = await crud.get_user_team_full(db, str(current_user.id), current_gameweek.id)
-        if not result:   # 👈 add this block
-            raise HTTPException(status_code=404, detail="Team not found")
+        result = await crud.get_user_team_full(db, str(current_user.id), gameweek_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Team not found for this gameweek")
         
         return result
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
     
 @router.post("/transfer", response_model=schemas.GetTeamResponse)
 async def transfer_player_route(

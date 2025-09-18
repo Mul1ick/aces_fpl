@@ -1,7 +1,8 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { Star } from 'lucide-react';
+import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface GameweekHeaderProps {
   gw: string | undefined;
@@ -14,6 +15,8 @@ interface GameweekHeaderProps {
   highestPoints?: number;
   gwRank?: string;
   freeTransfers?: number;
+  onNavigate: (direction: 'prev' | 'next') => void;
+
 }
 
 export const GameweekHeader: React.FC<GameweekHeaderProps> = ({ 
@@ -25,15 +28,25 @@ export const GameweekHeader: React.FC<GameweekHeaderProps> = ({
     averagePoints,
     highestPoints,
     gwRank,
-    freeTransfers
+    freeTransfers,
+    onNavigate
 }) => {
+  const currentGw = parseInt(gw || '1', 10);
   return (
     <header className="p-4 text-white">
       {/* Header Section */}
       <div className="text-left mb-3">
         <h1 className="font-bold text-xl text-white">{teamName || 'Your Team'}</h1>
       </div>
-      <p className="font-bold text-center text-base mb-3 text-white">Gameweek {gw || 1}</p>
+      <div className="flex justify-between items-center mb-3">
+        <Button variant="ghost" size="icon" onClick={() => onNavigate('prev')} disabled={currentGw <= 1}>
+          <ChevronLeft className="w-6 h-6" />
+        </Button>
+        <p className="font-bold text-center text-base text-white">Gameweek {gw || 1}</p>
+        <Button variant="ghost" size="icon" onClick={() => onNavigate('next')}>
+          <ChevronRight className="w-6 h-6" />
+        </Button>
+      </div>
 
       {/* Stats Layout */}
       <div className="flex justify-between items-center lg:justify-center lg:gap-x-16">

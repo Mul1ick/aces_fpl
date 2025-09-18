@@ -6,7 +6,10 @@ export const API = {
     login: `${API_BASE_URL}/auth/login`,
     signup: `${API_BASE_URL}/auth/signup`,
     // Add more as needed
-    team: `${API_BASE_URL}/teams/team`,
+    team: (gw_number?: number) => 
+        gw_number 
+            ? `${API_BASE_URL}/teams/team/by-gameweek-number/${gw_number}`
+            : `${API_BASE_URL}/teams/team`,
     saveTeam: `${API_BASE_URL}/teams/save-team`,
     submitTeam: `${API_BASE_URL}/teams/submit-team`,
     gameweek: `${API_BASE_URL}/gameweeks`,

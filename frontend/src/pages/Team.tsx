@@ -82,7 +82,7 @@ const Team: React.FC = () => {
     const fetchAllData = async () => {
         try {
             const [teamRes, hubRes, leaderboardRes] = await Promise.all([
-                fetch(API.endpoints.team, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(API.endpoints.team(), { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } })
             ]);
