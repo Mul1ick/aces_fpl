@@ -371,7 +371,7 @@ const handlePlayerRemove = (position: string, index: number) => {
 
           <div className="p-4 grid grid-cols-3 gap-4 border-t bg-white sticky bottom-0">
             {/* <Button variant="outline" onClick={handleAutoFill}>Autofill</Button> */}
-            <Button variant="destructive" onClick={handleReset} disabled={playersOut.length === 0}>Reset</Button>
+            <Button variant="destructive" onClick={handleReset}>Reset</Button>
             {hasTeam ? (
                <Button
                   onClick={() => handleConfirmTransfers()}
