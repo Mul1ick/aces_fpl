@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // <-- 1. IMPORT LINK
 
 // --- ASSET IMPORTS ---
 import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
@@ -20,7 +20,7 @@ const TEAM_JERSEYS = {
 interface TeamOfTheWeek {
   manager_name: string;
   points: number;
-  starting: any[]; // Using 'any' for simplicity, you can create a specific type
+  starting: any[];
   bench: any[];
 }
 
@@ -33,7 +33,8 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team }) =>
   return (
     <Card className="h-full border-black border-2">
       <CardHeader>
-        <Link to="/team-of-the-week" className="flex items-center justify-between group">
+        {/* --- 2. WRAP THE HEADER CONTENT IN A LINK --- */}
+        <Link to="/team-view/top/1" className="flex items-center justify-between group">
             <CardTitle className="text-xl group-hover:underline">Team of the Week</CardTitle>
             <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
         </Link>
@@ -53,7 +54,7 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team }) =>
             </div>
           ))}
           <h4 className="font-bold text-gray-500 text-sm pt-2 border-t">Bench</h4>
-          {team.bench.map(player => (
+           {team.bench.map(player => (
             <div key={player.id} className="flex items-center space-x-3 text-sm">
               <img src={TEAM_JERSEYS[player.team.short_name]} alt={`${player.team.short_name} jersey`} className="w-6 h-8 object-contain"/>
               <div className="flex-1">

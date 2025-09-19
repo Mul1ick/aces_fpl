@@ -1,6 +1,6 @@
 import React from 'react';
 import PlayerCard from '@/components/layout/PlayerCard'; 
-import pitchBackground from '@/assets/images/pitch.svg';
+import pitchBackground from '@/assets/images/pitch.png';
 
 interface PitchViewProps {
   playersByPos: any;
