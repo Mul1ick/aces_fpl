@@ -149,7 +149,7 @@ const PlayerFilterControls = ({ filters, setFilters, resetFilters, allTeamNames 
                     <div className="space-y-2">
                         <div className="flex items-center space-x-2"><RadioGroupItem value="points" id="points" /><Label htmlFor="points">Total Points</Label></div>
                         <div className="flex items-center space-x-2"><RadioGroupItem value="price" id="price" /><Label htmlFor="price">Price</Label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="tsb" id="tsb" /><Label htmlFor="tsb">Team Selected By %</Label></div>
+                    
                      </div>
                 </RadioGroup>
             </FilterModal>

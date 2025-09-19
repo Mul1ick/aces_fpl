@@ -17,13 +17,13 @@ interface TransfersHeroCardProps {
   user: {
     free_transfers: number;
     played_first_gameweek: boolean;
+    has_team?: boolean;
   } | null;
   view: 'pitch' | 'list';
   setView: (view: 'pitch' | 'list') => void;
   gameweek: Gameweek | null;
-  transferCount: number; // --- ADD THIS ---
-  transferCost: number;  // --- ADD THIS ---
-
+  transferCount: number;
+  transferCost: number;
 }
 
 const StatDisplay = ({ value, label }: { value: string | number; label: string }) => (
@@ -42,16 +42,12 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   view,
   setView,
   gameweek,
-  transferCount, // --- ADD THIS ---
-  transferCost,  // --- ADD THIS ---
-
+  transferCount,
+  transferCost,
 }) => {
   const transfersText = user?.played_first_gameweek === false 
     ? "Unlimited" 
     : `${user?.free_transfers ?? 0} FT`;
-
-  
-  // const transferCost = 0;
 
   const deadlineDate = gameweek?.deadline ? new Date(gameweek.deadline) : null;
   const deadlineText = deadlineDate && isValid(deadlineDate)
@@ -64,14 +60,12 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
         <div className="space-y-4">
           <div>
             <h2 className="text-2xl font-bold">Transfers</h2>
-            {/* --- MODIFIED --- */}
-            {/* Updated the instructional text to reflect the new 2-player rule. */}
             <p className="text-sm text-pl-white/70">
-               Select a maximum of 2 players from a single team or 'Auto Pick' if you are short of time.
+               Select a maximum of 2 players from a single team.
             </p>
           </div>
 
-          <div className="bg-pl-white/10 rounded-lg p-3">
+           <div className="bg-pl-white/10 rounded-lg p-3">
             <p className="font-bold text-center text-sm">
                {gameweek ? `Gameweek ${gameweek.gw_number}` : 'Current Gameweek'} • {deadlineText}
             </p>
@@ -85,26 +79,28 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
           </div>
           
           <div className="flex justify-center pt-2 bg-pl-white/10 p-1 rounded-lg">
-            <div className="grid grid-cols-2 gap-1 w-full">
-                <button
-                    onClick={() => setView('pitch')}
-                    className={cn(
-                        "w-full py-2 text-sm font-semibold rounded-md transition-colors",
-                        view === 'pitch' ? 'bg-pl-white text-pl-purple' : 'text-pl-white/70 hover:bg-pl-white/20'
-                    )}
-                >
-                    Pitch View
-                </button>
-                <button
-                    onClick={() => setView('list')}
-                    className={cn(
-                        "w-full py-2 text-sm font-semibold rounded-md transition-colors",
-                        view === 'list' ? 'bg-pl-white text-pl-purple' : 'text-pl-white/70 hover:bg-pl-white/20'
-                    )}
-                >
-                    List View
-                </button>
-            </div>
+            {user?.has_team && (
+              <div className="grid grid-cols-2 gap-1 w-full">
+                  <button
+                      onClick={() => setView('pitch')}
+                      className={cn(
+                          "w-full py-2 text-sm font-semibold rounded-md transition-colors",
+                          view === 'pitch' ? 'bg-pl-white text-pl-purple' : 'text-pl-white/70 hover:bg-pl-white/20'
+                      )}
+                  >
+                      Pitch View
+                  </button>
+                  <button
+                      onClick={() => setView('list')}
+                      className={cn(
+                          "w-full py-2 text-sm font-semibold rounded-md transition-colors",
+                          view === 'list' ? 'bg-pl-white text-pl-purple' : 'text-pl-white/70 hover:bg-pl-white/20'
+                      )}
+                  >
+                      List View
+                  </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -116,7 +112,7 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className={cn(
-               "p-3 text-center font-semibold text-sm",
+              "p-3 text-center font-semibold text-sm",
               notification.type === 'error' ? 'bg-red-500 text-white' : 'bg-pl-green text-pl-purple'
             )}
           >

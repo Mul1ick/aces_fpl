@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { API } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext'; // Add this import
+import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // --- ASSET IMPORTS ---
@@ -29,36 +29,36 @@ const TeamPageSkeleton = () => (
                 <Skeleton className="h-24 w-full rounded-lg" />
                 <Skeleton className="h-[72px] w-full rounded-lg" />
             </div>
-            <main 
+             <main 
                 className="flex-1 relative flex flex-col justify-around py-4"
                 style={{ backgroundImage: `url(${pitchBackground})`, backgroundSize: 'cover', backgroundPosition: 'center top' }}
             >
                 <div className="flex justify-center"><Skeleton className="h-28 w-20 rounded-md" /></div>
-                <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>
+                 <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>
                 <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>
                 <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>
             </main>
             <footer className="flex-shrink-0 p-3 bg-gray-100 border-t">
-                <div className="grid grid-cols-3 gap-4 place-items-center">
+                 <div className="grid grid-cols-3 gap-4 place-items-center">
                     <Skeleton className="h-[90px] w-[70px] rounded-md" />
                     <Skeleton className="h-[90px] w-[70px] rounded-md" />
                     <Skeleton className="h-[90px] w-[70px] rounded-md" />
                 </div>
-            </footer>
+             </footer>
             <div className="p-4 text-center bg-white border-t-2 border-gray-200">
                 <Skeleton className="h-[60px] w-48 mx-auto rounded-lg" />
             </div>
             <div className="p-4">
                 <Skeleton className="h-48 w-full rounded-lg" />
             </div>
-        </div>
+     </div>
     </div>
 );
 
 const Team: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth(); // Add this
+  const { user } = useAuth();
   const [squad, setSquad] = useState<{ starting: any[], bench: any[] }>({ starting: [], bench: [] });
   const [initialSquadState, setInitialSquadState] = useState<string>('');
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
@@ -111,7 +111,7 @@ const Team: React.FC = () => {
             if (leaderboardRes.ok) setLeaderboard(await leaderboardRes.json());
 
         } catch (err) {
-            console.error("Failed to fetch initial data:", err);
+             console.error("Failed to fetch initial data:", err);
             setSquad({ starting: [], bench: [] });
             toast({ variant: "destructive", title: "Could not load your team." });
         } finally {
@@ -133,6 +133,15 @@ const Team: React.FC = () => {
   const isDirty = useMemo(() => {
     return JSON.stringify(squad) !== initialSquadState;
   }, [squad, initialSquadState]);
+
+  const benchLayout = useMemo(() => {
+    if (!squad || !squad.bench) return { goalkeeper: null, outfielders: [] };
+    
+    const goalkeeper = squad.bench.find(p => p.pos === 'GK') || null;
+    const outfielders = squad.bench.filter(p => p.pos !== 'GK');
+    
+    return { goalkeeper, outfielders };
+  }, [squad]);
   
   const handlePlayerClick = (clickedPlayer: any) => {
     if (selectedPlayer) {
@@ -162,7 +171,8 @@ const Team: React.FC = () => {
             newStarterPlayer.isVice = true;
         }
         
-        setSquad(currentSquad => {
+        
+ setSquad(currentSquad => {
             const updatedStarting = currentSquad.starting.filter(p => p.id !== starter.id).concat(newStarterPlayer);
             const updatedBench = currentSquad.bench.filter(p => p.id !== benched.id).concat(newBenchedPlayer);
              
@@ -192,7 +202,7 @@ const Team: React.FC = () => {
     setSquad(currentSquad => {
         const newStarting = currentSquad.starting.map(p => {
             if (kind === 'C') p.isCaptain = false;
-            if (kind === 'VC') p.isVice = false;
+             if (kind === 'VC') p.isVice = false;
             return p;
         });
 
@@ -200,7 +210,7 @@ const Team: React.FC = () => {
         if (targetPlayer) {
             if (kind === 'C') {
                 targetPlayer.isCaptain = true;
-                if (targetPlayer.isVice) targetPlayer.isVice = false;
+                 if (targetPlayer.isVice) targetPlayer.isVice = false;
             }
             if (kind === 'VC') {
                 targetPlayer.isVice = true;
@@ -208,7 +218,7 @@ const Team: React.FC = () => {
             }
         }
         
-        return { ...currentSquad, starting: newStarting };
+         return { ...currentSquad, starting: newStarting };
     });
 
     toast({ title: "Success", description: `${player.name} is now your ${kind === 'C' ? 'Captain' : 'Vice-Captain'}.` });
@@ -244,11 +254,10 @@ const Team: React.FC = () => {
         return;
     }
     
-    // --- THIS IS THE CORRECTED LINE ---
     const payload = {
         players: allPlayers.map((p) => ({
             id: p.id,
-            position: p.pos,
+             position: p.pos,
             is_captain: p.isCaptain,
             is_vice_captain: p.isVice,
             is_benched: p.is_benched,
@@ -324,14 +333,14 @@ const Team: React.FC = () => {
       <motion.div variants={itemVariants} className="hidden lg:block lg:w-2/5 p-4">
         <div className="lg:sticky lg:top-4">
           <ManagerInfoCard 
-  isLoading={isExtraDataLoading}
-  teamName={squad.team_name}
-  managerName={user?.full_name}
-  stats={hubStats}
-  leagueStandings={leaderboard.slice(0, 5)}
-  overallRank={userRank}
-  currentUserEmail={user?.email}
-/>
+            isLoading={isExtraDataLoading}
+            teamName={squad.team_name}
+            managerName={user?.full_name}
+            stats={hubStats}
+            leagueStandings={leaderboard.slice(0, 5)}
+            overallRank={userRank}
+            currentUserEmail={user?.email}
+          />
         </div>
       </motion.div>
        <div className="flex flex-col flex-1 lg:w-3/5">
@@ -349,7 +358,7 @@ const Team: React.FC = () => {
           variants={itemVariants}
           className="flex-1 relative flex flex-col justify-around py-4"
           style={{ 
-            backgroundImage: `url(${pitchBackground})`, 
+             backgroundImage: `url(${pitchBackground})`, 
             backgroundSize: 'cover', 
             backgroundPosition: 'center top',
           }}
@@ -357,14 +366,14 @@ const Team: React.FC = () => {
           {positionOrder.map((pos) => (
             <motion.div
               key={pos}
-              className="flex justify-center items-center gap-x-8 sm:gap-x-12"
+               className="flex justify-center items-center gap-x-8 sm:gap-x-12"
               variants={containerVariants}
             >
               {playersByPos[pos].map(p => (
                 <motion.div
                   key={p.id}
                   variants={itemVariants}
-                  onClick={() => handlePlayerClick(p)} 
+                   onClick={() => handlePlayerClick(p)} 
                   className={cn("cursor-pointer rounded-md transition-all", selectedPlayer?.id === p.id && "ring-2 ring-accent-teal ring-offset-2 ring-offset-transparent")}
                 >
                    <PlayerCard player={p} displayMode='fixture'/>
@@ -375,28 +384,41 @@ const Team: React.FC = () => {
         </motion.main>
 
         <motion.footer variants={itemVariants} className="flex-shrink-0 p-3 bg-gray-100 border-t">
-           <motion.div variants={containerVariants} className="grid grid-cols-3 gap-4 place-items-center">
-            {squad.bench.map(player => (
-              <motion.div
-                key={player.id}
-                variants={itemVariants}
-                onClick={() => handlePlayerClick(player)} 
-                 className={cn("cursor-pointer rounded-md transition-all", selectedPlayer?.id === player.id && "ring-2 ring-accent-teal ring-offset-2 ring-offset-transparent")}
-              >
-                <PlayerCard player={player} isBench={true} displayMode='fixture' />
-              </motion.div>
-            ))}
-          </motion.div>
-         </motion.footer>
+            <div className="flex justify-center items-center gap-x-12">
+                {benchLayout.goalkeeper && (
+                    <motion.div
+                        key={benchLayout.goalkeeper.id}
+                        variants={itemVariants}
+                        onClick={() => handlePlayerClick(benchLayout.goalkeeper)}
+                        className={cn("cursor-pointer rounded-md transition-all", selectedPlayer?.id === benchLayout.goalkeeper.id && "ring-2 ring-accent-teal ring-offset-2 ring-offset-transparent")}
+                    >
+                        <PlayerCard player={benchLayout.goalkeeper} isBench={true} displayMode='fixture' />
+                    </motion.div>
+                )}
+                <div className="h-16 w-px bg-gray-300"></div>
+                <div className="grid grid-cols-2 gap-12">
+                    {benchLayout.outfielders.map(player => (
+                        <motion.div
+                            key={player.id}
+                            variants={itemVariants}
+                            onClick={() => handlePlayerClick(player)}
+                            className={cn("cursor-pointer rounded-md transition-all", selectedPlayer?.id === player.id && "ring-2 ring-accent-teal ring-offset-2 ring-offset-transparent")}
+                        >
+                            <PlayerCard player={player} isBench={true} displayMode='fixture' />
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
+        </motion.footer>
 
         <motion.div variants={itemVariants} className="p-4 text-center bg-white border-t-2 border-gray-200">
             <Button 
-        onClick={handleSaveTeam} 
-        disabled={!isDirty}
-        className="bg-accent-pink text-white font-bold text-lg px-8 py-6 rounded-lg shadow-lg disabled:opacity-50"
-    >
-        Save Changes
-    </Button>
+                onClick={handleSaveTeam} 
+                disabled={!isDirty}
+                className="bg-accent-pink text-white font-bold text-lg px-8 py-6 rounded-lg shadow-lg disabled:opacity-50"
+            >
+                Save Changes
+            </Button>
          </motion.div>
 
         <motion.div variants={itemVariants} className="p-4">
@@ -406,14 +428,14 @@ const Team: React.FC = () => {
       
       <motion.div variants={itemVariants} className="block lg:hidden p-4">
           <ManagerInfoCard 
-  isLoading={isExtraDataLoading}
-  teamName={squad.team_name}
-  managerName={user?.full_name}
-  stats={hubStats}
-  leagueStandings={leaderboard.slice(0, 5)}
-  overallRank={userRank}
-  currentUserEmail={user?.email}
-/>
+            isLoading={isExtraDataLoading}
+            teamName={squad.team_name}
+            managerName={user?.full_name}
+            stats={hubStats}
+            leagueStandings={leaderboard.slice(0, 5)}
+            overallRank={userRank}
+            currentUserEmail={user?.email}
+          />
       </motion.div>
 
       <AnimatePresence>
@@ -426,7 +448,7 @@ const Team: React.FC = () => {
                 <AlertDialogTitle>Team Saved!</AlertDialogTitle>
             </AlertDialogHeader>
              <AlertDialogAction onClick={() => setIsSavedModalOpen(false)}>
-                Continue
+                 Continue
             </AlertDialogAction>
         </AlertDialogContent>
       </AlertDialog>

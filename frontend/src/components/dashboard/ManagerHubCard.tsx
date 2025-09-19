@@ -24,12 +24,13 @@ interface ManagerHubCardProps {
     total_players: number;
     squad_value: number,
     in_the_bank: number,
-
   };
+  // ✅ ADD THIS PROP
+  overallRank?: number | null;
 }
 
 
-export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats }) => {
+export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats, overallRank }) => {
   return (
     <Card className="h-full border-black border-2">
         <CardContent className="p-4">
@@ -38,7 +39,8 @@ export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats }) => {
                 <h3 className="font-bold text-lg mb-2">Points & Rankings</h3>
                 <div className="space-y-1">
                     <StatRow label="Overall points" value={stats.overall_points} />
-                    <StatRow label="Overall rank" value="958,151" />
+                    {/* ✅ MODIFIED THIS LINE */}
+                    <StatRow label="Overall rank" value={overallRank?.toLocaleString() ?? '...'} />
                     <StatRow label="Total players" value={stats.total_players.toLocaleString()} />
                     <StatRow label="Gameweek points" value={stats.gameweek_points} />
                     <LinkRow label="Gameweek History" />

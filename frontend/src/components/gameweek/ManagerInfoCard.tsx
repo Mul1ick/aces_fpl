@@ -101,7 +101,7 @@ export const ManagerInfoCard: React.FC<ManagerInfoCardProps> = ({
                     <StatRow label="Overall rank" value={overallRank?.toLocaleString() ?? '...'} />
                     <StatRow label="Total players" value={stats?.total_players.toLocaleString() ?? '...'} />
                     <StatRow label="Gameweek points" value={stats?.gameweek_points.toLocaleString() ?? '...'} />
-                    <LinkRow label="Gameweek History" />
+                    
                 </div>
             </div>
             <div className="border-b border-gray-200 my-4"></div>
@@ -129,7 +129,7 @@ export const ManagerInfoCard: React.FC<ManagerInfoCardProps> = ({
                 <div className="space-y-1">
                     <StatRow label="Gameweek transfers" value="0" />
                     <StatRow label="Total transfers" value="0" />
-                    <LinkRow label="Transfer History" />
+                    
                 </div>
             </div>
              <div className="border-b border-gray-200 my-4"></div>
@@ -144,14 +144,7 @@ export const ManagerInfoCard: React.FC<ManagerInfoCardProps> = ({
             </div>
             <div className="border-b border-gray-200 my-4"></div>
 
-             {/* Admin Section */}
-            <div>
-                <h3 className="font-bold text-lg mb-2">Admin</h3>
-                <div className="space-y-1">
-                    <LinkRow label="Team Details" />
-                     <LinkRow label="User Profile" />
-                </div>
-            </div>
+            
         </CardContent>
     </Card>
   );
