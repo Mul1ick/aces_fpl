@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
-import NewUserDashboard from "./NewUserDashboard"; // Import the new component
+import NewUserDashboard from "./NewUserDashboard";
 
-// Import your existing dashboard components
 import { GameweekHeroCard } from "@/components/dashboard/GameweekHeroCard";
 import { ManagerHubCard } from "@/components/dashboard/ManagerHubCard";
 import { GameweekStatusCard } from "@/components/dashboard/GameweekStatusCard";
@@ -35,32 +34,11 @@ type TransferStatsResponse =
       [k: string]: any;
     };
     
-const teamOfTheWeek = {
-  manager: 'John Smith',
-  points: 95,
-  players: [
-      { id: 1, name: 'Pope', club: 'NEW', pos: 'GK', points: 12 },
-      { id: 2, name: 'Trippier', club: 'NEW', pos: 'DEF', points: 18 },
-      { id: 3, name: 'James', club: 'CHE', pos: 'DEF', points: 15 },
-      { id: 4, name: 'De Bruyne', club: 'MCI', pos: 'MID', points: 21 },
-      { id: 5, name: 'Salah', club: 'LIV', pos: 'MID', points: 19 },
-      { id: 6, name: 'Saka', club: 'ARS', pos: 'MID', points: 16 },
-      { id: 7, name: 'Haaland', club: 'MCI', pos: 'FWD', points: 23 },
-      { id: 8, name: 'Kane', club: 'TOT', pos: 'FWD', points: 18 },
-  ],
-  bench: [
-      { id: 9, name: 'Alisson', club: 'LIV', pos: 'GK', points: 10 },
-      { id: 10, name: 'Saliba', club: 'ARS', pos: 'DEF', points: 11 },
-      { id: 11, name: 'Son', club: 'TOT', pos: 'MID', points: 14 },
-  ]
-};
-
-
 const Dashboard: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [squad, setSquad] = useState<TeamResponse | null>(null);
   const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
-  const [gameweek, setGameweek] = useState<{ gw_number: number } | null>(null); // Add this line
+  const [gameweek, setGameweek] = useState<{ gw_number: number } | null>(null);
   const [gameweekStats, setGameweekStats] = useState({
     user_points: 0,
     average_points: 0,
@@ -73,7 +51,10 @@ const Dashboard: React.FC = () => {
     squad_value: 0.0,
     in_the_bank: 110.0,
   });
-
+  
+  // ✅ ADD THESE STATE VARIABLES
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [userRank, setUserRank] = useState<number | null>(null);
 
   const [transfersIn, setTransfersIn] = useState<
     { rank: number; name: string; club: string; pos: string; transfers: string }[]
@@ -98,14 +79,12 @@ const Dashboard: React.FC = () => {
   rows.map((row, idx) => ({
     rank: idx + 1,
     name: row.full_name ?? `Player #${row.player_id}`,
-    // --- MODIFIED LINE BELOW ---
     club: row.team?.name ?? row.team?.short_name ?? "—",
     pos: row.position ?? "—",
     transfers: (row.count ?? 0).toLocaleString(),
   }));
 
   useEffect(() => {
-    // We only fetch data if the user has a team
     if (user?.has_team) {
       const token = localStorage.getItem("access_token");
       const URL = API.endpoints.transferStats;
@@ -153,14 +132,47 @@ const Dashboard: React.FC = () => {
     if (user) {
         fetchCurrentGameweek();
     }
-}, [user]);
+  }, [user]);
+  
+  // ✅ ADD THIS EFFECT TO FETCH LEADERBOARD DATA
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const response = await fetch(API.endpoints.leaderboard, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setLeaderboard(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch leaderboard:", error);
+      }
+    };
 
-  // Show a loading state while checking auth
+    if (user) {
+      fetchLeaderboard();
+    }
+  }, [user]);
+
+  // ✅ ADD THIS EFFECT TO CALCULATE USER RANK
+  useEffect(() => {
+    if (user && leaderboard.length > 0) {
+      const userEntry = leaderboard.find(
+        (entry: any) => entry.manager_email === user.email
+      );
+      if (userEntry) {
+        setUserRank(userEntry.rank);
+      }
+    }
+  }, [user, leaderboard]);
+
   if (isLoading) {
     return <div className="min-h-screen bg-pl-purple flex items-center justify-center text-pl-white">Loading...</div>;
   }
   
-  // Conditionally render the new user dashboard
   if (user && user.has_team === false) {
     return <NewUserDashboard />;
   }
@@ -170,8 +182,7 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem("access_token");
       if (!token) return;
       try {
-        const response = await fetch(API.endpoints.gameweekStats
-, {
+        const response = await fetch(API.endpoints.gameweekStats, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
@@ -183,20 +194,19 @@ const Dashboard: React.FC = () => {
       }
     };
 
-    if (user) { // Only fetch if the user is loaded
+    if (user) {
         fetchGameweekStats();
     }
   }, [user]);
   
 
   useEffect(() => {
-    // Fetch the user's team data when the component mounts
     const fetchTeam = async () => {
       const token = localStorage.getItem("access_token");
       if (!user || !token) return;
 
       try {
-        const response = await fetch(API.endpoints.team, {
+        const response = await fetch(API.endpoints.team(), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
@@ -210,8 +220,6 @@ const Dashboard: React.FC = () => {
     
     fetchTeam();
   }, [user]);
-
-
 
   useEffect(() => {
     const fetchHubStats = async () => {
@@ -235,7 +243,6 @@ const Dashboard: React.FC = () => {
     }
   }, [user]);
 
-
   useEffect(() => {
     const fetchTeamOfTheWeek = async () => {
       const token = localStorage.getItem("access_token");
@@ -258,10 +265,6 @@ const Dashboard: React.FC = () => {
     }
   }, [user]);
 
-
-
-
-  // Your Existing Dashboard Code
   return (
     <div className="bg-white min-h-screen text-black">
           <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
@@ -276,14 +279,15 @@ const Dashboard: React.FC = () => {
                 <motion.div variants={itemVariants}>
                   <GameweekHeroCard user={user}
                   points={gameweekStats.user_points}
-      averagePoints={gameweekStats.average_points}
-      highestPoints={gameweekStats.highest_points}
-      teamName={squad?.team_name}
-      currentGameweekNumber={gameweek?.gw_number || 1}
- />
+                  averagePoints={gameweekStats.average_points}
+                  highestPoints={gameweekStats.highest_points}
+                  teamName={squad?.team_name}
+                  currentGameweekNumber={gameweek?.gw_number || 1}
+                 />
                 </motion.div>
                 <motion.div variants={itemVariants}>
-                  <ManagerHubCard stats={hubStats}/>
+                  {/* ✅ MODIFIED: Pass the userRank prop here */}
+                  <ManagerHubCard stats={hubStats} overallRank={userRank} />
                 </motion.div>
               </div>
 
@@ -294,7 +298,7 @@ const Dashboard: React.FC = () => {
                          <CardTitle className="text-2xl">Gameweek Status</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-8">
-                         <GameweekStatusCard />
+                        <GameweekStatusCard />
                         <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
                         {teamOfTheWeek && <TeamOfTheWeekCard team={teamOfTheWeek} />}
                     </CardContent>

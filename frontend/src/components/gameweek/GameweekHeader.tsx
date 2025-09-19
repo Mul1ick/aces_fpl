@@ -16,11 +16,11 @@ interface GameweekHeaderProps {
   gwRank?: string;
   freeTransfers?: number;
   onNavigate: (direction: 'prev' | 'next') => void;
-
+  currentGameweekNumber?: number | null;
 }
 
 export const GameweekHeader: React.FC<GameweekHeaderProps> = ({ 
-     gw, 
+    gw, 
     view, 
     setView,
     teamName,
@@ -29,7 +29,8 @@ export const GameweekHeader: React.FC<GameweekHeaderProps> = ({
     highestPoints,
     gwRank,
     freeTransfers,
-    onNavigate
+    onNavigate,
+    currentGameweekNumber
 }) => {
   const currentGw = parseInt(gw || '1', 10);
   return (
@@ -39,20 +40,32 @@ export const GameweekHeader: React.FC<GameweekHeaderProps> = ({
         <h1 className="font-bold text-xl text-white">{teamName || 'Your Team'}</h1>
       </div>
       <div className="flex justify-between items-center mb-3">
-        <Button variant="ghost" size="icon" onClick={() => onNavigate('prev')} disabled={currentGw <= 1}>
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
+        {/* --- MODIFIED: Button disappears if on Gameweek 1 --- */}
+        {currentGw > 1 ? (
+          <Button variant="ghost" size="icon" onClick={() => onNavigate('prev')}>
+            <ChevronLeft className="w-6 h-6" />
+          </Button>
+        ) : (
+          <div className="w-10 h-10" /> // Invisible placeholder to keep title centered
+        )}
+
         <p className="font-bold text-center text-base text-white">Gameweek {gw || 1}</p>
-        <Button variant="ghost" size="icon" onClick={() => onNavigate('next')}>
-          <ChevronRight className="w-6 h-6" />
-        </Button>
+        
+        {/* --- MODIFIED: Button disappears if on the current gameweek or later --- */}
+        {(currentGameweekNumber && currentGw < currentGameweekNumber) ? (
+          <Button variant="ghost" size="icon" onClick={() => onNavigate('next')}>
+            <ChevronRight className="w-6 h-6" />
+          </Button>
+        ) : (
+          <div className="w-10 h-10" /> // Invisible placeholder to keep title centered
+        )}
       </div>
 
       {/* Stats Layout */}
       <div className="flex justify-between items-center lg:justify-center lg:gap-x-16">
         {/* Left Column Stats */}
         <div className="space-y-2 text-center">
-          <div>
+           <div>
             <p className="font-bold text-xl text-white">{averagePoints ?? '...'}</p>
             <p className="text-[10px] text-gray-300">Average Points</p>
           </div>
@@ -60,7 +73,7 @@ export const GameweekHeader: React.FC<GameweekHeaderProps> = ({
           <div>
             <p className="font-bold text-xl text-white">{highestPoints ?? '...'}</p>
             <p className="text-[10px] text-gray-300">Highest Points</p>
-          </div>
+           </div>
         </div>
 
         {/* Highlight Card (Center Focus) */}
@@ -85,7 +98,7 @@ export const GameweekHeader: React.FC<GameweekHeaderProps> = ({
           <div>
             <p className="font-bold text-xl text-white">{freeTransfers ?? '...'}</p>
             <p className="text-[10px] text-gray-300">Transfers</p>
-          </div>
+           </div>
         </div>
       </div>
 

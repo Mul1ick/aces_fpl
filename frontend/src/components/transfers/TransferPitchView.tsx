@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { PlusCircle, X } from 'lucide-react';
-import pitchBackground from '@/assets/images/pitch.svg';
+import pitchBackground from '@/assets/images/pitch.png';
 import PlayerCard from '@/components/layout/PlayerCard';
 import PlayerDetailModal from './PlayerDetailModal';
 

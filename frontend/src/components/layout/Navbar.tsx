@@ -1,31 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import acesLogo from '@/assets/aces-logo.png';
-
-// Links for existing users
-const regularNavLinks = [
-  { name: 'Status', path: '/dashboard' },
-  { name: 'Pick Team', path: '/team' },
-  { name: 'Transfers', path: '/transfers' },
-  { name: 'Fixtures', path: '/fixtures' },
-  { name: 'League', path: '/leaderboard' },
-  { name: 'Stats', path: '/stats' },
-  { name: 'Help', path: '/help' },
-];
-
-// Simplified links for new users
-const newUserNavLinks = [
-  { name: 'Select Team', path: '/transfers' },
-  { name: 'Help', path: '/help' },
-];
+import { API } from '@/lib/api'; // Import the API helper
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // --- ADDED: State to hold the current gameweek number ---
+  const [currentGameweek, setCurrentGameweek] = useState<number | null>(null);
+
+  // --- ADDED: useEffect to fetch the current gameweek ---
+  useEffect(() => {
+    const fetchCurrentGameweek = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!user?.has_team || !token) {
+        // Don't fetch if user has no team or is not logged in
+        setCurrentGameweek(1); // Default to 1 for display purposes
+        return;
+      }
+      try {
+        const response = await fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setCurrentGameweek(data.gw_number);
+        }
+      } catch (error) {
+        console.error("Failed to fetch current gameweek for navbar:", error);
+        setCurrentGameweek(1); // Fallback to 1 on error
+      }
+    };
+
+    fetchCurrentGameweek();
+  }, [user]);
+
+  // --- MODIFIED: Added the new "Points" link ---
+  const regularNavLinks = [
+    { name: 'Status', path: '/dashboard' },
+    { name: 'Points', path: `/gameweek/${currentGameweek || 1}` },
+    { name: 'Pick Team', path: '/team' },
+    { name: 'Transfers', path: '/transfers' },
+    { name: 'Fixtures', path: '/fixtures' },
+    { name: 'League', path: '/leaderboard' },
+    { name: 'Stats', path: '/stats' },
+    { name: 'Help', path: '/help' },
+  ];
+
+  // Simplified links for new users
+  const newUserNavLinks = [
+    { name: 'Select Team', path: '/transfers' },
+    { name: 'Help', path: '/help' },
+  ];
 
   const navLinks = user?.has_team ? regularNavLinks : newUserNavLinks;
 
@@ -101,7 +132,7 @@ const Navbar: React.FC = () => {
               className="fixed top-0 right-0 z-50 h-full w-full max-w-xs bg-black"
             >
                 <div className="flex justify-between items-center h-16 px-4 sm:px-6 border-b border-gray-800">
-                  <NavLink to="/dashboard" className="flex items-center space-x-3" onClick={() => setIsMenuOpen(false)}>
+                    <NavLink to="/dashboard" className="flex items-center space-x-3" onClick={() => setIsMenuOpen(false)}>
                         <img src={acesLogo} alt="Aces Logo" className="h-8 w-auto" />
                     </NavLink>
                   <button onClick={() => setIsMenuOpen(false)}>

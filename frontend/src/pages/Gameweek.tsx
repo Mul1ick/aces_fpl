@@ -10,21 +10,24 @@ import { Card } from '@/components/ui/card';
 import { API } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useMemo } from 'react'; // Make sure useMemo is imported
+import { useMemo } from 'react';
 import { PlayerDetailCard } from '@/components/gameweek/PlayerDetailCard';
 
 const Gameweek: React.FC = () => {
   const { gw } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth(); // Add useAuth
-  const { toast } = useToast(); // Add useToast
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [view, setView] = useState('pitch');
   const [detailedPlayer, setDetailedPlayer] = useState(null);
   const [squad, setSquad] = useState<TeamResponse | null>(null);
-  const [gameweekStats, setGameweekStats] = useState(null); // Add this
+  const [gameweekStats, setGameweekStats] = useState(null);
   const [hubStats, setHubStats] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [isExtraDataLoading, setIsExtraDataLoading] = useState(true);
+  
+  // --- ADDED: State to store the current gameweek number ---
+  const [currentGameweek, setCurrentGameweek] = useState<number | null>(null);
 
 
   useEffect(() => {
@@ -36,13 +39,15 @@ const Gameweek: React.FC = () => {
     const gameweekNumber = parseInt(gw, 10);
 
     const fetchAllData = async () => {
-      setIsExtraDataLoading(true);
+       setIsExtraDataLoading(true);
       try {
-        const [teamRes, hubRes, leaderboardRes, gwStatsRes] = await Promise.all([
+        // --- MODIFIED: Added fetch for current gameweek ---
+        const [teamRes, hubRes, leaderboardRes, gwStatsRes, currentGwRes] = await Promise.all([
             fetch(API.endpoints.team(gameweekNumber), { headers: { Authorization: `Bearer ${token}` } }),
             fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
             fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } }),
-            fetch(`${API.endpoints.gameweek}/${gameweekNumber}/stats`, { headers: { Authorization: `Bearer ${token}` } })
+            fetch(`${API.endpoints.gameweek}/${gameweekNumber}/stats`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
 
         if (!teamRes.ok) throw new Error("Failed to fetch team data");
@@ -54,12 +59,18 @@ const Gameweek: React.FC = () => {
         if (hubRes.ok) setHubStats(await hubRes.json());
         if (leaderboardRes.ok) setLeaderboard(await leaderboardRes.json());
         if (gwStatsRes.ok) setGameweekStats(await gwStatsRes.json());
+        
+        // --- ADDED: Set the current gameweek number from the new API call ---
+        if (currentGwRes.ok) {
+            const currentGwData = await currentGwRes.json();
+            setCurrentGameweek(currentGwData.gw_number);
+        }
 
       } catch (error) {
         console.error("Error fetching data:", error);
         toast({ variant: "destructive", title: "Could not load page data." });
       } finally {
-        setIsExtraDataLoading(false);
+         setIsExtraDataLoading(false);
       }
     };
 
@@ -76,7 +87,7 @@ const Gameweek: React.FC = () => {
   const handleNavigation = (direction: 'next' | 'prev') => {
     const currentGw = parseInt(gw || '1', 10);
     const newGw = direction === 'next' ? currentGw + 1 : currentGw - 1;
-    if (newGw > 0) { // Add any upper bound checks if necessary
+    if (newGw > 0) {
       navigate(`/gameweek/${newGw}`);
     }
   };
@@ -96,44 +107,41 @@ const Gameweek: React.FC = () => {
   const allPlayers = [...squad.starting, ...squad.bench];
 
   return (
-    // --- MODIFIED: Removed lg:h-screen to allow global scroll ---
     <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
-       {/* --- MODIFIED: Added classes for sticky positioning --- */}
       <div className="hidden lg:block lg:w-2/5 p-4">
         <div className="lg:sticky lg:top-4">
             <ManagerInfoCard 
-  isLoading={isExtraDataLoading}
-  teamName={squad.team_name}
-  managerName={user?.full_name}
-  stats={hubStats}
-  leagueStandings={leaderboard.slice(0, 5)}
-  overallRank={userRank}
-  currentUserEmail={user?.email}
-/>
+              isLoading={isExtraDataLoading}
+              teamName={squad.team_name}
+              managerName={user?.full_name}
+              stats={hubStats}
+              leagueStandings={leaderboard.slice(0, 5)}
+              overallRank={userRank}
+              currentUserEmail={user?.email}
+            />
         </div>
       </div>
 
-      {/* Right Column / Main Mobile View */}
-      {/* --- MODIFIED: Removed lg:h-screen --- */}
       <div className="flex flex-col flex-1 lg:w-3/5">
         <div className="lg:m-4 lg:border-2 lg:border-gray-300 lg:rounded-lg flex flex-col flex-grow">
-           <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] p-4 lg:rounded-t-lg">
+          <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] p-4 lg:rounded-t-lg">
                 <GameweekHeader 
-    gw={gw} 
-    view={view} 
-    setView={setView}
-    teamName={squad.team_name}
-    totalPoints={gameweekStats?.user_points}
-    averagePoints={gameweekStats?.average_points}
-    highestPoints={gameweekStats?.highest_points}
-    gwRank={userRank?.toLocaleString()}
-    freeTransfers={user?.free_transfers}
-    onNavigate={handleNavigation}
-
-/>
+                    gw={gw} 
+                    view={view} 
+                    setView={setView}
+                    teamName={squad.team_name}
+                    totalPoints={gameweekStats?.user_points}
+                    averagePoints={gameweekStats?.average_points}
+                    highestPoints={gameweekStats?.highest_points}
+                    gwRank={userRank?.toLocaleString()}
+                    freeTransfers={user?.free_transfers}
+                    onNavigate={handleNavigation}
+                    // --- ADDED: Pass the current gameweek as a prop ---
+                    currentGameweekNumber={currentGameweek}
+                />
             </div>
             
-            {view === 'pitch' ? (
+             {view === 'pitch' ? (
                <PitchView playersByPos={playersByPos} bench={squad.bench} onPlayerClick={setDetailedPlayer} />
             ) : (
                 <ListView players={allPlayers} />
@@ -141,17 +149,16 @@ const Gameweek: React.FC = () => {
         </div>
       </div>
       
-      {/* Manager Info Card (Mobile Only) */}
       <div className="block lg:hidden p-4">
           <ManagerInfoCard 
-  isLoading={isExtraDataLoading}
-  teamName={squad.team_name}
-  managerName={user?.full_name}
-  stats={hubStats}
-  leagueStandings={leaderboard.slice(0, 5)}
-  overallRank={userRank}
-  currentUserEmail={user?.email}
-/>
+            isLoading={isExtraDataLoading}
+            teamName={squad.team_name}
+            managerName={user?.full_name}
+            stats={hubStats}
+            leagueStandings={leaderboard.slice(0, 5)}
+            overallRank={userRank}
+            currentUserEmail={user?.email}
+          />
       </div>
 
       <AnimatePresence>
