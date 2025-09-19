@@ -60,10 +60,26 @@ async def get_gameweek_stats(
         gameweek_id=gameweek_id
     )
 
-@router.get("/team-of-the-week", response_model=Optional[schemas.TeamOfTheWeekOut]) # You will need to create this schema
-async def get_team_of_the_week_route(db: Prisma = Depends(get_db)):
+@router.get("/team-of-the-week", response_model=Optional[schemas.TeamOfTheWeekOut])
+async def get_latest_team_of_the_week(db: Prisma = Depends(get_db)):
+    """
+    Gets the Team of the Week for the last completed gameweek.
+    """
     team_data = await crud.get_team_of_the_week(db)
-    
-    # If the crud function returns None, team_data will be None.
-    # FastAPI handles this automatically because of the Optional response_model.
+    if not team_data:
+        raise HTTPException(status_code=404, detail="Team of the Week not available.")
+    return team_data
+
+# ✅ ADD THIS: Route for TeamView (gets a specific TOTW by number)
+@router.get("/team-of-the-week/{gameweek_number}", response_model=Optional[schemas.TeamOfTheWeekOut])
+async def get_team_of_the_week_for_gameweek(gameweek_number: int, db: Prisma = Depends(get_db)):
+    """
+    Gets the Team of the Week for a specific gameweek number.
+    """
+    team_data = await crud.get_team_of_the_week(db, gameweek_number=gameweek_number)
+    if not team_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Team of the Week for gameweek {gameweek_number} not found or not yet calculated."
+        )
     return team_data

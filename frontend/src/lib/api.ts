@@ -21,7 +21,7 @@ export const API = {
     playerStats: `${API_BASE_URL}/players/stats`,
     userTeam: (userId: string, gw: number) =>
       `${API_BASE_URL}/teams/user/${userId}/by-gameweek-number/${gw}`,
-    teamOfTheWeekByGameweek: (gw: number) => `${API.BASE_URL}/gameweeks/team-of-the-week/${gw}`,
+teamOfTheWeekByGameweek: (gw: number) => `${API.BASE_URL}/gameweeks/team-of-the-week/${gw}`,
     chips: {
       status: (gw?: number) =>
         gw
