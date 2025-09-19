@@ -64,8 +64,6 @@ export const transformApiPlayer = (rawPlayer: any): any => {
   if (!rawPlayer) return null;
 
   const position = String(rawPlayer.pos ?? rawPlayer.position ?? '').toUpperCase();
-  
-  // This handles both structures: player.team.name OR player.club
   const clubName = rawPlayer.team?.name || rawPlayer.club || 'Unknown';
 
   return {
@@ -78,9 +76,14 @@ export const transformApiPlayer = (rawPlayer: any): any => {
     teamName: clubName,
     price: rawPlayer.price,
     points: rawPlayer.points,
+    tsb: rawPlayer.tsb, // Team Selected By %
     fixture: rawPlayer.fixture_str,
     isCaptain: rawPlayer.is_captain ?? rawPlayer.isCaptain ?? false,
     isVice: rawPlayer.is_vice_captain ?? rawPlayer.isVice ?? false,
     isBenched: rawPlayer.is_benched ?? rawPlayer.isBenched ?? false,
+    // Add the detailed stats from the API response
+    recent_fixtures: rawPlayer.recent_fixtures ?? [],
+    raw_stats: rawPlayer.raw_stats ?? {},
+    breakdown: rawPlayer.breakdown ?? [],
   };
 };
