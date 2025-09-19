@@ -22,8 +22,9 @@ interface LeaderboardEntry {
 
 interface GameweekInfo {
   gw_number: number;
-  deadline_time: string;      // ← backend field name
+  deadline_time: string;
 }
+
 
 // --- MOBILE CARD COMPONENT ---
 const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean }> = ({ entry, isCurrentUser }) => (
@@ -65,56 +66,79 @@ const Leaderboard: React.FC = () => {
 const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null);
 
   useEffect(() => {
-  const fetchAll = async () => {
-    const token = localStorage.getItem("access_token");
-    if (!token) { setError("You are not authenticated."); setIsLoading(false); return; }
+  const token = localStorage.getItem("access_token");
+  if (!token) { setError("You are not authenticated."); setIsLoading(false); return; }
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const fetchCurrentGw = async (): Promise<GameweekInfo> => {
+    const paths = [
+      "/gameweeks/gameweek/current",
+      "/gameweek/current",
+      "/gameweeks/current",
+    ];
+    for (const p of paths) {
+      try {
+        const res = await fetch(`${API.BASE_URL}${p}`, { headers });
+        if (!res.ok) {
+          // surface server detail for debugging
+          console.warn(`GW fetch ${p} -> ${res.status}`, await res.text().catch(() => ""));
+          continue;
+        }
+        const gw = await res.json();
+        return {
+          gw_number: Number(gw.gw_number ?? gw.number ?? gw.gw ?? 0),
+          deadline_time: String(gw.deadline_time ?? gw.deadline ?? gw.deadlineTime ?? ""),
+        };
+      } catch (e) {
+        console.warn(`GW fetch ${p} network error`, e);
+      }
+    }
+    throw new Error("Current gameweek endpoint not found");
+  };
+
+  (async () => {
     try {
       setIsLoading(true);
-      const [lbRes, gwRes] = await Promise.all([
-        fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: { Authorization: `Bearer ${token}` } }),
+      setError(null);
+
+      const [lbRes, gwInfo] = await Promise.all([
+        fetch(API.endpoints.leaderboard, { headers }),
+        fetchCurrentGw(),
       ]);
-      if (!lbRes.ok) throw new Error("Failed to fetch leaderboard data.");
-      if (!gwRes.ok) throw new Error("Failed to fetch gameweek info.");
+      if (!lbRes.ok) throw new Error("Failed to fetch leaderboard.");
 
       const rawLb: any[] = await lbRes.json();
-      const gw: any = await gwRes.json();
-
       const lbData: LeaderboardEntry[] = (rawLb ?? []).map((r: any) => ({
         rank: Number(r.rank ?? 0),
         team_name: String(r.team_name ?? ""),
         manager_email: String(r.manager_email ?? ""),
         total_points: Number(r.total_points ?? 0),
-        gwPoints: Math.floor(Math.random() * 40) + 30,  // keep your placeholder
-        user_id: String(r.user_id ?? r.userId ?? r.id ?? r.user?.id ?? ""), // tolerate shapes
+        gwPoints: Math.floor(Math.random() * 40) + 30,
+        user_id: String(r.user_id ?? r.userId ?? r.id ?? r.user?.id ?? ""),
       }));
 
       setLeaderboardData(lbData);
-      setCurrentGameweek({
-        gw_number: Number(gw.gw_number ?? gw.number ?? 0),
-        deadline_time: String(gw.deadline_time ?? gw.deadline ?? ""),
-      });
+      setCurrentGameweek(gwInfo);
       setCurrentPage(1);
     } catch (e: any) {
-      setError(e?.message || "An unknown error occurred.");
+      setError(e.message || "Failed to fetch gameweek info.");
     } finally {
       setIsLoading(false);
     }
-  };
-  fetchAll();
+  })();
 }, []);
 
 const handleRowClick = (entry: LeaderboardEntry) => {
   if (!currentGameweek) return;
-  const deadline = new Date(currentGameweek.deadline_time);
-  const now = new Date();
-  const targetGwNumber =
-    now < deadline ? Math.max(1, currentGameweek.gw_number - 1) : currentGameweek.gw_number;
 
-  const userKey = entry.user_id || entry.manager_email;   // ← fallback to email
+  const targetGwNumber = Number(currentGameweek.gw_number) || 1; // ← use current GW
+  const userKey = entry.user_id || entry.manager_email;
   if (!userKey) return;
-  navigate(`/team-view/${encodeURIComponent(userKey)}/${targetGwNumber}`); // ← encode
+
+  navigate(`/team-view/${encodeURIComponent(userKey)}/${targetGwNumber}`);
 };
+
 
   const filteredData = useMemo(() =>
     leaderboardData.filter(

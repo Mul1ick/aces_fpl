@@ -292,6 +292,7 @@ class LeaderboardEntry(BaseModel):
     team_name: str
     manager_email: EmailStr  # Add this field
     total_points: int
+    user_id: str
 
 
 class TransferItem(BaseModel):
