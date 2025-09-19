@@ -145,6 +145,38 @@ async def get_user_team_by_gameweek_number(
     data = await crud.get_user_team_full(db, str(user.id), gw.id)
     if not data:
         raise HTTPException(status_code=404, detail="No fantasy team found for this user/gameweek")
+    
+    try:
+        lb = await crud.get_leaderboard(db)
+        me = next((r for r in lb if r.get("user_id") == str(user.id)), None)
+        overall_points = int(me["total_points"]) if me else 0
+        overall_rank = int(me["rank"]) if me and me.get("rank") is not None else None
+    except Exception:
+        overall_points, overall_rank = 0, None
+
+    # gameweek points for this GW (minus hits)
+    try:
+        ugws = await db.usergameweekscore.find_first(
+            where={"user_id": str(user.id), "gameweek_id": gw.id}
+        )
+        gw_points = int((ugws.total_points or 0) - (ugws.transfer_hits or 0)) if ugws else 0
+    except Exception:
+        gw_points = 0
+
+    # lightweight manager display
+    manager_name = (user.email or "").split("@")[0]
+
+    # attach without altering existing fields
+    data = {
+        **data,
+        "manager_name": data.get("manager_name") or manager_name,
+        "stats": data.get("stats") or {
+            "overall_points": overall_points,
+            "total_players": len(data.get("starting") or []) + len(data.get("bench") or []),
+            "gameweek_points": gw_points,
+        },
+        "overallRank": data.get("overallRank") or overall_rank,
+    }
 
     # optional: normalize shape here if needed
     return data
