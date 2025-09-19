@@ -33,6 +33,64 @@ async def get_current_gameweek(db: Prisma = Depends(get_db)):
     # CORRECTED: Fixed the typo here
     if not gameweek:
         raise HTTPException(status_code=404, detail="No gameweek found.")
+    
+    # --- NEW: Calculate Aggregate Stats ---
+    
+    # Most Captained Player
+    cap_agg = await db.userteam.group_by(
+        by=['player_id'],
+        where={'gameweek_id': gameweek.id, 'is_captain': True},
+        count={'_all': True},
+        order={'_count': {'player_id': 'desc'}},
+        take=1
+    )
+    most_captained = "N/A"
+    if cap_agg:
+        player = await db.player.find_unique(where={'id': cap_agg[0]['player_id']})
+        if player:
+            most_captained = player.full_name
+
+    # Most Vice-Captained Player
+    vc_agg = await db.userteam.group_by(
+        by=['player_id'],
+        where={'gameweek_id': gameweek.id, 'is_vice_captain': True},
+        count={'_all': True},
+        order={'_count': {'player_id': 'desc'}},
+        take=1
+    )
+    most_vice_captained = "N/A"
+    if vc_agg:
+        player = await db.player.find_unique(where={'id': vc_agg[0]['player_id']})
+        if player:
+            most_vice_captained = player.full_name
+
+    # Most Selected Player
+    selected_agg = await db.userteam.group_by(
+        by=['player_id'],
+        where={'gameweek_id': gameweek.id},
+        count={'_all': True},
+        order={'_count': {'player_id': 'desc'}},
+        take=1
+    )
+    most_selected = "N/A"
+    if selected_agg:
+        player = await db.player.find_unique(where={'id': selected_agg[0]['player_id']})
+        if player:
+            most_selected = player.full_name
+
+    # Chips Played Count
+    chips_played = await db.userchip.count(where={'gameweek_id': gameweek.id})
+    
+    # Combine the data into one response object
+    response_data = gameweek.model_dump()
+    response_data.update({
+        "most_captained": most_captained,
+        "most_vice_captained": most_vice_captained,
+        "most_selected": most_selected,
+        "chips_played": chips_played
+    })
+    
+    return response_data
         
     return gameweek
 

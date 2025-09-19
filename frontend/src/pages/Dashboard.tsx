@@ -20,6 +20,15 @@ type TransferStatItem = {
   team?: { short_name?: string; name?: string };
 };
 
+type GameweekStats = {
+  gw_number: number;
+  most_captained?: string;
+  most_vice_captained?: string;
+  most_selected?: string;
+  chips_played?: number;
+};
+
+
 type TransferStatsResponse =
   | {
       gameweek_id?: number;
@@ -39,7 +48,7 @@ const Dashboard: React.FC = () => {
   const [squad, setSquad] = useState<TeamResponse | null>(null);
   // const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
   // const [gameweek, setGameweek] = useState<{ gw_number: number } | null>(null);
-  const [gameweek, setGameweek] = useState<{ gw_number: number } | null>(null);
+const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
   const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
 
   const [gameweekStats, setGameweekStats] = useState({
@@ -301,7 +310,7 @@ const Dashboard: React.FC = () => {
                          <CardTitle className="text-2xl">Gameweek Status</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-8">
-                        <GameweekStatusCard />
+                        <GameweekStatusCard stats={gameweek} />
                         <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
                         {teamOfTheWeek && (
               <TeamOfTheWeekCard 
