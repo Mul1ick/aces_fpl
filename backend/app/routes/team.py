@@ -6,6 +6,7 @@ from prisma import Prisma
 from prisma import models as PrismaModels # Import Prisma's generated models
 from app.schemas import SetArmbandRequest,SaveTeamPayload
 import uuid
+from typing import Optional
 router = APIRouter()
 
 @router.post("/submit-team")
@@ -180,3 +181,17 @@ async def get_user_team_by_gameweek_number(
 
     # optional: normalize shape here if needed
     return data
+
+@router.get("/team-of-the-week", response_model=Optional[schemas.TeamOfTheWeekOut])
+async def get_team_of_the_week_route(
+    db: Prisma = Depends(get_db),
+    gameweek_number: Optional[int] = None # Add this query parameter
+):
+    """
+    Gets the Team of the Week.
+    If gameweek_number is provided, it gets the TOTW for that specific gameweek.
+    Otherwise, it defaults to the last completed one.
+    """
+    team_data = await crud.get_team_of_the_week(db, gameweek_number) # Pass the number to the crud function
+    
+    return team_data

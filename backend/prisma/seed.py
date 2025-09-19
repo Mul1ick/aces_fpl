@@ -16,7 +16,7 @@ from app.auth import hash_password
 # Start the season "now" so you can test immediately. First GW is ~1 minute from now.
 def get_season_start_now():
     now = datetime.now(ZoneInfo("Asia/Kolkata")).replace(second=0, microsecond=0)
-    return now + timedelta(minutes=1)
+    return now + timedelta(minutes=15)
 
 
 SEASON_START_DATE = get_season_start_now()
@@ -221,7 +221,7 @@ async def main() -> None:
     gameweek_data = [
         {
             "gw_number": i,
-            "deadline": SEASON_START_DATE + timedelta(minutes=1120 * (i - 1)),
+            "deadline": SEASON_START_DATE + timedelta(minutes=45 * (i - 1)),
         }
         for i in range(1, 11)
     ]

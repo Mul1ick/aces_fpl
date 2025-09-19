@@ -56,10 +56,19 @@ useEffect(() => {
       const token = localStorage.getItem('access_token');
       if (!token) throw new Error('Not authenticated');
 
-      const res = await fetch(API.endpoints.userTeam(userId, Number(gw)), {
+      const isTeamOfTheWeek = userId === 'top';
+      const endpoint = isTeamOfTheWeek
+        ? API.endpoints.teamOfTheWeekByGameweek(Number(gw))
+        : API.endpoints.userTeam(userId, Number(gw));
+      
+      console.log(`Fetching from: ${endpoint}`); // Helpful for debugging
+
+      const res = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       });
+
+
       const rawText = await res.text();
       let data: any = {};
       try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* keep {} */ }
@@ -111,7 +120,7 @@ useEffect(() => {
         [];
 
       setTeamData({
-        team_name: data.team_name ?? data.teamName ?? '',
+        team_name: data.team_name ?? data.teamName ?? 'Team of the Week',
         manager_name: data.manager_name ?? data.managerName ?? '',
         stats: data.stats ?? undefined,
         overallRank: data.overallRank ?? undefined,

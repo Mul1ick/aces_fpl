@@ -1,7 +1,9 @@
+// frontend/src/components/dashboard/TeamOfTheWeekCard.tsx
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronRight } from 'lucide-react';
-import { Link } from 'react-router-dom'; // <-- 1. IMPORT LINK
+import { Link } from 'react-router-dom';
 
 // --- ASSET IMPORTS ---
 import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
@@ -26,15 +28,16 @@ interface TeamOfTheWeek {
 
 interface TeamOfTheWeekCardProps {
   team: TeamOfTheWeek;
+  currentGameweekNumber: number; // Add this prop
 }
 
 
-export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team }) => {
+export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, currentGameweekNumber }) => {
   return (
     <Card className="h-full border-black border-2">
       <CardHeader>
-        {/* --- 2. WRAP THE HEADER CONTENT IN A LINK --- */}
-        <Link to="/team-view/top/1" className="flex items-center justify-between group">
+        {/* --- MODIFIED: Use the prop to create a dynamic link --- */}
+        <Link to={`/team-view/top/${currentGameweekNumber}`} className="flex items-center justify-between group">
             <CardTitle className="text-xl group-hover:underline">Team of the Week</CardTitle>
             <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
         </Link>

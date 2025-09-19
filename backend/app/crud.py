@@ -1151,22 +1151,28 @@ async def get_manager_hub_stats(db: Prisma, user_id: str, gameweek_id: int):
 # In backend/app/crud.py
 from datetime import datetime, timezone
 
-async def get_team_of_the_week(db: Prisma):
-    """
-    Finds the highest-scoring team from the most recently completed gameweek.
-    """
-    now_utc = datetime.now(timezone.utc)
+# backend/app/crud.py
 
-    # 1. Find the most recently completed gameweek
-    last_completed_gw = await db.gameweek.find_first(
-        where={'deadline': {'lt': now_utc}},
-        order={'deadline': 'desc'}
-    )
-    if not last_completed_gw:
+async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None):
+    """
+    Finds the highest-scoring team for a specific gameweek, or the last completed one if not specified.
+    """
+    target_gw = None
+    if gameweek_number:
+        target_gw = await db.gameweek.find_unique(where={'gw_number': gameweek_number})
+    else:
+        now_utc = datetime.now(timezone.utc)
+        target_gw = await db.gameweek.find_first(
+            where={'deadline': {'lt': now_utc}},
+            order={'deadline': 'desc'}
+        )
+
+    if not target_gw:
         return None
-    # 2. Find the highest score in that gameweek
+
+    # Find the highest score in that gameweek
     top_score = await db.usergameweekscore.find_first(
-        where={'gameweek_id': last_completed_gw.id},
+        where={'gameweek_id': target_gw.id},
         order={'total_points': 'desc'}
     )
     if not top_score:
@@ -1174,7 +1180,7 @@ async def get_team_of_the_week(db: Prisma):
 
     top_user_id = top_score.user_id
 
-    # 3. Fetch the manager's details (User and FantasyTeam)
+    # Fetch the manager's details
     manager = await db.user.find_unique(
         where={'id': top_user_id},
         include={'fantasy_team': True}
@@ -1182,34 +1188,43 @@ async def get_team_of_the_week(db: Prisma):
     manager_name = manager.full_name if manager and manager.full_name else "Top Manager"
     team_name = manager.fantasy_team.name if manager and manager.fantasy_team else "Team of the Week"
 
-    # 4. Fetch the full team of the top-scoring user
-    # This logic is now self-contained and doesn't depend on the flawed get_user_team_full
+    # Fetch the full team roster
     user_team_entries = await db.userteam.find_many(
-        where={'user_id': top_user_id, 'gameweek_id': last_completed_gw.id},
+        where={'user_id': top_user_id, 'gameweek_id': target_gw.id},
         include={'player': {'include': {'team': True}}}
     )
+    
+    player_ids = [entry.player.id for entry in user_team_entries]
+    player_stats = await db.gameweekplayerstats.find_many(
+        where={
+            'gameweek_id': target_gw.id,
+            'player_id': {'in': player_ids}
+        }
+    )
+    points_map = {stat.player_id: stat.points for stat in player_stats}
 
     def to_display(entry):
+        player_points = points_map.get(entry.player.id, 0)
+        if entry.is_captain:
+            player_points *= 2
+            
         return {
             "id": entry.player.id, "full_name": entry.player.full_name,
             "position": entry.player.position, "price": entry.player.price,
             "is_captain": entry.is_captain, "is_vice_captain": entry.is_vice_captain,
             "is_benched": entry.is_benched, "team": entry.player.team,
-            "points": 0, "fixture_str": "" # Points/fixture not needed for this card display
+            "points": player_points
         }
 
     all_players = [to_display(p) for p in user_team_entries]
-    starting = [p for p in all_players if not p["is_benched"]]
-    bench = [p for p in all_players if p["is_benched"]]
-
+    
     return {
         "manager_name": manager_name,
         "team_name": team_name,
         "points": top_score.total_points,
-        "starting": starting,
-        "bench": bench
+        "starting": [p for p in all_players if not p["is_benched"]],
+        "bench": [p for p in all_players if p["is_benched"]]
     }
-
 
 # In backend/app/crud.py
 

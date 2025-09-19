@@ -37,8 +37,11 @@ type TransferStatsResponse =
 const Dashboard: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [squad, setSquad] = useState<TeamResponse | null>(null);
-  const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
+  // const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
+  // const [gameweek, setGameweek] = useState<{ gw_number: number } | null>(null);
   const [gameweek, setGameweek] = useState<{ gw_number: number } | null>(null);
+  const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
+
   const [gameweekStats, setGameweekStats] = useState({
     user_points: 0,
     average_points: 0,
@@ -300,7 +303,12 @@ const Dashboard: React.FC = () => {
                     <CardContent className="space-y-8">
                         <GameweekStatusCard />
                         <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
-                        {teamOfTheWeek && <TeamOfTheWeekCard team={teamOfTheWeek} />}
+                        {teamOfTheWeek && (
+              <TeamOfTheWeekCard 
+                team={teamOfTheWeek} 
+                currentGameweekNumber={gameweek?.gw_number || 1} 
+              />
+            )}
                     </CardContent>
                 </Card>
               </motion.div>
