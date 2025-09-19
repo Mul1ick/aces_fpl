@@ -16,7 +16,8 @@ import Leaderboard from "./pages/Leaderboard";
 import NotFound from "./pages/NotFound";
 import Fixtures from "./pages/Fixtures";
 import Stats from "./pages/Stats";
-import Help from "./pages/Help"; // 1. Import the new Help page
+import Help from "./pages/Help";
+import TeamView from "./pages/TeamView"; // <-- 1. IMPORT THE NEW PAGE
 
 const queryClient = new QueryClient();
 
@@ -43,14 +44,15 @@ const App = () => (
                 <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
                 <Route path="/fixtures" element={<ProtectedRoute><Fixtures /></ProtectedRoute>} />
                 <Route path="/stats" element={<ProtectedRoute><Stats /></ProtectedRoute>} />
-                
-                {/* 2. Add the new route for the Help page */}
                 <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
 
+                {/* --- 2. ADD THE NEW ROUTES BELOW --- */}
+                <Route path="/team-view/top/:gw" element={<ProtectedRoute><TeamView /></ProtectedRoute>} />
+                <Route path="/team-view/:userId/:gw" element={<ProtectedRoute><TeamView /></ProtectedRoute>} />
               </Route>
 
               {/* --- Catch-all Not Found Route --- */}
-              <Route path="*" element={<NotFound />} />
+               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>
         </BrowserRouter>

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { PlusCircle, X } from 'lucide-react';
-import pitchBackground from '@/assets/images/pitch.svg';
+import pitchBackground from '@/assets/images/pitch.png';
 import PlayerCard from '@/components/layout/PlayerCard';
 import PlayerDetailModal from './PlayerDetailModal';
 
@@ -46,7 +46,6 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                 }}
             >
                 {Object.keys(squad).map((pos) => (
-                // --- MODIFIED LINE BELOW ---
                 <div key={pos} className="flex justify-center items-center gap-x-8 sm:gap-x-12 my-2">
                     {squad[pos].map((player: any, index: number) =>
                      player ? (
@@ -55,35 +54,38 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                             className="relative group bg-black/40 rounded-lg hover:bg-black/50 transition-colors"
                             onClick={() => handlePlayerClick(player)}
                         >
-                            <div className="pointer-events-none">
+                        <div className="pointer-events-none">
                                   <PlayerCard 
                                      player={{
-                                        ...player,
+                                         ...player,
+                                         name: player.name,
+                                         pos: player.pos,
                                          team: player.club 
                                     }} 
+                                     isBench={pos === 'SUB'}
                                      displayMode="fixture" 
                                      showArmbands={false} 
                                  />
-                            </div>
+                             </div>
                             <button
                                onClick={(e) => {
-                                   e.stopPropagation();
+                                    e.stopPropagation();
                                     onPlayerRemove(pos, index);
                                 }}
                                  className="absolute top-1 right-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all hidden lg:flex items-center justify-center w-5 h-5"
                             >
-                          <X className="w-3 h-3" />
+                                <X className="w-3 h-3" />
                             </button>
                         </div>
                     ) : (
-                        <PlayerSlot key={`${pos}-${index}`} position={pos} onClick={() => onSlotClick(pos, index)} />
+                         <PlayerSlot key={`${pos}-${index}`} position={pos} onClick={() => onSlotClick(pos, index)} />
                     )
                     )}
                 </div>
                 ))}
             </main>
             <PlayerDetailModal
-                player={detailedPlayer}
+                 player={detailedPlayer}
                 onClose={() => setDetailedPlayer(null)}
                 onRemove={() => {
                    if (detailedPlayer) {
@@ -95,7 +97,7 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                     }
                 }}
                 onTransfer={(p) => {
-                   if (!p) return;
+                    if (!p) return;
                     const posKey = String(p.pos ?? p.position ?? '').toUpperCase();
                     const idx = squad[posKey]?.findIndex((x:any) => x && x.id === p.id) ?? -1;
                     if (idx >= 0) {

@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Search, Trophy, ChevronLeft, ChevronRight, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Search, Trophy, ChevronLeft, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/fpl-button";
 import { Card, CardContent } from "@/components/ui/fpl-card";
@@ -14,18 +15,23 @@ interface LeaderboardEntry {
   team_name: string;
   manager_email: string;
   total_points: number;
-  gwPoints?: number; // Gameweek points can be added later if the API provides it
+  userId: string; // IMPORTANT: Assumes the backend will provide this
 }
 
+interface GameweekInfo {
+  gw_number: number;
+  deadline: string;
+}
 
 // --- MOBILE CARD COMPONENT ---
-const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean }> = ({ entry, isCurrentUser }) => (
+const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean; onClick: () => void }> = ({ entry, isCurrentUser, onClick }) => (
   <motion.div
     variants={{
       hidden: { opacity: 0, y: 20 },
       visible: { opacity: 1, y: 0 },
     }}
-    className={`p-4 border-b border-pl-border last:border-b-0 ${isCurrentUser ? "bg-pl-green/10" : ""}`}
+    className={`p-4 border-b border-pl-border last:border-b-0 cursor-pointer transition-colors ${isCurrentUser ? "bg-pl-green/10 hover:bg-pl-green/20" : "hover:bg-pl-white/5"}`}
+    onClick={onClick}
   >
     <div className="flex justify-between items-start">
       <div className="flex items-center space-x-4">
@@ -39,17 +45,16 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
       </div>
       <div className="text-right">
         <p className="text-xl font-bold text-pl-white">{entry.total_points}</p>
-        {entry.gwPoints && <p className="text-caption text-pl-white/60">{entry.gwPoints} (GW)</p>}
       </div>
     </div>
   </motion.div>
 );
 
-
-
 const Leaderboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,30 +62,57 @@ const Leaderboard: React.FC = () => {
   const itemsPerPage = 20;
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        setError("You are not authenticated.");
-        setIsLoading(false);
-        return;
-      }
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      setError("You are not authenticated.");
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(API.endpoints.leaderboard, { // Using the API helper
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) throw new Error("Failed to fetch leaderboard data.");
-        const data: LeaderboardEntry[] = await response.json();
-        // You can add logic here to fetch and add GW points if needed
-        setLeaderboardData(data);
+        const [leaderboardRes, gameweekRes] = await Promise.all([
+          fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+
+        if (!leaderboardRes.ok) throw new Error("Failed to fetch leaderboard.");
+        if (!gameweekRes.ok) throw new Error("Failed to fetch gameweek info.");
+
+        const lbData: LeaderboardEntry[] = await leaderboardRes.json();
+        const gwData: GameweekInfo = await gameweekRes.json();
+
+        setLeaderboardData(lbData);
+        setCurrentGameweek(gwData);
+
       } catch (e) {
         setError(e instanceof Error ? e.message : "An unknown error occurred.");
       } finally {
         setIsLoading(false);
       }
     };
-    fetchLeaderboard();
+    fetchData();
   }, []);
+
+  const handleRowClick = useCallback((entry: LeaderboardEntry) => {
+    if (!currentGameweek) return;
+
+    let targetGwNumber = currentGameweek.gw_number;
+    const deadline = new Date(currentGameweek.deadline);
+    const now = new Date();
+
+    // If deadline is in the future, show the previous gameweek
+    if (now < deadline) {
+      targetGwNumber = Math.max(1, currentGameweek.gw_number - 1);
+    }
+    
+    // The backend needs to provide entry.userId for this to work
+    const userId = entry.userId || entry.manager_email; // Fallback to email if ID isn't there yet
+    navigate(`/team-view/${userId}/${targetGwNumber}`);
+
+  }, [currentGameweek, navigate]);
+
 
   const filteredData = useMemo(() =>
     leaderboardData.filter(
@@ -89,26 +121,22 @@ const Leaderboard: React.FC = () => {
         entry.team_name.toLowerCase().includes(searchQuery.toLowerCase())
     ), [leaderboardData, searchQuery]);
 
-
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const paginatedData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
   };
-
 
    return (
     <div className="min-h-screen bg-pl-purple">
       <div className="container mx-auto px-4 sm:px-6 py-8 max-w-[1100px]">
         <motion.div initial="hidden" animate="visible" variants={containerVariants}>
           
-          {/* Header Section */}
           <motion.div variants={containerVariants} className="mb-6 text-center">
             <img src={acesLogo} alt="Aces FPL Logo" className="w-16 h-16 mx-auto mb-2" />
             <h1 className="text-4xl md:text-5xl font-extrabold text-pl-white">
@@ -143,31 +171,32 @@ const Leaderboard: React.FC = () => {
             </Card>
           </motion.div>
 
+          
           <motion.div variants={containerVariants}>
             <Card variant="glass">
               <CardContent className="p-0">
                 {isLoading ? (
                   <div className="h-96 flex items-center justify-center text-pl-white">Loading standings...</div>
                 ) : error ? (
-                  <div className="h-96 flex items-center justify-center text-pl-pink">{error}</div>
+                   <div className="h-96 flex items-center justify-center text-pl-pink">{error}</div>
                 ) : (
                   <>
-                    {/* --- DESKTOP TABLE --- */}
                     <div className="overflow-x-auto hidden md:block">
-                      <table className="w-full text-left">
+                       <table className="w-full text-left">
                         <thead className="border-b border-pl-border">
                           <tr>
                             <th className="p-4 text-caption font-semibold text-pl-white/60 w-16 text-center">Rank</th>
                             <th className="p-4 text-caption font-semibold text-pl-white/60">Team & Manager</th>
                             <th className="p-4 text-caption font-semibold text-pl-white/60 text-center">Total</th>
                           </tr>
-                        </thead>
+                         </thead>
                         <motion.tbody initial="hidden" animate="visible" variants={containerVariants}>
                           {paginatedData.map((entry) => (
                             <motion.tr
                               key={entry.rank}
                               variants={containerVariants}
-                              className={`border-b border-pl-border last:border-b-0 transition-colors ${entry.manager_email === user?.email ? "bg-pl-green/10 hover:bg-pl-green/20" : "hover:bg-pl-white/5"}`}
+                              className={`border-b border-pl-border last:border-b-0 transition-colors cursor-pointer ${entry.manager_email === user?.email ? "bg-pl-green/10 hover:bg-pl-green/20" : "hover:bg-pl-white/5"}`}
+                              onClick={() => handleRowClick(entry)}
                             >
                               <td className="p-4 text-center">
                                 <span className={`font-semibold tabular-nums ${entry.manager_email === user?.email ? "text-pl-green" : "text-pl-white"}`}>
@@ -175,21 +204,20 @@ const Leaderboard: React.FC = () => {
                                 </span>
                               </td>
                               <td className="p-4">
-                                <p className="font-semibold text-pl-white">{entry.team_name}</p>
+                                 <p className="font-semibold text-pl-white">{entry.team_name}</p>
                                 <p className="text-caption text-pl-white/60">{entry.manager_email}</p>
                               </td>
                               <td className="p-4 text-center text-body font-bold text-pl-white tabular-nums">{entry.total_points}</td>
                             </motion.tr>
                           ))}
                         </motion.tbody>
-                      </table>
+                       </table>
                     </div>
                     
-                    {/* --- MOBILE CARD LIST --- */}
                     <div className="md:hidden">
-                        <motion.div initial="hidden" animate="visible" variants={containerVariants}>
+                         <motion.div initial="hidden" animate="visible" variants={containerVariants}>
                            {paginatedData.map(entry => (
-                               <LeaderboardCard key={entry.rank} entry={entry} isCurrentUser={entry.manager_email === user?.email} />
+                               <LeaderboardCard key={entry.rank} entry={entry} isCurrentUser={entry.manager_email === user?.email} onClick={() => handleRowClick(entry)} />
                            ))}
                         </motion.div>
                     </div>
@@ -199,7 +227,6 @@ const Leaderboard: React.FC = () => {
             </Card>
           </motion.div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <motion.div variants={containerVariants} className="mt-6 flex items-center justify-center">
               <div className="flex items-center space-x-2 glass rounded-full p-1">
@@ -209,7 +236,7 @@ const Leaderboard: React.FC = () => {
                 <span className="text-caption text-pl-white/80 tabular-nums">
                   Page {currentPage} of {totalPages}
                 </span>
-                <Button variant="icon" size="icon" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="disabled:opacity-50">
+                 <Button variant="icon" size="icon" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="disabled:opacity-50">
                   <ChevronRight className="size-4" />
                 </Button>
               </div>
@@ -217,7 +244,7 @@ const Leaderboard: React.FC = () => {
           )}
         </motion.div>
       </div>
-    </div>
+     </div>
   );
 };
 

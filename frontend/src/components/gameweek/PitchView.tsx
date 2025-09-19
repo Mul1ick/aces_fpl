@@ -1,6 +1,6 @@
 import React from 'react';
 import PlayerCard from '@/components/layout/PlayerCard'; 
-import pitchBackground from '@/assets/images/pitch.svg';
+import pitchBackground from '@/assets/images/pitch.png';
 
 interface PitchViewProps {
   playersByPos: any;
@@ -20,8 +20,6 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
            backgroundPosition: 'center top'
         }}
       >
-        {/* --- MODIFIED: The order of these blocks has been reversed to put GK at the top --- */}
-
         {/* Goalkeeper (Top of Pitch) */}
         <div className="flex justify-center items-center">
           {playersByPos.GK.map(p => <div key={p.id} onClick={() => onPlayerClick(p)} className="cursor-pointer">
@@ -42,13 +40,13 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
           <PlayerCard player={{
                 id: p.id,
                 name: p.full_name,
-                pos: p.position,
-                 team: p.team.name,
+                 pos: p.position,
+                team: p.team.name,
                 points: p.points,
                 isCaptain: p.is_captain,
                 isVice: p.is_vice_captain
               }} />
-           </div>)}
+            </div>)}
         </div>
 
         {/* Midfielders */}
@@ -57,7 +55,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
            <PlayerCard player={{
                 id: p.id,
                 name: p.full_name,
-                pos: p.position,
+                 pos: p.position,
                 team: p.team.name,
                  points: p.points,
                 isCaptain: p.is_captain,
@@ -86,15 +84,18 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
         <div className="grid grid-cols-3 gap-4 place-items-center">
           {bench.map(p => (
             <div key={p.id} onClick={() => onPlayerClick(p)} className="cursor-pointer">
-            <PlayerCard player={{
-                id: p.id,
-                name: p.full_name,
-                pos: p.position,
-                team: p.team.name,
-                points: p.points,
-                isCaptain: p.is_captain,
-                isVice: p.is_vice_captain
-              }} />
+            <PlayerCard 
+                isBench={true}
+                player={{
+                  id: p.id,
+                  name: p.full_name,
+                  pos: p.position,
+                  team: p.team.name,
+                  points: p.points,
+                  isCaptain: p.is_captain,
+                  isVice: p.is_vice_captain
+                }} 
+            />
             </div>
            ))}
         </div>

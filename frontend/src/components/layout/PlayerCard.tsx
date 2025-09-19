@@ -35,15 +35,14 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displa
   return (
     <motion.div
       className="flex flex-col items-center text-center relative"
-      style={{ width: isBench ? '70px' : '85px' }}
+      style={{ width: isBench ? '65px' : '78px' }}
       whileHover={{ scale: 1.1, zIndex: 10 }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
     >
-      <div className="w-full overflow-hidden shadow-lg border border-white/10 flex flex-col" style={{ height: isBench ? '90px' : '115px' }}>
+      <div className="w-full overflow-hidden shadow-lg border border-white/10 flex flex-col" style={{ height: isBench ? '85px' : '100px' }}>
         {/* Jersey Section */}
-        {/* --- MODIFIED LINE BELOW --- */}
         <div className="relative h-[65%] p-0">
           <img
             src={jerseySrc}

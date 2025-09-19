@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext'; // Add this import
 import { Skeleton } from '@/components/ui/skeleton';
 
 // --- ASSET IMPORTS ---
-import pitchBackground from '@/assets/images/pitch.svg';
+import pitchBackground from '@/assets/images/pitch.png';
 import acesLogo from "@/assets/aces-logo.png";
 
 const TeamPageSkeleton = () => (
