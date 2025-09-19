@@ -24,6 +24,9 @@ interface ManagerHubCardProps {
     total_players: number;
     squad_value: number,
     in_the_bank: number,
+    gameweek_transfers: number; // Added
+    total_transfers: number;    // Added
+
   };
   // ✅ ADD THIS PROP
   overallRank?: number | null;
@@ -51,8 +54,8 @@ export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats, overallRa
             <div className="mt-6">
                 <h3 className="font-bold text-lg mb-2">Transfers</h3>
                 <div className="space-y-1">
-                    <StatRow label="Gameweek transfers" value="0" />
-                    <StatRow label="Total transfers" value="0" />
+                    <StatRow label="Gameweek transfers" value={stats.gameweek_transfers} />
+                    <StatRow label="Total transfers" value={stats.total_transfers} />
                     <LinkRow label="Transfer History" />
                 </div>
             </div>

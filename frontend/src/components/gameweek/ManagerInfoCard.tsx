@@ -63,6 +63,8 @@ interface ManagerInfoCardProps {
     gameweek_points: number;
     squad_value: number;
     in_the_bank: number;
+    gameweek_transfers: number; // Added
+    total_transfers: number;    // Added
   };
   leagueStandings?: LeaderboardEntry[];
   overallRank?: number;
@@ -127,8 +129,8 @@ export const ManagerInfoCard: React.FC<ManagerInfoCardProps> = ({
             <div>
                 <h3 className="font-bold text-lg mb-2">Transfers</h3>
                 <div className="space-y-1">
-                    <StatRow label="Gameweek transfers" value="0" />
-                    <StatRow label="Total transfers" value="0" />
+                    <StatRow label="Gameweek transfers" value={stats?.gameweek_transfers?.toLocaleString() ?? '...'} />
+                    <StatRow label="Total transfers" value={stats?.total_transfers?.toLocaleString() ?? '...'} />
                     
                 </div>
             </div>

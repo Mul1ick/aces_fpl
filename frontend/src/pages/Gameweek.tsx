@@ -22,7 +22,16 @@ const Gameweek: React.FC = () => {
   const [detailedPlayer, setDetailedPlayer] = useState(null);
   const [squad, setSquad] = useState<TeamResponse | null>(null);
   const [gameweekStats, setGameweekStats] = useState(null);
-  const [hubStats, setHubStats] = useState(null);
+  const [hubStats, setHubStats] = useState({
+    overall_points: 0,
+    gameweek_points: 0,
+    total_players: 0,
+    squad_value: 0.0,
+    in_the_bank: 0.0,
+    gameweek_transfers: 0,
+    total_transfers: 0,
+});
+
   const [leaderboard, setLeaderboard] = useState([]);
   const [isExtraDataLoading, setIsExtraDataLoading] = useState(true);
   

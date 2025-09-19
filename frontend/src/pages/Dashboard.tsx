@@ -62,6 +62,9 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
     total_players: 0,
     squad_value: 0.0,
     in_the_bank: 110.0,
+    gameweek_transfers: 0,
+    total_transfers: 0,
+
   });
   
   // ✅ ADD THESE STATE VARIABLES

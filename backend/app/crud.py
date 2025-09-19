@@ -1140,12 +1140,26 @@ async def get_manager_hub_stats(db: Prisma, user_id: str, gameweek_id: int):
     total_budget = 110.0
     in_the_bank = total_budget - float(squad_value)
 
+    gameweek_transfers_count = await db.transfer_log.count(
+        where={
+            "user_id": user_id,
+            "gameweek_id": gameweek_id
+        }
+    )
+    
+    total_transfers_count = await db.transfer_log.count(
+        where={"user_id": user_id}
+    )
+
+
     return {
         "overall_points": overall_points or 0,
         "gameweek_points": gameweek_points,
         "total_players": total_players,
         "squad_value" : float(squad_value),
-        "in_the_bank":in_the_bank
+        "in_the_bank":in_the_bank,
+        "gameweek_transfers": gameweek_transfers_count,
+        "total_transfers": total_transfers_count,
     }
 
 # In backend/app/crud.py

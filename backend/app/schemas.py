@@ -279,6 +279,8 @@ class ManagerHubStats(BaseModel):
     total_players: int
     squad_value: float
     in_the_bank: float
+    gameweek_transfers: int
+    total_transfers: int
 
 class TeamOfTheWeekOut(BaseModel):
     manager_name: str
