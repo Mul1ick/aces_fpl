@@ -5,8 +5,7 @@ from app.auth import get_current_user
 from prisma import Prisma
 from prisma import models as PrismaModels # Import Prisma's generated models
 from app.schemas import SetArmbandRequest,SaveTeamPayload
-
-
+import uuid
 router = APIRouter()
 
 @router.post("/submit-team")
@@ -120,3 +119,32 @@ async def get_player_card_endpoint(
     current_user: schemas.UserOut = Depends(get_current_user)
 ):
     return await crud.get_player_card(db, current_user.id, gameweek_id, player_id)
+
+@router.get("/user/{user_key}/by-gameweek-number/{gameweek_number}")
+async def get_user_team_by_gameweek_number(
+    user_key: str,
+    gameweek_number: int,
+    db: Prisma = Depends(get_db),
+    _: PrismaModels.User = Depends(get_current_user),
+):
+    # resolve user by UUID or email
+    user = None
+    try:
+        uuid.UUID(user_key)
+        user = await db.user.find_unique(where={"id": user_key})
+    except ValueError:
+        user = await db.user.find_unique(where={"email": user_key})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    gw = await db.gameweek.find_unique(where={"gw_number": gameweek_number})
+    if not gw:
+        raise HTTPException(status_code=404, detail="Gameweek not found")
+
+    # pass the resolved UUID, not the email
+    data = await crud.get_user_team_full(db, str(user.id), gw.id)
+    if not data:
+        raise HTTPException(status_code=404, detail="No fantasy team found for this user/gameweek")
+
+    # optional: normalize shape here if needed
+    return data

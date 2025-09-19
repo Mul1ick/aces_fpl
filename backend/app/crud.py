@@ -354,62 +354,37 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
 
 
 async def get_leaderboard(db: Prisma):
-    """
-    Gets all active users with a fantasy team and ranks them by their
-    total points, defaulting to 0 for users with no scores yet.
-    """
-    # 1. Get all active users who have created a fantasy team.
-    #    This is now our source of truth for who should be on the leaderboard.
-    all_users_with_teams = await db.user.find_many(
-    where={
-        'is_active': True,
-        'role': 'user',
-        'fantasy_team': {
-            'is_not': None
-        }
-    },
-    include={'fantasy_team': True}
-)
-
-    if not all_users_with_teams:
+    users = await db.user.find_many(
+        where={'is_active': True, 'role': 'user', 'fantasy_team': {'is_not': None}},
+        include={'fantasy_team': True},
+    )
+    if not users:
         return []
 
-    # 2. Get all aggregated scores and create an efficient lookup map.
     scores_data = await db.usergameweekscore.group_by(
         by=['user_id'],
-        sum={'total_points': True, 'transfer_hits': True}
+        sum={'total_points': True, 'transfer_hits': True},  # prisma-py expects `sum=...`
     )
 
-    # score_map will look like: {'user-uuid-1': 150, 'user-uuid-2': 95}
-    score_map = {
-        item['user_id']: (item['_sum']['total_points'] or 0) - (item['_sum']['transfer_hits'] or 0)
-        for item in scores_data
-    }
+    score_map: dict[str, int] = {}
+    for item in scores_data:
+        agg = item.get('_sum') or item.get('sum') or {}     # handle either result shape
+        total = int(agg.get('total_points') or 0)
+        hits  = int(agg.get('transfer_hits') or 0)
+        score_map[str(item['user_id'])] = total - hits
 
-    # 3. Combine user data with scores, defaulting to 0 if a user has no score entry.
-    unranked_list = []
-    for user in all_users_with_teams:
-        total_points = score_map.get(str(user.id), 0)
-        unranked_list.append({
-            "user_details": user,
-            "total_points": total_points
-        })
+    rows = [{
+        "rank": 0,
+        "team_name": u.fantasy_team.name,
+        "manager_email": u.email,
+        "user_id": str(u.id),
+        "total_points": int(score_map.get(str(u.id), 0)),
+    } for u in users]
 
-    # 4. Sort the combined list by points in descending order.
-    unranked_list.sort(key=lambda x: x['total_points'], reverse=True)
-
-    # 5. Build the final response with the correct rank.
-    leaderboard = []
-    for rank, item in enumerate(unranked_list, 1):
-        user_details = item['user_details']
-        leaderboard.append({
-            "rank": rank,
-            "team_name": user_details.fantasy_team.name,
-            "manager_email": user_details.email,
-            "total_points": item['total_points']
-        })
-
-    return leaderboard
+    rows.sort(key=lambda r: r['total_points'], reverse=True)
+    for i, r in enumerate(rows, 1):
+        r["rank"] = i
+    return rows
 
 
 

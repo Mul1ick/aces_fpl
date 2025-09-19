@@ -19,6 +19,8 @@ export const API = {
     transfer: `${API_BASE_URL}/teams/transfer`,
     userStats: `${API_BASE_URL}/users/stats`,
     playerStats: `${API_BASE_URL}/players/stats`,
+    userTeam: (userId: string, gw: number) =>
+      `${API_BASE_URL}/teams/user/${userId}/by-gameweek-number/${gw}`,
     chips: {
       status: (gw?: number) =>
         gw

@@ -123,6 +123,8 @@ class LeaderboardEntry(BaseModel):
     rank: int
     team_name: str
     total_points: int
+    manager_email: str
+    user_id: str
 
 # --- Admin Dashboard Schemas ---
 class Gameweek(BaseModel):
