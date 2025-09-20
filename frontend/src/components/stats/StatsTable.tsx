@@ -2,27 +2,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/fpl-card';
 import { Skeleton } from '@/components/ui/skeleton';
-
-// --- MOCK DATA & ASSETS ---
-import redLogo from '@/assets/images/team-logos/red.png';
-import blueLogo from '@/assets/images/team-logos/blue.png';
-import blackLogo from '@/assets/images/team-logos/black.png';
-import whiteLogo from '@/assets/images/team-logos/white.png';
-
-
-const teamLogos = {
-    'Arsenal': redLogo,
-    'Man City': blueLogo,
-    'Liverpool': redLogo,
-    'Spurs': whiteLogo,
-    'Chelsea': blueLogo,
-    'Newcastle': blackLogo,
-};
+import { getTeamLogo } from '@/lib/player-utils';
 
 // --- SUB-COMPONENTS ---
 
-// Added onPlayerClick prop
-const PlayerRow = ({ player, index, onPlayerClick }) => (
+const PlayerRow = ({ player, index, onPlayerClick }: { player: any, index: number, onPlayerClick: (player: any) => void }) => (
     <motion.tr
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -32,7 +16,7 @@ const PlayerRow = ({ player, index, onPlayerClick }) => (
     >
         <td className="p-4">
             <div className="flex items-center space-x-3">
-                <img src={teamLogos[player.team] || whiteLogo} alt={player.team} className="w-7 h-7" />
+                <img src={getTeamLogo(player.team_short_name)} alt={player.team} className="w-7 h-7" />
                 <div>
                     <p className="font-bold text-pl-white">{player.name}</p>
                     <p className="text-caption text-pl-white/60">{player.team} · {player.pos}</p>
@@ -64,7 +48,7 @@ const StatsLoading = () => (
 interface StatsTableProps {
     players: any[];
     isLoading: boolean;
-    onPlayerClick: (player: any) => void; // Added prop for click handler
+    onPlayerClick: (player: any) => void;
 }
 
 export const StatsTable: React.FC<StatsTableProps> = ({ players, isLoading, onPlayerClick }) => {

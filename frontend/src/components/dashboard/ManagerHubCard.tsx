@@ -46,7 +46,7 @@ export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats, overallRa
                     <StatRow label="Overall rank" value={overallRank?.toLocaleString() ?? '...'} />
                     <StatRow label="Total players" value={stats.total_players.toLocaleString()} />
                     <StatRow label="Gameweek points" value={stats.gameweek_points} />
-                    <LinkRow label="Gameweek History" />
+                    
                 </div>
             </div>
 
@@ -54,9 +54,9 @@ export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats, overallRa
             <div className="mt-6">
                 <h3 className="font-bold text-lg mb-2">Transfers</h3>
                 <div className="space-y-1">
-                    <StatRow label="Gameweek transfers" value={stats.gameweek_transfers} />
+                    
                     <StatRow label="Total transfers" value={stats.total_transfers} />
-                    <LinkRow label="Transfer History" />
+                   
                 </div>
             </div>
 
@@ -69,14 +69,7 @@ export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats, overallRa
                 </div>
             </div>
 
-            {/* Admin Section */}
-            <div className="mt-6">
-                <h3 className="font-bold text-lg mb-2">Admin</h3>
-                <div className="space-y-1">
-                    <LinkRow label="Team Details" />
-                    <LinkRow label="User Profile" />
-                </div>
-            </div>
+          
         </CardContent>
     </Card>
   );

@@ -22,13 +22,13 @@ interface MatchUI {
 }
 
 interface GameweekDataUI {
-  gameweek: number;
+  gameweek: number; // This will now correctly be the GW number
   title: string;
   deadline?: string;
   matches: MatchUI[];
 }
 
-/** Shape we expect from backend `GET /fixtures` */
+/** Shape we expect from backend GET /fixtures */
 interface FixtureFromAPI {
   id: number;
   gameweek_id: number;
@@ -39,7 +39,7 @@ interface FixtureFromAPI {
   away: { id: number; name: string; short_name: string };
 }
 
-// --- NEW TYPE ---
+/** Shape we expect from backend GET /gameweeks */
 interface GameweekFromAPI {
     id: number;
     gw_number: number;
@@ -52,21 +52,21 @@ const Fixtures: React.FC = () => {
   const [currentGwIndex, setCurrentGwIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // --- MODIFIED: This useEffect now fetches both fixtures and the current gameweek ---
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
     (async () => {
       try {
-        // Fetch fixtures and current gameweek data concurrently
-        const [fixturesRes, currentGwRes] = await Promise.all([
+        // Fetch fixtures, current GW, and ALL gameweeks concurrently
+        const [fixturesRes, currentGwRes, allGameweeksRes] = await Promise.all([
             fetch(API.endpoints.fixtures, { headers }),
-            fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers })
+            fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers }),
+            fetch(API.endpoints.gameweek, { headers })
         ]);
 
-        if (!fixturesRes.ok) {
-          throw new Error(`GET /fixtures failed: ${fixturesRes.status}`);
+        if (!fixturesRes.ok || !allGameweeksRes.ok) {
+          throw new Error(`API fetch failed`);
         }
         if (!currentGwRes.ok) {
             console.warn("Could not fetch current gameweek, defaulting to first available.");
@@ -74,6 +74,10 @@ const Fixtures: React.FC = () => {
 
         const fixtures: FixtureFromAPI[] = await fixturesRes.json();
         const currentGwData: GameweekFromAPI | null = currentGwRes.ok ? await currentGwRes.json() : null;
+        const allGameweeks: GameweekFromAPI[] = await allGameweeksRes.json();
+
+        // Create a map from gameweek ID to gameweek NUMBER
+        const gameweekIdToNumberMap = new Map(allGameweeks.map(gw => [gw.id, gw.gw_number]));
 
         // Group by gameweek_id
         const grouped = fixtures.reduce<Record<number, FixtureFromAPI[]>>((acc, f) => {
@@ -86,6 +90,8 @@ const Fixtures: React.FC = () => {
         const byGw: Record<number, GameweekDataUI> = {};
         Object.entries(grouped).forEach(([gwIdStr, list]) => {
           const gwId = Number(gwIdStr);
+          const gwNumber = gameweekIdToNumberMap.get(gwId) || gwId; // Use map, fallback to ID
+          
           const matches: MatchUI[] = list
             .sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
             .map((f) => {
@@ -127,26 +133,27 @@ const Fixtures: React.FC = () => {
               };
             });
 
+          // Use the correct gwNumber for title and data
           byGw[gwId] = {
-            gameweek: gwId,
-            title: `Gameweek ${gwId}`,
+            gameweek: gwNumber,
+            title: `Gameweek ${gwNumber}`,
             matches,
           };
         });
 
+        // Sort keys by the actual gameweek number for correct navigation order
         const keys = Object.keys(byGw)
           .map(Number)
-          .sort((a, b) => a - b);
+          .sort((a, b) => (gameweekIdToNumberMap.get(a) || 0) - (gameweekIdToNumberMap.get(b) || 0));
 
         setAllByGw(byGw);
         setGwKeys(keys);
-
-        // --- MODIFIED: Set the index to the current gameweek ---
+        
         if (currentGwData) {
             const initialIndex = keys.indexOf(currentGwData.id);
             setCurrentGwIndex(initialIndex !== -1 ? initialIndex : 0);
         } else {
-            setCurrentGwIndex(0); // Fallback to the first gameweek
+            setCurrentGwIndex(0);
         }
 
       } catch (e) {
@@ -185,7 +192,7 @@ const Fixtures: React.FC = () => {
           <CardHeader className="p-0 border-b border-border">
             <GameweekNavigator
               gameweekTitle={currentData.title}
-              gameweekDeadline={undefined}
+              gameweekDeadline={currentData.deadline ? new Date(currentData.deadline).toLocaleString() : 'TBC'}
               onPrevious={handlePrevious}
               onNext={handleNext}
               isFirst={currentGwIndex === 0}

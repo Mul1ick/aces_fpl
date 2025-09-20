@@ -78,7 +78,7 @@ export const TeamViewInfoCard: React.FC<TeamViewInfoCardProps> = ({
                     <StatRow label="Overall rank" value={overallRank?.toLocaleString() ?? '...'} />
                     <StatRow label="Total players" value={stats?.total_players.toLocaleString() ?? '...'} />
                      <StatRow label="Gameweek points" value={stats?.gameweek_points.toLocaleString() ?? '...'} />
-                    <LinkRow label="Gameweek History" />
+                   
                 </div>
             </div>
         </CardContent>

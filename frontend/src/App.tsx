@@ -47,7 +47,7 @@ const App = () => (
                 <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
 
                 {/* --- 2. ADD THE NEW ROUTES BELOW --- */}
-                <Route path="/team-view/top/:gw" element={<ProtectedRoute><TeamView /></ProtectedRoute>} />
+                
                 <Route path="/team-view/:userId/:gw" element={<ProtectedRoute><TeamView /></ProtectedRoute>} />
               </Route>
 

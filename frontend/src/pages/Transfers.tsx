@@ -330,7 +330,11 @@ const handlePlayerRemove = (position: string, index: number) => {
         animate="visible"
         variants={containerVariants}
       >
-        <motion.div variants={itemVariants} className="hidden lg:block lg:col-span-4 h-screen overflow-y-auto p-4 border-r sticky top-0">
+          {/* --- MODIFIED: Added z-20 to raise this column's stacking context --- */}
+        <motion.div 
+          variants={itemVariants} 
+          className="hidden lg:block lg:col-span-4 h-screen overflow-y-auto p-4 border-r sticky top-0 z-20"
+        >
           <PlayerSelectionList
             onClose={() => {}}
             onPlayerSelect={handlePlayerSelect}

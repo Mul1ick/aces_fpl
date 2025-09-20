@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { getTeamJersey } from '@/lib/utils'; // Import the centralized jersey helper
+// --- MODIFIED: Import the correct, centralized jersey helper ---
+import { getTeamJersey } from '@/lib/player-utils';
 
 interface TransferListViewProps {
   squad: {
@@ -9,7 +10,6 @@ interface TransferListViewProps {
     MID: any[],
     FWD: any[],
   };
-  // The onPlayerRemove prop is no longer needed
 }
 
 export const TransferListView: React.FC<TransferListViewProps> = ({ squad }) => {
@@ -29,10 +29,12 @@ export const TransferListView: React.FC<TransferListViewProps> = ({ squad }) => 
     <tr className={cn("border-b border-gray-200", player.is_benched && "bg-gray-50 opacity-80")}>
       <td className="p-3">
         <div className="flex items-center space-x-3">
-          <img src={getTeamJersey(player.team.name)} alt="jersey" className="w-8 h-10 object-contain" />
+          {/* --- MODIFIED: Use the correct property 'player.teamName' --- */}
+          <img src={getTeamJersey(player.teamName)} alt="jersey" className="w-8 h-10 object-contain" />
           <div>
             <p className="font-bold text-sm">{player.full_name}</p>
-            <p className="text-xs text-gray-500">{player.pos} · {player.team.name}</p>
+            {/* --- MODIFIED: Use the correct property 'player.teamName' --- */}
+            <p className="text-xs text-gray-500">{player.pos} · {player.teamName}</p>
           </div>
         </div>
       </td>

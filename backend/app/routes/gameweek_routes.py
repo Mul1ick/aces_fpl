@@ -9,6 +9,14 @@ from app import schemas, crud
 
 router = APIRouter()
 
+# --- ADDED: New endpoint to get all gameweeks ---
+@router.get("/")
+async def get_all_gameweeks(db: Prisma = Depends(get_db)):
+    """
+    Returns a list of all gameweeks, sorted by their number.
+    """
+    return await db.gameweek.find_many(order={'gw_number': 'asc'})
+
 @router.get("/gameweek/current")
 async def get_current_gameweek(db: Prisma = Depends(get_db)):
     """
@@ -36,7 +44,6 @@ async def get_current_gameweek(db: Prisma = Depends(get_db)):
     
     # --- NEW: Calculate Aggregate Stats ---
     
-    # Most Captained Player
     cap_agg = await db.userteam.group_by(
         by=['player_id'],
         where={'gameweek_id': gameweek.id, 'is_captain': True},
@@ -44,11 +51,14 @@ async def get_current_gameweek(db: Prisma = Depends(get_db)):
         order={'_count': {'player_id': 'desc'}},
         take=1
     )
-    most_captained = "N/A"
+    most_captained = None # Default to None
     if cap_agg:
-        player = await db.player.find_unique(where={'id': cap_agg[0]['player_id']})
-        if player:
-            most_captained = player.full_name
+        player = await db.player.find_unique(
+            where={'id': cap_agg[0]['player_id']},
+            include={'team': True} # Include the related team
+        )
+        if player and player.team:
+            most_captained = {"name": player.full_name, "team_name": player.team.name}
 
     # Most Vice-Captained Player
     vc_agg = await db.userteam.group_by(
@@ -58,11 +68,14 @@ async def get_current_gameweek(db: Prisma = Depends(get_db)):
         order={'_count': {'player_id': 'desc'}},
         take=1
     )
-    most_vice_captained = "N/A"
+    most_vice_captained = None # Default to None
     if vc_agg:
-        player = await db.player.find_unique(where={'id': vc_agg[0]['player_id']})
-        if player:
-            most_vice_captained = player.full_name
+        player = await db.player.find_unique(
+            where={'id': vc_agg[0]['player_id']},
+            include={'team': True} # Include the related team
+        )
+        if player and player.team:
+            most_vice_captained = {"name": player.full_name, "team_name": player.team.name}
 
     # Most Selected Player
     selected_agg = await db.userteam.group_by(
@@ -72,11 +85,14 @@ async def get_current_gameweek(db: Prisma = Depends(get_db)):
         order={'_count': {'player_id': 'desc'}},
         take=1
     )
-    most_selected = "N/A"
+    most_selected = None # Default to None
     if selected_agg:
-        player = await db.player.find_unique(where={'id': selected_agg[0]['player_id']})
-        if player:
-            most_selected = player.full_name
+        player = await db.player.find_unique(
+            where={'id': selected_agg[0]['player_id']},
+            include={'team': True} # Include the related team
+        )
+        if player and player.team:
+            most_selected = {"name": player.full_name, "team_name": player.team.name}
 
     # Chips Played Count
     chips_played = await db.userchip.count(where={'gameweek_id': gameweek.id})
