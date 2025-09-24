@@ -8,10 +8,138 @@ from typing import Dict, List, Optional,Any
 import logging
 from decimal import Decimal
 from uuid import UUID
+from prisma import models as PrismaModels # <--- ADD THIS LINE
+from collections import defaultdict 
+
 
 logger = logging.getLogger(__name__)
 
 # --- USER FUNCTIONS ---
+
+alog = logging.getLogger("aces.crud")
+
+
+# --- NEW HELPER FUNCTIONS (Add these anywhere in the file) ---
+
+def _is_valid_formation(starting_xi: List[PrismaModels.Player]) -> bool:
+    if len(starting_xi) != 8:
+        alog.warning(f"  [Check Failed] Hypothetical XI has {len(starting_xi)} players, not 8.")
+        return False
+
+    counts = defaultdict(int)
+    for p in starting_xi:
+        counts[p.position] += 1
+    
+    is_valid = (
+        counts['GK'] == 1 and
+        counts['DEF'] >= 2 and
+        counts['MID'] >= 2 and
+        counts['FWD'] >= 1
+    )
+    
+    if not is_valid:
+        alog.warning(f"  [Check Failed] Invalid formation: GK:{counts['GK']}, DEF:{counts['DEF']}, MID:{counts['MID']}, FWD:{counts['FWD']}")
+    
+    return is_valid
+
+
+async def _handle_captaincy_swap(db: Prisma, user_id: str, gameweek_id: int, minutes_map: dict):
+    """Handles the captaincy swap if the captain did not play."""
+    team = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id},
+        include={'player': True}
+    )
+    
+    captain = next((p for p in team if p.is_captain), None)
+    vice_captain = next((p for p in team if p.is_vice_captain), None)
+
+    if not captain or captain.is_benched or minutes_map.get(captain.player_id, 0) > 0:
+        return # Captain played or doesn't exist
+
+    if vice_captain and not vice_captain.is_benched and minutes_map.get(vice_captain.player_id, 0) > 0:
+        alog.info(f"Swapping captaincy from {captain.player.full_name} to {vice_captain.player.full_name} for user {user_id}")
+        await db.userteam.update(
+            where={'id': captain.id},
+            data={'is_captain': False, 'is_vice_captain': True}
+        )
+        await db.userteam.update(
+            where={'id': vice_captain.id},
+            data={'is_captain': True, 'is_vice_captain': False}
+        )
+
+async def perform_auto_subs_for_user(db: Prisma, user_id: str, gameweek_id: int):
+    alog.info(f"--- Running auto-subs for user: {user_id} ---")
+    team_players = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id},
+        include={'player': True}
+    )
+    
+    if not team_players:
+        alog.warning(f"[Auto-Sub] User {user_id} has no team for GW {gameweek_id}.")
+        return
+
+    player_ids = [p.player_id for p in team_players]
+    stats = await db.gameweekplayerstats.find_many(
+        where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
+    )
+    minutes_map = {s.player_id: s.minutes for s in stats}
+    
+    await _handle_captaincy_swap(db, user_id, gameweek_id, minutes_map)
+
+    team_players = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id},
+        include={'player': True}
+    )
+
+    starters = [p for p in team_players if not p.is_benched]
+    bench = sorted([p for p in team_players if p.is_benched], key=lambda p: (p.player.position != 'GK', p.id))
+    non_playing_starters = [p for p in starters if minutes_map.get(p.player_id, 0) == 0]
+
+    if not non_playing_starters:
+        alog.info(f"[Auto-Sub] No non-playing starters found for user {user_id}. No subs needed.")
+        return
+        
+    alog.info(f"[Auto-Sub] Found non-playing starters: {[p.player.full_name for p in non_playing_starters]}")
+    alog.info(f"[Auto-Sub] Bench order: {[p.player.full_name for p in bench]}")
+
+    current_starters = [p.player for p in starters]
+
+    non_playing_gk = next((p for p in non_playing_starters if p.player.position == 'GK'), None)
+    bench_gk = next((p for p in bench if p.player.position == 'GK'), None)
+
+    if non_playing_gk and bench_gk and minutes_map.get(bench_gk.player_id, 0) > 0:
+        alog.info(f"[Auto-Sub] Swapping GK {non_playing_gk.player.full_name} for {bench_gk.player.full_name}")
+        await db.userteam.update(where={'id': non_playing_gk.id}, data={'is_benched': True})
+        await db.userteam.update(where={'id': bench_gk.id}, data={'is_benched': False})
+        
+        current_starters = [p for p in current_starters if p.id != non_playing_gk.player_id] + [bench_gk.player]
+        non_playing_starters = [p for p in non_playing_starters if p.id != non_playing_gk.id]
+        bench.remove(bench_gk)
+
+    available_bench = [p for p in bench if p.player.position != 'GK']
+    
+    for starter_to_sub in non_playing_starters:
+        alog.info(f"[Auto-Sub] Attempting to substitute {starter_to_sub.player.full_name} ({starter_to_sub.player.position})")
+        substituted = False
+        for bench_player in available_bench:
+            alog.info(f"  -> Considering bench player: {bench_player.player.full_name} ({bench_player.player.position})")
+            hypothetical_xi = [p for p in current_starters if p.id != starter_to_sub.player_id]
+            hypothetical_xi.append(bench_player.player)
+
+            if _is_valid_formation(hypothetical_xi):
+                alog.info(f"  [Check Passed] Swapping {starter_to_sub.player.full_name} FOR {bench_player.player.full_name}")
+                await db.userteam.update(where={'id': starter_to_sub.id}, data={'is_benched': True})
+                await db.userteam.update(where={'id': bench_player.id}, data={'is_benched': False})
+                
+                current_starters = hypothetical_xi
+                available_bench.remove(bench_player)
+                substituted = True
+                break
+        if not substituted:
+             alog.warning(f"[Auto-Sub] Could not find a valid substitution for {starter_to_sub.player.full_name}")
+
+
+
 
 async def get_user_by_email(db: Prisma, email: str):
     return await db.user.find_unique(where={"email": email})
@@ -776,45 +904,54 @@ async def user_has_team(db: Prisma, user_id: str) -> bool:
     # team = await db.team.find_first(where={"user_id": user_id})
     return team is not None
 
+# In backend/app/crud.py
+
 async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
-    """
-    To be run after a gameweek deadline.
-    - Sets 'played_first_gameweek' for users whose first gameweek was this one.
-    - Adds 1 free transfer to every user who has already played, capped at 2.
-    """
-    # 1. Find all users who had a team in the completed gameweek
+    # (This function remains the same as the corrected version from the previous step)
+    alog.info(f"Starting rollover tasks for Gameweek {completed_gw_id}...")
+
+    active_users = await db.user.find_many(
+        where={'is_active': True, 'fantasy_team': {'is_not': None}}
+    )
+
+    if not active_users:
+        alog.info(f"No active users with teams to process for Gameweek {completed_gw_id}.")
+        return "No active users with teams to process."
+
+    # --- Step 1 & 2: Auto-subs and score recalculation for each user ---
+    for user in active_users:
+        await perform_auto_subs_for_user(db, str(user.id), completed_gw_id)
+        await compute_user_score_for_gw(db, str(user.id), completed_gw_id)
+    
+    alog.info(f"Completed auto-subs and score recalculations for {len(active_users)} users.")
+
+    # --- Step 3: Flag new players who just completed their first gameweek ---
     users_in_completed_gw = await db.userteam.find_many(
         where={'gameweek_id': completed_gw_id},
         distinct=['user_id']
     )
     user_ids_in_gw = {u.user_id for u in users_in_completed_gw}
 
-    if not user_ids_in_gw:
-        return "No users played this gameweek. Nothing to update."
-
-    # 2. For each of those users, find their very first gameweek entry
     first_gameweek_entries = await db.userteam.group_by(
         by=['user_id'],
         min={'gameweek_id': True},
         where={'user_id': {'in': list(user_ids_in_gw)}}
     )
-
-    # 3. Identify users whose first gameweek was the one that just completed
+    
     new_players_to_flag = [
         entry['user_id'] for entry in first_gameweek_entries
         if entry['_min']['gameweek_id'] == completed_gw_id
     ]
 
     async with db.tx() as transaction:
-        # 4. Set played_first_gameweek = true ONLY for those new players
         if new_players_to_flag:
-            await transaction.user.update_many(
+            update_count_result = await transaction.user.update_many(
                 where={'id': {'in': new_players_to_flag}},
                 data={'played_first_gameweek': True}
             )
+            alog.info(f"Flagged {update_count_result} new players as having played their first gameweek.")
 
-        # 5. Add 1 free transfer to ALL users who have already played (flag is true)
-        # This now correctly includes long-time players and the new players we just flagged.
+        # --- Step 4: Add 1 free transfer to all users who have played ---
         await transaction.query_raw(
             """
             UPDATE "users"
@@ -822,8 +959,11 @@ async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
             WHERE played_first_gameweek = true
             """
         )
-    
-    return f"Rollover tasks complete for GW {completed_gw_id}."
+        alog.info(f"Updated free transfers for all eligible users.")
+
+    message = f"Rollover complete for Gameweek {completed_gw_id}."
+    alog.info(message)
+    return message
 
 
 async def _resolve_gw(db: Prisma, gameweek_id: int | None):
