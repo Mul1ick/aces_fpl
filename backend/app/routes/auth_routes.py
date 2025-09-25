@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from app import schemas, crud, auth
 from app.database import get_db
@@ -32,6 +32,12 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: Prisma = Depend
     user = await auth.authenticate_user(db, form.username, form.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, # Correct status for this case
+            detail="Account is inactive or pending approval."
+        )
 
     access_token =  auth.create_access_token({"sub": str(user.id), "role": user.role})
     has_team = await crud.user_has_team(db, str(user.id))
