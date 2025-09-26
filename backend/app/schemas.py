@@ -241,11 +241,17 @@ class ChipStatus(BaseModel):
 
 class PlayerStatIn(BaseModel):
     player_id: int
+    played: bool = False                # NEW: To track if the player played
     goals_scored: int = 0
     assists: int = 0
+    clean_sheets: bool = False          # NEW: Direct toggle from the modal
+    goals_conceded: int = 0             # NEW: Per-player stat
+    own_goals: int = 0                  # NEW
+    penalties_missed: int = 0           # NEW
     yellow_cards: int = 0
     red_cards: int = 0
     bonus_points: int = 0
+
 
 class SubmitFixtureStats(BaseModel):
     fixture_id: int

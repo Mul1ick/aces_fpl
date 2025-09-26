@@ -107,9 +107,7 @@ const [modalLoading, setModalLoading] = useState(false);
 const handleSaveStats = async (
   fixtureId: number,
   scores: { home_score: number; away_score: number },
-  statsMap: { [playerId: number]: {
-    goals_scored: number; assists: number; yellow_cards: number; red_cards: number; bonus_points: number; minutes?: number;
-  }}
+  statsMap: { [playerId: number]: PlayerGameweekStats}
 ) => {
   const t = token || localStorage.getItem("admin_token");
   if (!t || !gameweek) return;
@@ -117,13 +115,18 @@ const handleSaveStats = async (
   // map object -> array for API
   const player_stats = Object.entries(statsMap).map(([pid, s]) => ({
     player_id: Number(pid),
+    played: s.played ?? false,
     goals_scored: s.goals_scored ?? 0,
     assists: s.assists ?? 0,
+    clean_sheets: s.clean_sheets ?? false,
+    goals_conceded: s.goals_conceded ?? 0,
+    own_goals: s.own_goals ?? 0,
+    penalties_missed: s.penalties_missed ?? 0,
     yellow_cards: s.yellow_cards ?? 0,
     red_cards: s.red_cards ?? 0,
     bonus_points: s.bonus_points ?? 0,
-    minutes: s.minutes ?? 0,
   }));
+
 
   try {
     await gameweekAPI.submitPlayerStats(gameweek.id, fixtureId, {

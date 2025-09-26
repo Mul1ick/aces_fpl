@@ -315,6 +315,51 @@ async def admin_fixture_players(fixture_id: int, db: Prisma = Depends(get_db)):
     )
     return players
 
+def calculate_player_points(position: str, stats: schemas.PlayerStatIn) -> int:
+    """
+    Calculates total points for a player based on all FPL scoring rules.
+    """
+    points = 0
+
+    # 1. Points for playing (if toggled)
+    if stats.played:
+        points += 1  # CHANGED: This is now conditional
+
+    # 2. Goal points
+    if stats.goals_scored > 0:
+        if position == "GK":
+            points += stats.goals_scored * 10
+        elif position == "DEF":
+            points += stats.goals_scored * 6
+        elif position == "MID":
+            points += stats.goals_scored * 5
+        elif position == "FWD":
+            points += stats.goals_scored * 4
+    
+    # 3. Other points
+    points += stats.assists * 3
+    points += stats.bonus_points
+
+    # 4. Clean sheet points (if toggled)
+    if stats.clean_sheets:
+        if position in ["GK", "DEF"]:
+            points += 4
+        elif position == "MID":
+            points += 1
+
+    # 5. Deductions (now using per-player stats from the modal)
+    if position in ["GK", "DEF"]:
+        points -= (stats.goals_conceded // 2)
+    
+    points -= stats.penalties_missed * 2
+    points -= stats.own_goals * 2
+    points -= stats.yellow_cards * 1
+    points -= stats.red_cards * 3
+
+    return points
+
+
+
 @router.post("/gameweeks/{gameweek_id}/stats")
 async def admin_submit_fixture_stats(
     gameweek_id: int,
@@ -325,80 +370,56 @@ async def admin_submit_fixture_stats(
     if not fx or fx.gameweek_id != gameweek_id:
         raise HTTPException(400, "Fixture does not belong to this gameweek")
 
-    ids = [s.player_id for s in payload.player_stats]
-    players = await db.player.find_many(
-    where={'id': {'in': list(ids)}},
-)
-    pos_map = {p.id: p.position for p in players}
-
-    def goal_pts(pos: str) -> int:
-        if pos == "GK":
-            return 10
-        if pos == "DEF":
-            return 6
-        if pos == "MID":
-            return 5
-        return 4  # FWD / default
+    player_ids = [s.player_id for s in payload.player_stats]
+    players = await db.player.find_many(where={'id': {'in': player_ids}})
+    player_map = {p.id: p for p in players}
 
     async with db.tx() as tx:
-        # optional: update fixture score if those fields exist
-        try:
-            await tx.fixture.update(
-                where={"id": payload.fixture_id},
-                data={
-                    "home_score": payload.home_score,
-                    "away_score": payload.away_score,
-                    "stats_entered": True,
-                },
-            )
-        except Exception:
-            pass
+        await tx.fixture.update(
+            where={"id": payload.fixture_id},
+            data={
+                "home_score": payload.home_score,
+                "away_score": payload.away_score,
+                "stats_entered": True,
+            },
+        )
 
         for s in payload.player_stats:
-            pos = pos_map.get(s.player_id)
-            if not pos:
+            player = player_map.get(s.player_id)
+            if not player:
                 continue
 
-            gs   = int(s.goals_scored or 0)
-            ast  = int(s.assists or 0)
-            yc   = int(s.yellow_cards or 0)
-            rc   = int(s.red_cards or 0)
-            bps  = int(s.bonus_points or 0)
+            total_points = calculate_player_points(player.position, s)
 
-            points = goal_pts(pos) * gs + 3 * ast - 1 * yc - 3 * rc + bps
+            # Prepare data for upsert, excluding the player_id which is used for connecting
+            stat_data = s.model_dump()
+            del stat_data['player_id']
 
+            # --- CORRECTED UPSERT LOGIC ---
             await tx.gameweekplayerstats.upsert(
-                where={
-                    "gameweek_id_player_id": {
-                        "gameweek_id": gameweek_id,
-                        "player_id": s.player_id,
-                    }
-                },
+                where={"gameweek_id_player_id": {"gameweek_id": gameweek_id, "player_id": s.player_id}},
                 data={
                     "create": {
-                        "gameweek_id": gameweek_id,
-                        "player_id": s.player_id,
-                        "goals_scored": gs,
-                        "assists": ast,
-                        "yellow_cards": yc,
-                        "red_cards": rc,
-                        "bonus_points": bps,
-                        # "minutes": s.minutes,
-                        "points": points,
+                        "gameweek": {"connect": {"id": gameweek_id}},
+                        "player": {"connect": {"id": s.player_id}},
+                        **stat_data,
+                        "points": total_points,
                     },
                     "update": {
-                        "goals_scored": gs,
-                        "assists": ast,
-                        "yellow_cards": yc,
-                        "red_cards": rc,
-                        "bonus_points": bps,
-                        # "minutes": s.minutes,
-                        "points": points,
+                        **stat_data,
+                        "points": total_points,
                     },
                 },
             )
 
     return {"ok": True}
+
+
+
+
+
+
+
 
 @router.get("/fixtures/{fixture_id}/stats", response_model=schemas.FixtureStatsOut)
 async def admin_get_fixture_stats(fixture_id: int, db: Prisma = Depends(get_db)):
