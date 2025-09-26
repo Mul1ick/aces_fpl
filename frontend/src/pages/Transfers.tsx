@@ -12,6 +12,7 @@ import { EnterSquadModal } from '@/components/transfers/EnterSquadModal';
 import { Button } from '@/components/ui/button';
 import { TransferListView } from '@/components/transfers/TransferListView';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ChipStatus } from '@/lib/api'; // Make sure ChipStatus is imported
 import acesLogo from "@/assets/aces-logo.png";
 
 // --- LIB & TYPE IMPORTS ---
@@ -43,6 +44,8 @@ const Transfers: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const token = localStorage.getItem("access_token");
+
+  const [chipStatus, setChipStatus] = useState<ChipStatus | null>(null);
 
   // --- STATE MANAGEMENT ---
   const [squad, setSquad] = useState(initialSquad);
@@ -124,6 +127,10 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
         .then(setGameweek)
         .catch(() => console.error("Failed to fetch gameweek data"));
     }
+    fetch(`${API.BASE_URL}/chips/status`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+        .then(res => res.json())
+        .then(setChipStatus)
+        .catch(() => console.error("Failed to fetch chip status"));
   }, [hasTeam, isAuthLoading, fetchAndSetTeam, token]);
 
   // --- SQUAD LOGIC & VALIDATION ---
@@ -139,10 +146,13 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
 
     const totalCost = currentPlayers.reduce((acc, p) => acc + (p?.price || 0), 0);
     const remainingBank = 110.0 - totalCost;
-
+    const isWildcardActive = chipStatus?.active === 'WILDCARD';
     const freeTransfers = user?.free_transfers ?? 1;
     const numTransfers = out.length;
-    const paidTransfers = user?.played_first_gameweek ? Math.max(0, numTransfers - freeTransfers) : 0;
+    const paidTransfers = (isWildcardActive || user?.played_first_gameweek === false) 
+        ? 0 
+        : Math.max(0, numTransfers - freeTransfers);
+
     const cost = paidTransfers * 4;
 
     return {
@@ -152,7 +162,7 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
       transferCost: cost,
       playersSelected: currentPlayers.length
     };
-  }, [squad, initialSquadObject, user]);
+  }, [squad, initialSquadObject, user,chipStatus]);
 
   const squadValidation = useMemo(() => {
     const allPlayers = Object.values(squad).flat().filter(p => p !== null);
@@ -355,6 +365,8 @@ const handlePlayerRemove = (position: string, index: number) => {
               gameweek={gameweek}
               transferCount={playersOut.length}
               transferCost={transferCost}
+              activeChip={chipStatus?.active}
+
             />
           </div>
           

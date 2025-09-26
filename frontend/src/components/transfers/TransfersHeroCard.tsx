@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { format, isValid } from 'date-fns';
+import { ChipName } from '@/lib/api';
 
 // Interface for the gameweek data we expect
 interface Gameweek {
@@ -24,6 +25,7 @@ interface TransfersHeroCardProps {
   gameweek: Gameweek | null;
   transferCount: number;
   transferCost: number;
+  activeChip: ChipName | null | undefined;
 }
 
 const StatDisplay = ({ value, label }: { value: string | number; label: string }) => (
@@ -44,11 +46,16 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   gameweek,
   transferCount,
   transferCost,
+  activeChip
 }) => {
-  const transfersText = user?.played_first_gameweek === false 
-    ? "Unlimited" 
-    : `${user?.free_transfers ?? 0} FT`;
+  const getTransfersText = () => {
+    if (activeChip === 'WILDCARD' || user?.played_first_gameweek === false) {
+      return "Unlimited";
+    }
+    return `${user?.free_transfers ?? 0} FT`;
+  };
 
+  const transfersText = getTransfersText();
   const deadlineDate = gameweek?.deadline ? new Date(gameweek.deadline) : null;
   const deadlineText = deadlineDate && isValid(deadlineDate)
     ? `Deadline: ${format(deadlineDate, "E dd MMM, HH:mm")}`

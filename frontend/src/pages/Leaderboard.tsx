@@ -47,7 +47,7 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
       </div>
       <div className="text-right">
         <p className="text-xl font-bold text-pl-white">{entry.total_points}</p>
-        <p className="text-caption text-pl-white/60">{entry.gwPoints} (GW)</p>
+        {/* <p className="text-caption text-pl-white/60">{entry.gwPoints} (GW)</p> */}
       </div>
     </div>
   </motion.div>
@@ -114,7 +114,7 @@ const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null
         team_name: String(r.team_name ?? ""),
         manager_email: String(r.manager_email ?? ""),
         total_points: Number(r.total_points ?? 0),
-        gwPoints: Math.floor(Math.random() * 40) + 30,
+        // gwPoints: Math.floor(Math.random() * 40) + 30,
         user_id: String(r.user_id ?? r.userId ?? r.id ?? r.user?.id ?? ""),
       }));
 
@@ -214,7 +214,7 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                           <tr>
                             <th className="p-4 text-caption font-semibold text-pl-white/60 w-16 text-center">Rank</th>
                             <th className="p-4 text-caption font-semibold text-pl-white/60">Team & Manager</th>
-                            <th className="p-4 text-caption font-semibold text-pl-white/60 text-center">GW</th>
+                            {/* <th className="p-4 text-caption font-semibold text-pl-white/60 text-center">GW</th> */}
                             <th className="p-4 text-caption font-semibold text-pl-white/60 text-center">Total</th>
                           </tr>
                         </thead>
@@ -237,7 +237,7 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                                 <p className="font-semibold text-pl-white">{entry.team_name}</p>
                                 <p className="text-caption text-pl-white/60">{entry.manager_email}</p>
                               </td>
-                              <td className="p-4 text-center text-body text-pl-white tabular-nums">{entry.gwPoints}</td>
+                              {/* <td className="p-4 text-center text-body text-pl-white tabular-nums">{entry.gwPoints}</td> */}
                               <td className="p-4 text-center text-body font-bold text-pl-white tabular-nums">{entry.total_points}</td>
                             </motion.tr>
                           ))}
