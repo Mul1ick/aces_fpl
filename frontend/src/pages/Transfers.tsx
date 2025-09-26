@@ -145,7 +145,7 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
     const into = currentPlayers.filter(p => !initialIds.has(p.id));
 
     const totalCost = currentPlayers.reduce((acc, p) => acc + (p?.price || 0), 0);
-    const remainingBank = 110.0 - totalCost;
+    const remainingBank = 100.0 - totalCost;
     const isWildcardActive = chipStatus?.active === 'WILDCARD';
     const freeTransfers = user?.free_transfers ?? 1;
     const numTransfers = out.length;

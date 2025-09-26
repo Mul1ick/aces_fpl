@@ -1277,7 +1277,7 @@ async def get_manager_hub_stats(db: Prisma, user_id: str, gameweek_id: int):
     squad_value = sum(p.player.price for p in user_squad_entries) if user_squad_entries else 0.0
 
     # --- NEW: Calculate In The Bank ---
-    total_budget = 110.0
+    total_budget = 100.0
     in_the_bank = total_budget - float(squad_value)
 
     gameweek_transfers_count = await db.transfer_log.count(
