@@ -10,32 +10,33 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import type { Team, Player } from '@/types';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { Team, Player, PlayerGameweekStats } from '@/types';
 
-// Define a type for the stats we'll be collecting for each player
+import { CompactInput } from '@/components/shared/CompactInput';
+// --- CORRECTED IMPORT: Reverted to the correct 'Goal' icon ---
+import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, Award, Footprints, ShieldAlert, Ban, Star } from 'lucide-react';
+
 type PlayerStatInputs = {
-  [playerId: number]: {
-    goals_scored: number;
-    assists: number;
-    yellow_cards: number;
-    red_cards: number;
-    bonus_points: number;
-  };
+  [playerId: number]: PlayerGameweekStats;
 };
 
-const DEFAULT_ROW_STATS = {
+const DEFAULT_ROW_STATS: PlayerGameweekStats = {
+  played: false,
   goals_scored: 0,
   assists: 0,
+  clean_sheets: false,
+  goals_conceded: 0,
+  own_goals: 0,
+  penalties_missed: 0,
   yellow_cards: 0,
   red_cards: 0,
   bonus_points: 0,
-} as const;
+};
 
-type StatKey = keyof typeof DEFAULT_ROW_STATS;
-const STAT_FIELDS: StatKey[] = ['goals_scored','assists','yellow_cards','red_cards','bonus_points'];
+type StatKey = keyof PlayerGameweekStats;
 
-// Fixture type needs to be defined here as well for props
 interface Fixture {
   id: number;
   home_team: Team;
@@ -53,49 +54,67 @@ interface StatsEntryModalProps {
   onSave: (fixtureId: number, scores: { home_score: number; away_score: number }, stats: PlayerStatInputs) => void;
 }
 
+const StatsTableHeader = () => {
+    // --- CORRECTED: Using the correct 'Goal' icon component ---
+    const headers = [
+        { icon: <Footprints className="h-5 w-5" />, label: 'Played' },
+        { icon: <Goal className="h-5 w-5 text-blue-500" />, label: 'Goals' },
+        { icon: <PlusCircle className="h-5 w-5 text-green-500" />, label: 'Assists' },
+        { icon: <ShieldCheck className="h-5 w-5 text-green-500" />, label: 'Clean Sheet' },
+        { icon: <ShieldX className="h-5 w-5 text-red-500" />, label: 'Goals Conceded' },
+        { icon: <ShieldAlert className="h-5 w-5" />, label: 'Own Goals' },
+        { icon: <Ban className="h-5 w-5" />, label: 'Pen Miss' },
+        { icon: <Square className="h-5 w-5 text-yellow-500 fill-yellow-500" />, label: 'Yellow Card' },
+        { icon: <Square className="h-5 w-5 text-red-600 fill-red-600" />, label: 'Red Card' },
+        { icon: <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />, label: 'Bonus' },
+    ];
+
+    return (
+        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(10,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
+            <div className="text-left font-bold">Player</div>
+            {headers.map(h => (
+                <div key={h.label} className="flex flex-col items-center justify-center gap-1.5 h-12">
+                    {h.icon}
+                    <span className="font-bold text-center text-wrap leading-tight">{h.label}</span>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+
 const PlayerStatRow = ({
   player,
   stats,
   onStatChange,
 }: {
   player: Player;
-  stats: Partial<typeof DEFAULT_ROW_STATS> | undefined;
-  onStatChange: (playerId: number, field: StatKey, value: number) => void;
+  stats: PlayerGameweekStats;
+  onStatChange: (playerId: number, field: StatKey, value: number | boolean) => void;
 }) => {
-  const row = { ...DEFAULT_ROW_STATS, ...(stats || {}) };
   return (
-    <div className="grid grid-cols-7 items-center gap-3 py-2 border-b last:border-b-0">
-      <div className="col-span-2">
+    <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(10,_minmax(80px,_1fr))] items-center gap-3 py-2 border-b last:border-b-0">
+      <div>
         <p className="font-medium text-sm truncate">{player.full_name}</p>
         <p className="text-xs text-muted-foreground">{player.position}</p>
       </div>
-      {STAT_FIELDS.map((field) => (
-        <Input
-          key={field}
-          type="number"
-          min="0"
-          className="h-8 text-center"
-          value={row[field]}
-          onChange={(e) => onStatChange(player.id, field, parseInt(e.target.value) || 0)}
-        />
-      ))}
+      <div className="flex justify-center"><Switch checked={stats.played} onCheckedChange={(val) => onStatChange(player.id, 'played', val)} /></div>
+      <CompactInput value={stats.goals_scored} onValueChange={(val) => onStatChange(player.id, 'goals_scored', val)} />
+      <CompactInput value={stats.assists} onValueChange={(val) => onStatChange(player.id, 'assists', val)} />
+      <div className="flex justify-center"><Switch checked={stats.clean_sheets} onCheckedChange={(val) => onStatChange(player.id, 'clean_sheets', val)} /></div>
+      <CompactInput value={stats.goals_conceded} onValueChange={(val) => onStatChange(player.id, 'goals_conceded', val)} />
+      <CompactInput value={stats.own_goals} onValueChange={(val) => onStatChange(player.id, 'own_goals', val)} />
+      <CompactInput value={stats.penalties_missed} onValueChange={(val) => onStatChange(player.id, 'penalties_missed', val)} />
+      <CompactInput value={stats.yellow_cards} onValueChange={(val) => onStatChange(player.id, 'yellow_cards', val)} max={1} />
+      <CompactInput value={stats.red_cards} onValueChange={(val) => onStatChange(player.id, 'red_cards', val)} max={1} />
+      <CompactInput value={stats.bonus_points} onValueChange={(val) => onStatChange(player.id, 'bonus_points', val)} max={3} />
     </div>
   );
 };
 
-const StatsTableHeader = () => (
-  <div className="grid grid-cols-7 items-center gap-3 px-2 pb-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
-    <div className="col-span-2">Player</div>
-    <div className="text-center">G</div>
-    <div className="text-center">A</div>
-    <div className="text-center">YC</div>
-    <div className="text-center">RC</div>
-    <div className="text-center">BP</div>
-  </div>
-);
 
-
-export function StatsEntryModal({ fixture, players, isOpen, loading = false,onClose, onSave }: StatsEntryModalProps) {
+// --- No changes needed in the main modal component logic ---
+export function StatsEntryModal({ fixture, players, isOpen, loading = false, onClose, onSave }: StatsEntryModalProps) {
   const [stats, setStats] = useState<PlayerStatInputs>({});
   const [homeScore, setHomeScore] = useState<number | string>('');
   const [awayScore, setAwayScore] = useState<number | string>('');
@@ -106,13 +125,13 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false,onCl
   };
 
   const { homePlayers, awayPlayers } = useMemo(() => {
-  if (!fixture) return { homePlayers: [], awayPlayers: [] };
-  const getTid = (p: Player) => (p as any).team_id ?? (p as any).team?.id;
-  return {
-    homePlayers: players.filter(p => getTid(p) === fixture.home_team.id),
-    awayPlayers: players.filter(p => getTid(p) === fixture.away_team.id),
-  };
-}, [fixture, players]);
+    if (!fixture) return { homePlayers: [], awayPlayers: [] };
+    const getTid = (p: Player) => (p as any).team_id ?? (p as any).team?.id;
+    return {
+      homePlayers: players.filter(p => getTid(p) === fixture.home_team.id),
+      awayPlayers: players.filter(p => getTid(p) === fixture.away_team.id),
+    };
+  }, [fixture, players]);
 
   useEffect(() => {
     if (fixture) {
@@ -121,19 +140,13 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false,onCl
       const allFixturePlayers = [...homePlayers, ...awayPlayers];
       const initialStats: PlayerStatInputs = {};
       allFixturePlayers.forEach(player => {
-        initialStats[player.id] = {
-          goals_scored: 0,
-          assists: 0,
-          yellow_cards: 0,
-          red_cards: 0,
-          bonus_points: 0,
-        };
+        initialStats[player.id] = { ...DEFAULT_ROW_STATS };
       });
       setStats(initialStats);
     }
   }, [fixture, homePlayers, awayPlayers]);
-  
-  const handleStatChange = (playerId: number, field: keyof PlayerStatInputs[number], value: number) => {
+
+  const handleStatChange = (playerId: number, field: keyof PlayerGameweekStats, value: number | boolean) => {
     setStats(prev => ({ ...prev, [playerId]: { ...prev[playerId], [field]: value } }));
   };
 
@@ -146,20 +159,36 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false,onCl
 
   if (!fixture) return null;
 
+  const renderPlayerTable = (teamPlayers: Player[]) => (
+    <div className="border rounded-lg">
+      <StatsTableHeader />
+      <div className="px-3">
+        {teamPlayers.map(player => (
+          <PlayerStatRow
+            key={player.id}
+            player={player}
+            stats={stats[player.id] || DEFAULT_ROW_STATS}
+            onStatChange={handleStatChange}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl p-0">
+      <DialogContent className="max-w-7xl p-0">
         <DialogHeader className="bg-sidebar text-sidebar-foreground p-4 rounded-t-lg">
           <DialogTitle className="text-xl">Enter Match Stats</DialogTitle>
           <DialogDescription className="text-sidebar-foreground/80">
             Update the final score and individual player performance for this fixture.
           </DialogDescription>
-          <div className="flex items-center justify-between pt-4">
+          <div className="flex items-center justify-center pt-4 gap-4">
             <div className="flex items-center gap-3 w-2/5 justify-end">
               <h3 className="text-lg font-bold">{fixture.home_team.name}</h3>
               <img src={getLogoPath(fixture.home_team.logo_url)} alt={fixture.home_team.name} className="h-10 w-10"/>
             </div>
-            <div className="flex items-center gap-2 w-1/5 justify-center">
+            <div className="flex items-center gap-2 justify-center">
               <Input type="number" min="0" value={homeScore} onChange={(e) => setHomeScore(e.target.value)} className="h-12 w-16 text-center text-2xl font-bold bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-border" />
               <span className="text-2xl font-light">-</span>
               <Input type="number" min="0" value={awayScore} onChange={(e) => setAwayScore(e.target.value)} className="h-12 w-16 text-center text-2xl font-bold bg-sidebar-accent text-sidebar-accent-foreground border-sidebar-border" />
@@ -172,61 +201,35 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false,onCl
         </DialogHeader>
         
         <div className="p-6">
-            <ScrollArea className="h-[50vh] w-full">
-               {loading ? (
-    <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-      Loading players…
-    </div>
-  ) : (
-              <div className="space-y-6">
-                {/* Home Team Section in a distinct container */}
-                <div className="border rounded-lg p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h4 className="font-bold text-lg">{fixture.home_team.name}</h4>
-                      <Badge variant="secondary">Home</Badge>
-                    </div>
-                    <StatsTableHeader />
-                    <div className="px-2">
-                        {homePlayers.map(player => (
-  <PlayerStatRow
-    key={player.id}
-    player={player}
-    stats={stats[player.id]}   // may be undefined; component handles it
-    onStatChange={handleStatChange}
-  />
-))}
-                    </div>
-                </div>
-
-                {/* Away Team Section in a distinct container */}
-                <div className="border rounded-lg p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h4 className="font-bold text-lg">{fixture.away_team.name}</h4>
-                      <Badge variant="secondary">Away</Badge>
-                    </div>
-                    <StatsTableHeader />
-                    <div className="px-2">
-                        {awayPlayers.map(player => (
-                           <PlayerStatRow
-    key={player.id}
-    player={player}
-    stats={stats[player.id]}   // may be undefined; component handles it
-    onStatChange={handleStatChange}
-  />
-                        ))}
-                    </div>
-                </div>
-              </div>
-                )}
-            </ScrollArea>
+          <ScrollArea className="h-[55vh] w-full pr-4">
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading players…</div>
+            ) : (
+              <Tabs defaultValue="home">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="home">
+                    <img src={getLogoPath(fixture.home_team.logo_url)} alt="" className="h-5 w-5 mr-2" /> {fixture.home_team.name}
+                  </TabsTrigger>
+                  <TabsTrigger value="away">
+                    <img src={getLogoPath(fixture.away_team.logo_url)} alt="" className="h-5 w-5 mr-2" /> {fixture.away_team.name}
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="home">
+                  {renderPlayerTable(homePlayers)}
+                </TabsContent>
+                <TabsContent value="away">
+                  {renderPlayerTable(awayPlayers)}
+                </TabsContent>
+              </Tabs>
+            )}
+          </ScrollArea>
         </div>
 
         <DialogFooter className="p-6 pt-0">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}disabled={loading || homePlayers.length === 0 || awayPlayers.length === 0}>Save Stats & Results</Button>
+          <Button onClick={handleSave} disabled={loading || homePlayers.length === 0 || awayPlayers.length === 0}>Save Stats & Results</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

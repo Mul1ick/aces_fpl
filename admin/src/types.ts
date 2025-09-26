@@ -96,6 +96,20 @@ export interface PlayerStats {
   bonus_points: number;
 }
 
+// --- NEWLY ADDED INTERFACE FOR THE STATS MODAL ---
+export interface PlayerGameweekStats {
+  played: boolean;
+  goals_scored: number;
+  assists: number;
+  clean_sheets: boolean;
+  goals_conceded: number;
+  own_goals: number;
+  penalties_missed: number;
+  yellow_cards: number;
+  red_cards: number;
+  bonus_points: number;
+}
+
 export interface DashboardStats {
   pending_users: number;
   total_users: number;
@@ -147,4 +161,3 @@ export interface UserUpdateData {
   role?: 'user' | 'admin';
   is_active?: boolean;
 }
-
