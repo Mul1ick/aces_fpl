@@ -11,24 +11,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { API } from '@/lib/api';
 import { Slider } from '@/components/ui/slider';
+import { getTeamJersey } from '@/lib/player-utils';
 
-import satansJersey from '@/assets/images/jerseys/satans.png';
-import traanaJersey from '@/assets/images/jerseys/traana.png';
-import roarersJersey from '@/assets/images/jerseys/roarers.png';
-import southsideJersey from '@/assets/images/jerseys/southside.png';
-import titansJersey from '@/assets/images/jerseys/titans.png';
-import umaagJersey from '@/assets/images/jerseys/umang.png';
-import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png'
-
-// --- MODIFIED: The jersey mapping is now complete ---
-const TEAM_JERSEYS: Record<string, string> = {
- 'Satans': satansJersey,
-  'Roarers': roarersJersey,
-  'Traana': traanaJersey,
-  'Southside': southsideJersey,
-  'Titans': titansJersey,
-  'Umang Foundation Trust': umaagJersey,
-};
 
 // ============================================================================
 // SUB-COMPONENT: FilterModal
@@ -80,7 +64,7 @@ const PlayerTable = ({ players, onPlayerSelect }: { players: any[], onPlayerSele
             {players.map(player => (
             <tr key={player.id} className="border-b hover:bg-gray-100 cursor-pointer" onClick={() => onPlayerSelect(player)}>
                 <td className="p-3 flex items-center space-x-3">
-                 <img src={TEAM_JERSEYS[player.club] || tshirtWhite} alt="jersey" className="w-8 h-10 object-contain" />
+                 <img src={getTeamJersey(player.club)} alt="jersey" className="w-8 h-10 object-contain" />
                 <div>
                     <p className="font-bold text-sm">{player.name}</p>
                     <p className="text-xs text-gray-500">{player.pos} · {player.club}</p>
@@ -175,7 +159,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
     const [selectedClubs, setSelectedClubs] = useState<string[]>([]);
     const [sortBy, setSortBy] = useState('points');
-    const [priceRange, setPriceRange] = useState([3.5, 14.0]);
+    const [priceRange, setPriceRange] = useState([1.0, 25.0]);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 

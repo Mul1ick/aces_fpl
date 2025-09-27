@@ -1494,3 +1494,115 @@ async def confirm_transfers(
 
     # Return the updated team view
     return await get_user_team_full(db, user_id, gameweek_id)
+
+
+async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int):
+    """
+    Calculates a user's score for a specific gameweek, performing automatic substitutions first.
+    This logic is designed for an 8+3 player format.
+    """
+    
+    # 1. FETCH ALL NECESSARY DATA
+    # --------------------------------
+    # Get the user's chosen team for the gameweek
+    user_team_picks = await db.userteam.find_many(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id},
+        include={'player': True} # Include player data to get position
+    )
+
+    if not user_team_picks:
+        return 0 # User has no team for this gameweek
+
+    player_ids = [p.player_id for p in user_team_picks]
+
+    # Get the performance stats for all players in the user's squad
+    player_stats = await db.gameweekplayerstats.find_many(
+        where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
+    )
+    # Create a simple dictionary for fast lookups: { player_id: stats }
+    stats_map = {stat.player_id: stat for stat in player_stats}
+
+
+    # 2. SEPARATE STARTERS, BENCH, AND IDENTIFY NON-PLAYING STARTERS
+    # ---------------------------------------------------------------
+    starters = [p for p in user_team_picks if not p.is_benched]
+    
+    # Order the bench by position: GK first, then others. This sets sub priority.
+    bench = sorted([p for p in user_team_picks if p.is_benched], key=lambda p: 0 if p.player.position == 'GK' else 1)
+    
+    # Find starters who are marked as not having played
+    starters_who_did_not_play = [
+        p for p in starters 
+        if not stats_map.get(p.player_id) or not stats_map[p.player_id].played
+    ]
+
+    final_starters = list(starters) # Create a mutable copy of the starting lineup
+
+    # 3. PERFORM AUTOMATIC SUBSTITUTIONS (if necessary)
+    # ----------------------------------------------------
+    if starters_who_did_not_play:
+        for non_playing_starter in starters_who_did_not_play:
+            for i, substitute in enumerate(bench):
+                
+                # Find a substitute who played and hasn't been used yet
+                sub_stats = stats_map.get(substitute.player_id)
+                if sub_stats and sub_stats.played:
+                    
+                    # Create a temporary lineup to validate the formation
+                    temp_lineup = [p for p in final_starters if p.player_id != non_playing_starter.player_id]
+                    temp_lineup.append(substitute)
+
+                    # --- VALIDATION LOGIC FOR 8+3 FORMAT ---
+                    gk_count = sum(1 for p in temp_lineup if p.player.position == 'GK')
+                    def_count = sum(1 for p in temp_lineup if p.player.position == 'DEF')
+
+                    # Check if the formation is valid (1 GK, at least 2 DEF)
+                    if gk_count == 1 and def_count >= 2:
+                        # If valid, make the substitution permanent for this calculation
+                        final_starters = temp_lineup
+                        
+                        # Remove the used substitute from the bench
+                        bench.pop(i) 
+                        
+                        # Move to the next non-playing starter
+                        break 
+
+    # 4. CALCULATE TOTAL POINTS FOR THE FINAL LINEUP
+    # ------------------------------------------------
+    total_points = 0
+    
+    # Find the original captain and vice-captain picks
+    captain = next((p for p in starters if p.is_captain), None)
+    vice_captain = next((p for p in starters if p.is_vice_captain), None)
+    
+    active_captain = None
+    
+    # Check if the original captain is in the final lineup
+    if captain and any(p.player_id == captain.player_id for p in final_starters):
+        active_captain = captain
+    # If not, check if the vice-captain is in the final lineup
+    elif vice_captain and any(p.player_id == vice_captain.player_id for p in final_starters):
+        active_captain = vice_captain
+
+    # Add up the points for the final 11 starters
+    for starter in final_starters:
+        points = stats_map.get(starter.player_id, None)
+        player_points = points.points if points else 0
+        
+        # Apply captaincy bonus
+        if active_captain and starter.player_id == active_captain.player_id:
+             total_points += (player_points * 2) # Standard captaincy is 2x
+        else:
+             total_points += player_points
+
+    # 5. SAVE THE FINAL SCORE TO THE DATABASE
+    # -----------------------------------------
+    await db.usergameweekscore.upsert(
+        where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
+        data={
+            'create': {'user_id': user_id, 'gameweek_id': gameweek_id, 'total_points': total_points},
+            'update': {'total_points': total_points}
+        }
+    )
+    
+    return total_points

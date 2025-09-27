@@ -23,10 +23,10 @@ import defaultLogo from '@/assets/images/team-logos/yellow.png';
 export const TEAM_JERSEYS: Record<string, string> = {
   'Satans': satansJersey,
   'Roarers': roarersJersey,
-  'Traana': traanaJersey,
+  'Trana': traanaJersey, // CORRECTED: Key is now 'Trana'
   'Southside': southsideJersey,
   'Titans': titansJersey,
-  'Umang Foundation Trust': umaagJersey,
+  'Umang': umaagJersey, // CORRECTED: Key is now 'Umang'
 };
 
 
