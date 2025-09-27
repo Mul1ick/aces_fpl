@@ -1,17 +1,22 @@
+// File: admin/src/components/shared/CompactInput.tsx
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// 1. Add the optional 'disabled' property to the interface
 interface CompactInputProps {
   value: number;
   onValueChange: (newValue: number) => void;
   min?: number;
   max?: number;
+  disabled?: boolean;
 }
 
-export function CompactInput({ value, onValueChange, min = 0, max = 99 }: CompactInputProps) {
+// 2. Accept 'disabled' in the component's props
+export function CompactInput({ value, onValueChange, min = 0, max = 99, disabled = false }: CompactInputProps) {
   const handleIncrement = () => {
     if (value < max) onValueChange(value + 1);
   };
@@ -31,14 +36,16 @@ export function CompactInput({ value, onValueChange, min = 0, max = 99 }: Compac
     <div className="flex items-center justify-center">
       <div className={cn(
         "flex items-center rounded-md border transition-colors",
-        value > 0 ? 'border-primary bg-primary/5' : 'border-input bg-background'
+        value > 0 && !disabled ? 'border-primary bg-primary/5' : 'border-input bg-background',
+        disabled && 'opacity-50 cursor-not-allowed'
       )}>
         <Button
           size="icon"
           variant="ghost"
           className="h-8 w-7 rounded-r-none border-r"
           onClick={handleDecrement}
-          disabled={value <= min}
+          // 3. Update the disabled logic for the button
+          disabled={disabled || value <= min}
         >
           <Minus className="h-4 w-4" />
         </Button>
@@ -47,13 +54,16 @@ export function CompactInput({ value, onValueChange, min = 0, max = 99 }: Compac
           value={value}
           onChange={handleChange}
           className="h-8 w-10 shrink-0 rounded-none border-0 bg-transparent text-center font-bold text-foreground p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+          // 4. Pass the disabled prop to the input field
+          disabled={disabled}
         />
         <Button
           size="icon"
           variant="ghost"
           className="h-8 w-7 rounded-l-none border-l"
           onClick={handleIncrement}
-          disabled={value >= max}
+          // 5. Update the disabled logic for the button
+          disabled={disabled || value >= max}
         >
           <Plus className="h-4 w-4" />
         </Button>

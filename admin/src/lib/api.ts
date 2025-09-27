@@ -1,14 +1,14 @@
 // Centralized API functions for Aces FPL Admin Portal
 
-import type { 
-  User, 
-  Player, 
-  Team, 
-  Fixture, 
-  Gameweek, 
-  DashboardStats, 
-  PlayerStats, 
-  APIResponse, 
+import type {
+  User,
+  Player,
+  Team,
+  Fixture,
+  Gameweek,
+  DashboardStats,
+  PlayerStats,
+  APIResponse,
   PaginatedResponse,
   PlayerFormData,
   UserUpdateData
@@ -26,12 +26,12 @@ class APIError extends Error {
 
 // Generic API request function with authentication
 async function apiRequest<T>(
-  endpoint: string, 
+  endpoint: string,
   options: RequestInit = {},
   token?: string
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const headers: Record<string, string> = {
     // Default to JSON, but can be overridden
     'Content-Type': 'application/json',
@@ -125,8 +125,6 @@ export const dashboardAPI = {
   },
 };
 
-
-
 // User Management API calls
 export const userAPI = {
   async getPendingUsers(token: string): Promise<User[]> {
@@ -136,7 +134,7 @@ export const userAPI = {
   async getAllUsers(token: string, page = 1, search = ''): Promise<PaginatedResponse<User>> {
     const params = new URLSearchParams({ page: page.toString() });
     if (search) params.append('search', search);
-    
+
     return apiRequest(`/admin/users?${params}`, { method: 'GET' }, token);
   },
 
@@ -172,7 +170,7 @@ export const teamAPI = {
     }, token);
   },
 
-  async updateTeam(teamId: string, team: Partial<Omit<Team, 'id' | 'player_count'>>, token: string) {
+  async updateTeam(teamId: number, team: Partial<Omit<Team, 'id' | 'player_count'>>, token: string) {
     return apiRequest<Team>(`/admin/teams/${teamId}`, {
       method: 'PUT',
       body: JSON.stringify(team),
@@ -193,7 +191,7 @@ export const playerAPI = {
   if (search) params.append('search', search);
   if (team) params.append('team', team);
   if (position) params.append('position', position);
-    
+
   return apiRequest(`/admin/players?${params}`, { method: 'GET' }, token);
 },
 
@@ -224,27 +222,30 @@ export const playerAPI = {
 // Gameweek Management API calls
 export const gameweekAPI = {
   async getGameweeks(token: string): Promise<Gameweek[]> {
-    return apiRequest('/admin/gameweeks', { method: 'GET' }, token);
+    return apiRequest('/gameweeks', { method: 'GET' }, token); // CORRECTED Path
   },
 
   async getCurrentGameweek(token: string): Promise<Gameweek> {
     return apiRequest('/admin/gameweeks/current', { method: 'GET' }, token);
   },
 
+  async getGameweekById(gameweekId: number, token: string): Promise<Gameweek> {
+    return apiRequest(`/admin/gameweeks/${gameweekId}`, { method: 'GET' }, token);
+  },
+
   async getFixtures(gameweekId: string, token: string): Promise<Fixture[]> {
     return apiRequest(`/admin/gameweeks/${gameweekId}/fixtures`, { method: 'GET' }, token);
   },
   async calculatePoints(gameweekId: number, token: string): Promise<{ message: string }> {
-  return apiRequest(`/admin/gameweeks/${gameweekId}/calculate-points`, {
-    method: 'POST',
-  }, token);
-},
-async finalizeGameweek(gameweekId: number, token: string): Promise<{ message: string }> {
-    return apiRequest(`/admin/gameweeks/${gameweekId}/finalize`, {
+    return apiRequest(`/admin/gameweeks/${gameweekId}/calculate-points`, {
       method: 'POST',
     }, token);
   },
-
+  async finalizeGameweek(gameweekId: number, token: string): Promise<{ message: string }> {
+      return apiRequest(`/admin/gameweeks/${gameweekId}/finalize`, {
+        method: 'POST',
+      }, token);
+    },
 
   async submitPlayerStats(
     gameweekId: string | number,
@@ -275,15 +276,8 @@ async finalizeGameweek(gameweekId: number, token: string): Promise<{ message: st
     }, token);
   },
 
-
   async getFixtureStats(fixtureId: string, token: string) {
     return apiRequest(`/admin/fixtures/${fixtureId}/stats`, { method: 'GET' }, token);
-  },
-
-  async calculatePoints(gameweekId: string, token: string): Promise<APIResponse<void>> {
-    return apiRequest(`/admin/gameweeks/${gameweekId}/calculate-points`, {
-      method: 'POST',
-    }, token);
   },
 
   async getGameweekStatus(gameweekId: string, token: string): Promise<{ stats_complete: boolean; ready_to_finalize: boolean }> {
@@ -292,4 +286,3 @@ async finalizeGameweek(gameweekId: number, token: string): Promise<{ message: st
 };
 
 export { APIError };
-

@@ -217,6 +217,7 @@ class GameweekOutWithFixtures(BaseModel):
     gw_number: int
     deadline: datetime
     fixtures: List[FixtureOut] = []
+    status: str
     model_config = ConfigDict(from_attributes=True)
 
 class PlayerSelection(BaseModel):

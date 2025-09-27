@@ -7,10 +7,10 @@ from uuid import UUID
 import asyncio
 from collections import defaultdict
 import logging
-alog = logging.getLogger("aces.admin")
 from app.auth import get_current_admin_user
-from fastapi import Depends
+from datetime import datetime, timezone # <-- ADD THIS IMPORT
 
+alog = logging.getLogger("aces.admin")
 
 router = APIRouter(
     prefix="/admin",
@@ -274,11 +274,60 @@ async def admin_get_current_gameweek(db: Prisma = Depends(get_db)):
         where={"id": {"in": list(team_ids)}},
     )
     team_map = {t.id: t for t in teams}
-
+    
+    is_finished = datetime.now(timezone.utc) > gw.deadline
     return {
         "id": gw.id,
         "gw_number": gw.gw_number,
         "deadline": gw.deadline,
+        "status": "Finalized" if is_finished else "Live",
+        "fixtures": [
+            {
+                "id": f.id,
+                "gameweek_id": f.gameweek_id,
+                "home_team_id": f.home_team_id,
+                "away_team_id": f.away_team_id,
+                "home_score": getattr(f, "home_score", None),
+                "away_score": getattr(f, "away_score", None),
+                "stats_entered": getattr(f, "stats_entered", False),
+                "home_team": {
+                    "id": team_map[f.home_team_id].id,
+                    "name": team_map[f.home_team_id].name,
+                    "short_name": team_map[f.home_team_id].short_name,
+                },
+                "away_team": {
+                    "id": team_map[f.away_team_id].id,
+                    "name": team_map[f.away_team_id].name,
+                    "short_name": team_map[f.away_team_id].short_name,
+                },
+            }
+            for f in fixtures
+        ],
+    }
+
+@router.get("/gameweeks/{gameweek_id}", response_model=schemas.GameweekOutWithFixtures)
+async def admin_get_gameweek_by_id(gameweek_id: int, db: Prisma = Depends(get_db)):
+    gw = await db.gameweek.find_unique(where={"id": gameweek_id})
+    if not gw:
+        raise HTTPException(status_code=404, detail="Gameweek not found.")
+
+    fixtures = await db.fixture.find_many(
+        where={"gameweek_id": gw.id},
+        order={"id": "asc"},
+    )
+
+    team_ids = {f.home_team_id for f in fixtures} | {f.away_team_id for f in fixtures}
+    teams = await db.team.find_many(
+        where={"id": {"in": list(team_ids)}},
+    )
+    team_map = {t.id: t for t in teams}
+
+    is_finished = datetime.now(timezone.utc) > gw.deadline
+    return {
+        "id": gw.id,
+        "gw_number": gw.gw_number,
+        "deadline": gw.deadline,
+        "status": "Finalized" if is_finished else "Live",
         "fixtures": [
             {
                 "id": f.id,
@@ -316,16 +365,9 @@ async def admin_fixture_players(fixture_id: int, db: Prisma = Depends(get_db)):
     return players
 
 def calculate_player_points(position: str, stats: schemas.PlayerStatIn) -> int:
-    """
-    Calculates total points for a player based on all FPL scoring rules.
-    """
     points = 0
-
-    # 1. Points for playing (if toggled)
     if stats.played:
-        points += 1  # CHANGED: This is now conditional
-
-    # 2. Goal points
+        points += 1
     if stats.goals_scored > 0:
         if position == "GK":
             points += stats.goals_scored * 10
@@ -335,30 +377,20 @@ def calculate_player_points(position: str, stats: schemas.PlayerStatIn) -> int:
             points += stats.goals_scored * 5
         elif position == "FWD":
             points += stats.goals_scored * 4
-    
-    # 3. Other points
     points += stats.assists * 3
     points += stats.bonus_points
-
-    # 4. Clean sheet points (if toggled)
     if stats.clean_sheets:
         if position in ["GK", "DEF"]:
             points += 4
         elif position == "MID":
             points += 1
-
-    # 5. Deductions (now using per-player stats from the modal)
     if position in ["GK", "DEF"]:
         points -= (stats.goals_conceded // 2)
-    
     points -= stats.penalties_missed * 2
     points -= stats.own_goals * 2
     points -= stats.yellow_cards * 1
     points -= stats.red_cards * 3
-
     return points
-
-
 
 @router.post("/gameweeks/{gameweek_id}/stats")
 async def admin_submit_fixture_stats(
@@ -390,12 +422,9 @@ async def admin_submit_fixture_stats(
                 continue
 
             total_points = calculate_player_points(player.position, s)
-
-            # Prepare data for upsert, excluding the player_id which is used for connecting
             stat_data = s.model_dump()
             del stat_data['player_id']
 
-            # --- CORRECTED UPSERT LOGIC ---
             await tx.gameweekplayerstats.upsert(
                 where={"gameweek_id_player_id": {"gameweek_id": gameweek_id, "player_id": s.player_id}},
                 data={
@@ -411,15 +440,7 @@ async def admin_submit_fixture_stats(
                     },
                 },
             )
-
     return {"ok": True}
-
-
-
-
-
-
-
 
 @router.get("/fixtures/{fixture_id}/stats", response_model=schemas.FixtureStatsOut)
 async def admin_get_fixture_stats(fixture_id: int, db: Prisma = Depends(get_db)):
@@ -430,10 +451,9 @@ async def admin_get_fixture_stats(fixture_id: int, db: Prisma = Depends(get_db))
     rows = await db.gameweekplayerstats.find_many(
         where={"gameweek_id": fx.gameweek_id}
     )
-    # If you want to limit to only players from the two clubs:
     team_players = await db.player.find_many(
         where={"team_id": {"in": [fx.home_team_id, fx.away_team_id]}},
-        select={"id": True},
+        
     )
     ids = {p.id for p in team_players}
     rows = [r for r in rows if r.player_id in ids]
@@ -457,12 +477,7 @@ async def admin_get_fixture_stats(fixture_id: int, db: Prisma = Depends(get_db))
 
 @router.post("/gameweeks/{gameweek_id}/calculate-points", dependencies=[Depends(get_current_admin_user)])
 async def calculate_gameweek_points(gameweek_id: int, db: Prisma = Depends(get_db)):
-    """
-    Calculates and stores the total points for every active user for a given gameweek.
-    This is the trigger for processing all scores after stats are entered.
-    """
     try:
-        # Get all active users who have a team
         active_users_with_teams = await db.user.find_many(
             where={'is_active': True, 'fantasy_team': {'is_not': None}}
         )
@@ -470,7 +485,6 @@ async def calculate_gameweek_points(gameweek_id: int, db: Prisma = Depends(get_d
         if not active_users_with_teams:
             return {"message": "No active users with teams to process."}
 
-        # Run score calculation for each user
         for user in active_users_with_teams:
             await crud.compute_user_score_for_gw(db, str(user.id), gameweek_id)
 
@@ -479,13 +493,8 @@ async def calculate_gameweek_points(gameweek_id: int, db: Prisma = Depends(get_d
         alog.error(f"Error calculating gameweek points for GW {gameweek_id}: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred during point calculation.")
     
-
 @router.post("/gameweeks/{gameweek_id}/finalize", dependencies=[Depends(get_current_admin_user)])
 async def finalize_gameweek(gameweek_id: int, db: Prisma = Depends(get_db)):
-    """
-    Finalizes a gameweek, which triggers rollover tasks like
-    updating user free transfers.
-    """
     try:
         result_message = await crud.perform_gameweek_rollover_tasks(db, gameweek_id)
         alog.info(f"Gameweek {gameweek_id} finalized successfully. Details: {result_message}")

@@ -64,13 +64,15 @@ export interface Fixture {
 }
 
 export interface Gameweek {
-  id: string;
+  id: number; // CORRECTED: Was 'string'
+  gw_number: number; // ADDED
   name: string;
-  deadline_time: string;
+  deadline: string; // CORRECTED: Was 'deadline_time'
   is_current: boolean;
   is_next: boolean;
   finished: boolean;
   data_checked: boolean;
+  fixtures?: Fixture[]; // ADDED
   transfers_made?: number;
   most_selected?: string;
   most_transferred_in?: string;
