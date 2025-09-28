@@ -907,13 +907,31 @@ async def user_has_team(db: Prisma, user_id: str) -> bool:
 # In backend/app/crud.py
 
 async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
-    # (This function remains the same as the corrected version from the previous step)
     alog.info(f"Starting rollover tasks for Gameweek {completed_gw_id}...")
+
+    # --- START: NEW STATUS UPDATE LOGIC ---
+    async with db.tx() as transaction:
+        # 1. Mark the completed gameweek as FINISHED
+        completed_gw = await transaction.gameweek.update(
+            where={"id": completed_gw_id},
+            data={"status": "FINISHED"}
+        )
+        if not completed_gw:
+            raise Exception(f"Could not find the gameweek to finalize: ID {completed_gw_id}")
+        alog.info(f"Gameweek {completed_gw.gw_number} status set to FINISHED.")
+
+        # 2. Find the next gameweek by number and set it to LIVE
+        next_gw_number = completed_gw.gw_number + 1
+        await transaction.gameweek.update_many(
+            where={"gw_number": next_gw_number},
+            data={"status": "LIVE"}
+        )
+        alog.info(f"Gameweek {next_gw_number} status set to LIVE.")
+    # --- END: NEW STATUS UPDATE LOGIC ---
 
     active_users = await db.user.find_many(
         where={'is_active': True, 'fantasy_team': {'is_not': None}}
     )
-
     if not active_users:
         alog.info(f"No active users with teams to process for Gameweek {completed_gw_id}.")
         return "No active users with teams to process."
@@ -931,13 +949,11 @@ async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
         distinct=['user_id']
     )
     user_ids_in_gw = {u.user_id for u in users_in_completed_gw}
-
     first_gameweek_entries = await db.userteam.group_by(
         by=['user_id'],
         min={'gameweek_id': True},
         where={'user_id': {'in': list(user_ids_in_gw)}}
     )
-    
     new_players_to_flag = [
         entry['user_id'] for entry in first_gameweek_entries
         if entry['_min']['gameweek_id'] == completed_gw_id
@@ -949,7 +965,7 @@ async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
                 where={'id': {'in': new_players_to_flag}},
                 data={'played_first_gameweek': True}
             )
-            alog.info(f"Flagged {update_count_result} new players as having played their first gameweek.")
+            alog.info(f"Flagged {update_count_result.count} new players as having played their first gameweek.")
 
         # --- Step 4: Add 1 free transfer to all users who have played ---
         await transaction.query_raw(

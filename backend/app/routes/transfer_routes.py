@@ -1,5 +1,6 @@
 # app/routes/transfer_routes.py
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
+from datetime import datetime, timezone # Make sure this import is at the top
 from prisma import Prisma
 from app.database import get_db
 from app.crud import get_current_gameweek, get_transfer_stats
@@ -28,23 +29,29 @@ async def transfer_stats(
 
 @router.post("/confirm")
 async def confirm_transfers(
-    payload: schemas.ConfirmTransfersRequest,  # <-- Use the new schema here
+    payload: schemas.ConfirmTransfersRequest,
     db: Prisma = Depends(get_db),
     current_user: PrismaModels.User = Depends(get_current_user),
 ):
     """
-    Receives a 'basket' of transfers, validates them against all game
-    rules (budget, squad composition, etc.), and commits them in a
-    single atomic transaction if valid.
+    Confirms transfers for the next UPCOMING gameweek.
     """
-    current_gw = await crud.get_current_gameweek(db)
-    if not current_gw:
-        raise HTTPException(status_code=404, detail="No active gameweek found.")
+    # Find the gameweek that is open for transfers
+    upcoming_gw = await db.gameweek.find_first(
+        where={'status': 'UPCOMING'},
+        order={'gw_number': 'asc'}
+    )
+    if not upcoming_gw:
+        raise HTTPException(status_code=400, detail="There is no gameweek currently open for transfers.")
+    
+    # Also check the deadline as an extra layer of security
+    if upcoming_gw.deadline < datetime.now(timezone.utc):
+         raise HTTPException(status_code=400, detail=f"The deadline for Gameweek {upcoming_gw.gw_number} has passed.")
 
-    # This function already expects the list of transfers
+    # Call the existing crud function, but pass the upcoming gameweek's ID
     return await crud.confirm_transfers(
         db=db,
         user_id=str(current_user.id),
-        gameweek_id=current_gw.id,
+        gameweek_id=upcoming_gw.id,
         transfers=payload.transfers,
     )

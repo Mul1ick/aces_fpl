@@ -8,7 +8,12 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL") // <-- ADD THIS LINE
+}
 
+enum GameweekStatus {
+  UPCOMING
+  LIVE
+  FINISHED
 }
 
 model User {
@@ -68,6 +73,9 @@ model Gameweek {
   id          Int      @id @default(autoincrement())
   gw_number   Int      @unique
   deadline    DateTime @db.Timestamptz(6)
+  status      GameweekStatus @default(UPCOMING)
+
+  
   user_teams  UserTeam[]
   fixtures   Fixture[]
   gameweek_player_stats GameweekPlayerStats[]

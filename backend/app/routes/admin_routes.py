@@ -327,7 +327,7 @@ async def admin_get_gameweek_by_id(gameweek_id: int, db: Prisma = Depends(get_db
         "id": gw.id,
         "gw_number": gw.gw_number,
         "deadline": gw.deadline,
-        "status": "Finalized" if is_finished else "Live",
+        "status": gw.status,
         "fixtures": [
             {
                 "id": f.id,
