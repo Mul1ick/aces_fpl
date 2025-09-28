@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Search, Trophy, ChevronLeft, ChevronRight, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -56,6 +57,7 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
 
 const Leaderboard: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +66,12 @@ const Leaderboard: React.FC = () => {
   const itemsPerPage = 20;
   const navigate = useNavigate();
 const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null);
+
+
+  const deadlineHasPassed = useMemo(() => {
+    if (!currentGameweek?.deadline_time) return false;
+    return new Date() > new Date(currentGameweek.deadline_time);
+  }, [currentGameweek]);
 
   useEffect(() => {
   const token = localStorage.getItem("access_token");
@@ -130,13 +138,27 @@ const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null
 }, []);
 
 const handleRowClick = (entry: LeaderboardEntry) => {
-  if (!currentGameweek) return;
+  if (!currentGameweek) {
+    toast({ variant: "destructive", title: "Cannot view team", description: "Gameweek data is not available." });
+    return;
+  }
 
-  const targetGwNumber = Number(currentGameweek.gw_number) || 1; // ← use current GW
+  const currentGwNumber = Number(currentGameweek.gw_number);
   const userKey = entry.user_id || entry.manager_email;
   if (!userKey) return;
 
+  // Rule 1: It's Gameweek 1 and the deadline has NOT passed.
+  if (currentGwNumber === 1 && !deadlineHasPassed) {
+    toast({ title: "Team Hidden", description: "You can view other managers' teams after the first gameweek deadline." });
+    return;
+  }
+
+  // Rule 2 & 3: If deadline has passed, show current GW. If not, show previous GW.
+  const targetGwNumber = deadlineHasPassed ? currentGwNumber : currentGwNumber - 1;
+
+  // Navigate to the team view page with the correctly determined gameweek number.
   navigate(`/team-view/${encodeURIComponent(userKey)}/${targetGwNumber}`);
+
 };
 
 
