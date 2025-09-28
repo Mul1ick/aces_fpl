@@ -12,7 +12,7 @@ import southsideJersey from '@/assets/images/jerseys/southside.png';
 import titansJersey from '@/assets/images/jerseys/titans.png';
 import umaagJersey from '@/assets/images/jerseys/umang.png';
 import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png'
-
+import tshirtRed from '@/assets/images/jerseys/tshirt-red.png'
 const TEAM_JERSEYS = {
   'Satans': satansJersey,
     'Roarers': roarersJersey,

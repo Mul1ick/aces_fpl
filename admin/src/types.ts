@@ -1,5 +1,8 @@
 // Core Types for Aces FPL Admin Portal
 
+// --- NEW ---
+export type GameweekStatus = 'UPCOMING' | 'LIVE' | 'FINISHED' | 'Calculating' | 'Points Calculated';
+
 export interface User {
   id: string;
   email: string;
@@ -15,14 +18,13 @@ export interface Team {
   id: number;
   name: string;
   short_name: string;
-  logo_url?: string; // Added for team logos
-  next_fixture?: string; // Added for next fixture
+  logo_url?: string;
+  next_fixture?: string;
   primary_color?: string;
   secondary_color?: string;
   player_count?: number;
 }
 
-// Player Status Type
 export type PlayerStatus = 'ACTIVE' | 'INJURED' | 'SUSPENDED' ;
 
 export interface Player {
@@ -64,15 +66,16 @@ export interface Fixture {
 }
 
 export interface Gameweek {
-  id: number; // CORRECTED: Was 'string'
-  gw_number: number; // ADDED
+  id: number;
+  gw_number: number;
   name: string;
-  deadline: string; // CORRECTED: Was 'deadline_time'
+  deadline: string;
+  status: GameweekStatus; // <-- MODIFIED
   is_current: boolean;
   is_next: boolean;
   finished: boolean;
   data_checked: boolean;
-  fixtures?: Fixture[]; // ADDED
+  fixtures?: Fixture[];
   transfers_made?: number;
   most_selected?: string;
   most_transferred_in?: string;
@@ -98,7 +101,6 @@ export interface PlayerStats {
   bonus_points: number;
 }
 
-// --- NEWLY ADDED INTERFACE FOR THE STATS MODAL ---
 export interface PlayerGameweekStats {
   played: boolean;
   goals_scored: number;
