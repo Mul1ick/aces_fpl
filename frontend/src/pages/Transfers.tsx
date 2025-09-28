@@ -183,6 +183,8 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
   useEffect(() => {
     if (!squadValidation.isValid && squadValidation.errorTeam) {
       setNotification({ message: `You cannot have more than 2 players from ${squadValidation.errorTeam}.`, type: 'error' });
+    } else if (bank < 0) {
+      setNotification({ message: `You are £${Math.abs(bank).toFixed(1)}m over budget.`, type: 'error' });
     } else {
       setNotification(null);
     }
@@ -391,14 +393,14 @@ const handlePlayerRemove = (position: string, index: number) => {
             {hasTeam ? (
                <Button
                   onClick={() => handleConfirmTransfers()}
-                  disabled={!squadValidation.isValid || playersOut.length === 0}
+                  disabled={!squadValidation.isValid || playersOut.length === 0 || bank <0}
                 >
                   Make Transfers
                 </Button>
             ) : (
               <Button
                 onClick={() => setIsEnterSquadModalOpen(true)}
-                disabled={playersSelected !== 11 || !squadValidation.isValid}
+                disabled={playersSelected !== 11 || !squadValidation.isValid || bank<0}
               >
                 Enter Squad
               </Button>

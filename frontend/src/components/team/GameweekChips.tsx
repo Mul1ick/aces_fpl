@@ -90,8 +90,15 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
                   {isActive && (
                     <button
                       onClick={onCancelChip}
-                      disabled={loading}
-                      className="mt-1 w-full px-3 py-1 rounded-full bg-gradient-to-r from-accent-teal to-accent-blue"
+                      // Disable cancellation if the active chip is a Wildcard
+                      disabled={loading || status.active === 'WILDCARD'}
+                      className={cn(
+                        "mt-1 w-full px-3 py-1 rounded-full bg-gradient-to-r from-accent-teal to-accent-blue",
+                        // Visually indicate that the button is disabled
+                        status.active === 'WILDCARD' && "opacity-60 cursor-not-allowed"
+                      )}
+                      // Add a title to explain why it's disabled
+                      title={status.active === 'WILDCARD' ? "Wildcard cannot be cancelled" : "Cancel Chip"}
                     >
                       {/* --- MODIFIED: Text is now black for contrast --- */}
                       <p className="text-xs font-bold text-black">Active</p>

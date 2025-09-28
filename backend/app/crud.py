@@ -1016,20 +1016,25 @@ async def cancel_chip(db: Prisma, user_id: str, gameweek_id: int | None):
     now_utc = datetime.now(timezone.utc)
     if gw.deadline < now_utc:
         raise HTTPException(400, "Cannot cancel after deadline.")
+
+    # 1. Find the active chip for the gameweek
+    active_chip = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gw.id}
+    )
+
+    # 2. If no chip is active, there's nothing to do
+    if not active_chip:
+        return {"ok": True, "message": "No active chip to cancel."}
+
+    # 3. If the active chip is a Wildcard, raise an error
+    if active_chip.chip == "WILDCARD":
+        raise HTTPException(status_code=400, detail="A played Wildcard cannot be cancelled.")
+
+    # 4. If it's another type of chip, proceed with deletion
     await db.userchip.delete_many(where={'user_id': user_id, 'gameweek_id': gw.id})
     return {"ok": True}
 
-async def is_wildcard_active(db: Prisma, user_id: str, gameweek_id: int) -> bool:
-    row = await db.userchip.find_first(
-        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'chip': 'WILDCARD'}
-    )
-    return bool(row)
 
-async def is_triple_captain_active(db: Prisma, user_id: str, gameweek_id: int) -> bool:
-    row = await db.userchip.find_first(
-        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'chip': 'TRIPLE_CAPTAIN'}
-    )
-    return bool(row)
 
 async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) -> int:
     # Fetch team for the GW
@@ -1430,27 +1435,68 @@ async def confirm_transfers(
 
         if not current_team:
             raise HTTPException(status_code=404, detail="User has no team for this gameweek.")
+        
+        # --- START: REVISED CAPTAIN RE-ASSIGNMENT LOGIC ---
+        
+        players_out_ids = {t.out_player_id for t in transfers}
+        current_captain = next((p for p in current_team if p.is_captain), None)
+        current_vice_captain = next((p for p in current_team if p.is_vice_captain), None)
+
+        if current_captain and current_captain.player_id in players_out_ids:
+            if current_vice_captain and current_vice_captain.player_id not in players_out_ids:
+                # Use the compound unique key to ensure the correct record is updated
+                await tx.userteam.update(
+                    where={
+                        "user_id_gameweek_id_player_id": {
+                            "user_id": user_id,
+                            "gameweek_id": gameweek_id,
+                            "player_id": current_vice_captain.player_id,
+                        }
+                    },
+                    data={
+                        "is_captain": True,
+                        "is_vice_captain": False
+                    }
+                )
+        # --- END: REVISED CAPTAIN RE-ASSIGNMENT LOGIC ---
+
 
         # --- TRANSFER VALIDATION & COST CALCULATION ---
+        is_unlimited_transfers = (active_wildcard is not None) or (not user.played_first_gameweek)
+
         transfer_hits = 0
         new_free_transfers = user.free_transfers
         num_transfers = len(transfers)
 
-        if not is_wildcard_active:
-            # 2. Apply normal transfer rules ONLY if wildcard is NOT active
-            if num_transfers > new_free_transfers:
-                paid_transfers = num_transfers - new_free_transfers
+        if not is_unlimited_transfers:
+            # This block now ONLY runs for existing players without a wildcard
+            if num_transfers > user.free_transfers:
+                paid_transfers = num_transfers - user.free_transfers
                 transfer_hits = paid_transfers * 4  # 4 points per transfer
             
             # Deduct used transfers, but don't go below zero
-            new_free_transfers = max(0, new_free_transfers - num_transfers)
+            new_free_transfers = max(0, user.free_transfers - num_transfers)
+
+
         
         # --- (Your existing budget and squad validation logic would go here) ---
         # For now, we are focusing on the transfer cost logic.
 
         # --- EXECUTE TRANSFERS ---
         for transfer_item in transfers:
-            # Remove the outgoing player
+            # 1. Find the outgoing player's status before deleting them
+            outgoing_player_entry = next(
+                (p for p in current_team if p.player_id == transfer_item.out_player_id), None
+            )
+
+            # 2. Inherit the 'benched' status. Default to bench if not found.
+            is_benched = outgoing_player_entry.is_benched if outgoing_player_entry else True
+
+            # If the outgoing player was captain/vice, the new player is not benched
+            if outgoing_player_entry and (outgoing_player_entry.is_captain or outgoing_player_entry.is_vice_captain):
+                is_benched = False
+
+            # 3. Remove the outgoing player
             await tx.userteam.delete_many(
                 where={
                     "user_id": user_id,
@@ -1458,16 +1504,21 @@ async def confirm_transfers(
                     "player_id": transfer_item.out_player_id,
                 }
             )
-            # Add the incoming player
+
+            # 4. Add the incoming player with the inherited benched status
+            # Captaincy is NEVER inherited.
             await tx.userteam.create(
                 data={
                     "user_id": user_id,
                     "gameweek_id": gameweek_id,
                     "player_id": transfer_item.in_player_id,
-                    "is_benched": True,  # New players are added to the bench by default
+                    "is_benched": is_benched,
+                    "is_captain": False,
+                    "is_vice_captain": False,
                 }
             )
-            # Log the transfer
+
+            # 5. Log the transfer
             await tx.transfer_log.create(
                 data={
                     "user_id": user_id,
@@ -1477,20 +1528,22 @@ async def confirm_transfers(
                 }
             )
 
+
         # --- UPDATE USER STATE ---
-        if not is_wildcard_active:
-            # 3. Update free transfers and score only if wildcard is NOT active
+        if not is_unlimited_transfers:
             await tx.user.update(
                 where={"id": user_id},
                 data={"free_transfers": new_free_transfers}
             )
-            await tx.usergameweekscore.upsert(
-                where={"user_id_gameweek_id": {"user_id": user_id, "gameweek_id": gameweek_id}},
-                data={
-                    "create": {"user_id": user_id, "gameweek_id": gameweek_id, "transfer_hits": transfer_hits},
-                    "update": {"transfer_hits": {"increment": transfer_hits}},
-                },
-            )
+            if transfer_hits > 0:
+                await tx.usergameweekscore.upsert(
+                    where={"user_id_gameweek_id": {"user_id": user_id, "gameweek_id": gameweek_id}},
+                    data={
+                        "create": {"user_id": user_id, "gameweek_id": gameweek_id, "transfer_hits": transfer_hits},
+                        "update": {"transfer_hits": {"increment": transfer_hits}},
+                    },
+                )
+
 
     # Return the updated team view
     return await get_user_team_full(db, user_id, gameweek_id)
