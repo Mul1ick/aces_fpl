@@ -1,16 +1,16 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { GameweekInfoCard } from '@/components/gameweek/GameweekInfoCard';
-import { FixturesList } from '@/components/gameweek/FixturesList';
-import { StatsEntryModal } from '@/components/gameweek/StatsEntryModal';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '../hooks/use-toast';
+import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { GameweekInfoCard } from '../components/gameweek/GameweekInfoCard';
+import { FixturesList } from '../components/gameweek/FixturesList';
+import { StatsEntryModal } from '../components/gameweek/StatsEntryModal';
+import { Button } from '../components/ui/button';
+import { Card, CardContent } from '../components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { ChevronLeft, ChevronRight, Check, ShieldQuestion, Loader2, PlayCircle } from 'lucide-react';
-import type { Player, PlayerGameweekStats, Gameweek } from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
-import { gameweekAPI, playerAPI, API_BASE_URL } from '@/lib/api';
+import type { Player, PlayerGameweekStats, Gameweek } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { gameweekAPI, playerAPI, API_BASE_URL } from '../lib/api';
 
 // A new component for navigation
 const GameweekNavigator = ({ allGameweeks, selectedId, onNavigate, onSelect }) => {
@@ -69,7 +69,6 @@ export function GameweekPage() {
         const sortedGws = allGws.sort((a, b) => a.gw_number - b.gw_number);
         setAllGameweeks(sortedGws);
 
-        // Determine which gameweek to select initially
         const liveGw = sortedGws.find(gw => gw.status === 'LIVE');
         const upcomingGw = sortedGws.find(gw => gw.status === 'UPCOMING');
         
@@ -78,7 +77,7 @@ export function GameweekPage() {
         } else if (upcomingGw) {
             setSelectedGameweekId(upcomingGw.id);
         } else if (sortedGws.length > 0) {
-            setSelectedGameweekId(sortedGws[sortedGws.length - 1].id); // Fallback to last GW
+            setSelectedGameweekId(sortedGws[sortedGws.length - 1].id);
         }
     } catch (err) {
         console.error("[GameweekPage] Failed to load initial data:", err);
@@ -131,11 +130,52 @@ export function GameweekPage() {
   const allStatsEntered = useMemo(() => fixtures.length > 0 && fixtures.every(f => f.stats_entered), [fixtures]);
 
   const handleOpenStatsModal = async (fixtureId: number) => {
-    // This function's implementation remains the same
+    const t = token || localStorage.getItem("admin_token");
+    const fx = fixtures.find(f => f.id === fixtureId);
+    if (!t || !fx) return;
+
+    try {
+      setModalLoading(true);
+      setSelectedFixture(fx);
+
+      const [players, savedStats] = await Promise.all([
+        gameweekAPI.getPlayersForFixture(fx.id, t),
+        gameweekAPI.getFixtureStats(String(fx.id), t)
+      ]);
+
+      setModalPlayers(players);
+      
+      const statsMap = (savedStats as any).player_stats.reduce((acc, stat) => {
+        acc[stat.player_id] = stat;
+        return acc;
+      }, {});
+      setInitialModalStats(statsMap);
+
+    } catch (e:any) {
+      toast({ variant: "destructive", title: "Load failed", description: e.message || "Could not load fixture data." });
+      setSelectedFixture(null);
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   const handleSaveStats = async (fixtureId: number, scores: {home_score: number, away_score: number}, statsMap: {[playerId: number]: PlayerGameweekStats}) => {
-     // This function's implementation remains the same
+    const t = token || localStorage.getItem("admin_token");
+    if (!t || !gameweek) return;
+    const player_stats = Object.entries(statsMap).map(([pid, s]) => ({
+      player_id: Number(pid), played: s.played ?? false, goals_scored: s.goals_scored ?? 0,
+      assists: s.assists ?? 0, clean_sheets: s.clean_sheets ?? false, goals_conceded: s.goals_conceded ?? 0,
+      own_goals: s.own_goals ?? 0, penalties_missed: s.penalties_missed ?? 0, yellow_cards: s.yellow_cards ?? 0,
+      red_cards: s.red_cards ?? 0, bonus_points: s.bonus_points ?? 0,
+    }));
+    try {
+      await gameweekAPI.submitPlayerStats(gameweek.id, fixtureId, { home_score: scores.home_score, away_score: scores.away_score, player_stats }, t);
+      setFixtures(prev => prev.map(f => f.id === fixtureId ? { ...f, stats_entered: true, ...scores } : f));
+      setSelectedFixture(null);
+      toast({ title: "Saved", description: "Stats updated successfully." });
+    } catch (e:any) {
+      toast({ variant: "destructive", title: "Save failed", description: e.message || "An unknown error occurred." });
+    }
   };
 
   const handleStartSeason = useCallback(async () => {
@@ -150,7 +190,7 @@ export function GameweekPage() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || "Failed to start season.");
         toast({ title: "Success", description: data.message });
-        await fetchAllGameweekData(); // Refresh all data
+        await fetchAllGameweekData();
     } catch (error: any) {
         toast({ variant: "destructive", title: "Failed to Start Season", description: error.message });
     }
@@ -158,7 +198,19 @@ export function GameweekPage() {
 
 
   const handleCalculatePoints = useCallback(async () => {
-    // This function's implementation remains the same
+    const t = token || localStorage.getItem("admin_token");
+    if (!t || !gameweek) return;
+    setConfirming(null);
+    toast({ title: "Processing...", description: "Calculating points for all users. This may take a moment." });
+    try {
+      setGameweek(gw => ({ ...gw, status: 'Calculating' }));
+      const response = await gameweekAPI.calculatePoints(gameweek.id, t);
+      setGameweek(gw => ({ ...gw, status: 'Points Calculated' }));
+      toast({ title: "Success!", description: response.message || "Points calculation complete." });
+    } catch (error: any) {
+      setGameweek(gw => ({ ...gw, status: 'LIVE' }));
+      toast({ variant: "destructive", title: "Calculation Failed", description: error.message || "An error occurred." });
+    }
   }, [token, gameweek, toast]);
 
   const handleFinalizeGameweek = useCallback(async () => {
@@ -168,7 +220,7 @@ export function GameweekPage() {
     try {
         await gameweekAPI.finalizeGameweek(gameweek.id, t);
         toast({ title: `Gameweek ${gameweek.gw_number} Finalized!` });
-        await fetchAllGameweekData(); // Refresh the entire state
+        await fetchAllGameweekData();
     } catch (error: any) {
         toast({ variant: "destructive", title: "Finalization Failed", description: error.message });
     }
@@ -177,7 +229,6 @@ export function GameweekPage() {
   const MainActionButton = () => {
     if (!gameweek) return null;
 
-    // Check if the season has started (i.e., if any GW is not UPCOMING)
     const isSeasonStarted = allGameweeks.some(gw => gw.status !== 'UPCOMING');
 
     if (!isSeasonStarted && gameweek.gw_number === 1) {
@@ -265,7 +316,7 @@ export function GameweekPage() {
       ) : gameweek && (
         <>
           <GameweekInfoCard gameweek={gameweek} />
-          <FixturesList fixtures={fixtures} onOpenStatsModal={handleOpenStatsModal} />
+          <FixturesList fixtures={fixtures} gameweekStatus={gameweek.status} onOpenStatsModal={handleOpenStatsModal} />
           {gameweek.status !== 'FINISHED' && (
             <Card className="admin-card-shadow">
               <CardContent className="p-6 flex items-center justify-center">

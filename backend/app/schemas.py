@@ -5,12 +5,7 @@ from datetime import datetime
 
 # --- Generic Type for Paginated Response ---
 PlayerStatus = Literal['ACTIVE', 'INJURED', 'SUSPENDED']
-
 T = TypeVar('T')
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
 
 class PaginatedResponse(BaseModel, Generic[T]):
     items: List[T]
@@ -32,16 +27,14 @@ class UserOut(UserBase):
     is_active: bool
     role: str
     has_team: bool
-    free_transfers: int = 0                 # ← add default
+    free_transfers: int = 0
     played_first_gameweek: bool = False
-
-    # created_at is no longer required by the API response
     
     class Config:
         from_attributes = True
 
 class UserUpdateRole(BaseModel):
-    role: str # 'admin' or 'user'
+    role: str
 
 class BulkApproveRequest(BaseModel):
     user_ids: List[UUID]
@@ -68,6 +61,16 @@ class TeamUpdate(BaseModel):
     name: Optional[str] = None
     short_name: Optional[str] = None
 
+class TeamOutWithCount(TeamOut):
+    player_count: int
+
+class TeamTiny(BaseModel):
+    id: int
+    name: str
+    short_name: str
+    logo_url: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
 # --- Player Schemas ---
 class PlayerBase(BaseModel):
     full_name: str
@@ -75,8 +78,6 @@ class PlayerBase(BaseModel):
     price: float
     team_id: int
     status: PlayerStatus
-    
-
 
 class PlayerCreate(PlayerBase):
     pass
@@ -86,16 +87,26 @@ class PlayerOut(PlayerBase):
     team: TeamOut
     model_config = ConfigDict(from_attributes=True)
 
-# --- FPL Specific Schemas (from your original file) ---
+Position = Literal['GK', 'DEF', 'MID', 'FWD']
+class PlayerUpdate(BaseModel):
+    full_name: Optional[str] = None
+    position: Optional[Position] = None
+    price: Optional[float] = None
+    status: Optional[PlayerStatus] = None
+    team_id: Optional[int] = None
+
+# --- FPL Specific Schemas ---
 class PlayerSelection(BaseModel):
     id: int
-    position:str
     is_captain: bool = False
     is_vice_captain: bool = False
     is_benched: bool = False
 
 class SubmitTeamRequest(BaseModel):
     team_name:str
+    players: List[PlayerSelection]
+
+class SaveTeamPayload(BaseModel):
     players: List[PlayerSelection]
 
 class PlayerDisplay(BaseModel):
@@ -110,7 +121,7 @@ class PlayerDisplay(BaseModel):
     points: int
     fixture_str: Optional[str] = None
     recent_fixtures: Optional[List[Dict[str, Any]]] = None
-    raw_stats: Optional[Dict[str, int]] = None   # minutes, goals_scored, assists, yellow_cards, red_cards, bonus_points
+    raw_stats: Optional[Dict[str, int]] = None
     breakdown: Optional[List[Dict[str, int | str]]] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -126,80 +137,31 @@ class LeaderboardEntry(BaseModel):
     manager_email: str
     user_id: str
 
-# --- Admin Dashboard Schemas ---
-class Gameweek(BaseModel):
-    id: int
-    gw_number: int
-    deadline: datetime
-    name: str
-    finished: bool
-    is_current: bool
-    is_next: bool
-    data_checked: bool
-
-    model_config = ConfigDict(from_attributes=True)
-
-class Activity(BaseModel):
-    id: str
-    type: str
-    description: str
-    timestamp: datetime
-    model_config = ConfigDict(from_attributes=True)
-
-class DashboardStats(BaseModel):
-    pending_users: int
-    total_users: int
-    total_players: int
-    current_gameweek: Optional[Gameweek] = None
-    recent_activities: List[Activity]
-
 class TransferRequest(BaseModel):
     out_player_id: int
     in_player_id: int
+    
+class TransferItem(BaseModel):
+    out_player_id: int
+    in_player_id: int
+
+class ConfirmTransfersRequest(BaseModel):
+    transfers: List[TransferItem]
 
 class SetArmbandRequest(BaseModel):
     player_id: int
-    kind: str = Field(pattern="^(C|VC)$")  # C = captain, VC = vice-captain
+    kind: str = Field(pattern="^(C|VC)$")
 
-class SaveTeamPayload(BaseModel):
-    players: list[dict]
+ChipName = Literal['TRIPLE_CAPTAIN', 'WILDCARD']
+class PlayChipRequest(BaseModel):
+    chip: ChipName
+    gameweek_id: Optional[int] = None
 
+class ChipStatus(BaseModel):
+    active: Optional[ChipName] = None
+    used: List[ChipName] = []
 
-Position = Literal['GK', 'DEF', 'MID', 'FWD']
-class PlayerUpdate(BaseModel):
-    full_name: Optional[str] = None
-    position: Optional[Position] = None
-    price: Optional[float] = None
-    status: Optional[PlayerStatus] = None
-    team_id: Optional[int] = None
-
-    @field_validator('price', mode='before')
-    @classmethod
-    def _price(cls, v):
-        return None if v is None else float(v)
-
-    @field_validator('team_id', mode='before')
-    @classmethod
-    def _team(cls, v):
-        return None if v is None else int(v)
-
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: UserOut
-
-
-class TeamOutWithCount(TeamOut):
-    player_count: int
-
-
-class TeamTiny(BaseModel):
-    id: int
-    name: str
-    short_name: str
-    logo_url: Optional[str] = None
-    model_config = ConfigDict(from_attributes=True)
-
+# --- Gameweek & Fixture Schemas ---
 class FixtureOut(BaseModel):
     id: int
     gameweek_id: int
@@ -210,6 +172,7 @@ class FixtureOut(BaseModel):
     stats_entered: Optional[bool] = None
     home_team: TeamTiny
     away_team: TeamTiny
+    kickoff: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 class GameweekOutWithFixtures(BaseModel):
@@ -220,39 +183,19 @@ class GameweekOutWithFixtures(BaseModel):
     status: str
     model_config = ConfigDict(from_attributes=True)
 
-class PlayerSelection(BaseModel):
-    id: int
-    is_captain: bool = False
-    is_vice_captain: bool = False
-    is_benched: bool = False
-
-class SaveTeamPayload(BaseModel):
-    players: List[PlayerSelection]
-
-ChipName = Literal['TRIPLE_CAPTAIN', 'WILDCARD']
-
-class PlayChipRequest(BaseModel):
-    chip: ChipName
-    gameweek_id: Optional[int] = None  # default = current GW
-
-class ChipStatus(BaseModel):
-    active: Optional[ChipName] = None
-    used: List[ChipName] = []
-
-
+# --- Stats Schemas ---
 class PlayerStatIn(BaseModel):
     player_id: int
-    played: bool = False                # NEW: To track if the player played
+    played: bool = False
     goals_scored: int = 0
     assists: int = 0
-    clean_sheets: bool = False          # NEW: Direct toggle from the modal
-    goals_conceded: int = 0             # NEW: Per-player stat
-    own_goals: int = 0                  # NEW
-    penalties_missed: int = 0           # NEW
+    clean_sheets: bool = False
+    goals_conceded: int = 0
+    own_goals: int = 0
+    penalties_missed: int = 0
     yellow_cards: int = 0
     red_cards: int = 0
     bonus_points: int = 0
-
 
 class SubmitFixtureStats(BaseModel):
     fixture_id: int
@@ -272,8 +215,7 @@ class PlayerStatOut(BaseModel):
 class FixtureStatsOut(BaseModel):
     home_score: int | None = None
     away_score: int | None = None
-    player_stats: list[PlayerStatOut]
-
+    player_stats: list[PlayerStatIn] # Use PlayerStatIn to match what the frontend expects
 
 class GameweekStatsOut(BaseModel):
     user_points: int
@@ -295,19 +237,35 @@ class TeamOfTheWeekOut(BaseModel):
     points: int
     starting: List[PlayerDisplay]
     bench: List[PlayerDisplay]
+    
+# --- Admin Dashboard Schemas ---
+class Gameweek(BaseModel):
+    id: int
+    gw_number: int
+    deadline: datetime
+    name: str
+    finished: bool
+    is_current: bool
+    is_next: bool
+    data_checked: bool
+    model_config = ConfigDict(from_attributes=True)
 
-class LeaderboardEntry(BaseModel):
-    rank: int
-    team_name: str
-    manager_email: EmailStr  # Add this field
-    total_points: int
-    user_id: str
+class Activity(BaseModel):
+    id: str
+    type: str
+    description: str
+    timestamp: datetime
+    model_config = ConfigDict(from_attributes=True)
 
+class DashboardStats(BaseModel):
+    pending_users: int
+    total_users: int
+    total_players: int
+    current_gameweek: Optional[Gameweek] = None
+    recent_activities: List[Activity]
 
-class TransferItem(BaseModel):
-    out_player_id: int
-    in_player_id: int
-
-class ConfirmTransfersRequest(BaseModel):
-    transfers: List[TransferItem]
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
 
