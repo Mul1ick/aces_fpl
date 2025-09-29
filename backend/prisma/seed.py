@@ -1,3 +1,4 @@
+# FILE: backend/prisma/seed.py
 import asyncio
 from datetime import datetime, timedelta
 import sys
@@ -10,27 +11,29 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from prisma import Prisma
 from app.auth import hash_password
 
-# --- CONFIGURATION FOR THE INVESTOR PITCH DEMO ---
+# --- NEW CONFIGURATION FOR DEMO ---
 
-# Base date for the simulation (Tomorrow)
-PITCH_DAY_TOMORROW = datetime.now(ZoneInfo("Asia/Kolkata")).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-PITCH_DAY_AFTER = PITCH_DAY_TOMORROW + timedelta(days=1)
+# Base dates for the simulation, set to your current request time
+TODAY = datetime(2025, 9, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
+TOMORROW = TODAY + timedelta(days=1)
 
-# --- MODIFIED: New compressed schedule for the pitch ---
+# --- UPDATED GAMEWEEK SCHEDULE ---
+# Gameweeks 1-5 are on September 30th, and 6-10 are on October 1st.
 GAMEWEEK_SCHEDULE = {
-    1: PITCH_DAY_TOMORROW.replace(hour=11, minute=0),  # Tomorrow at 11 AM
-    2: PITCH_DAY_TOMORROW.replace(hour=14, minute=0),  # Tomorrow at 2 PM
-    3: PITCH_DAY_TOMORROW.replace(hour=17, minute=0),  # Tomorrow at 5 PM
-    4: PITCH_DAY_TOMORROW.replace(hour=20, minute=0),  # Tomorrow at 8 PM
-    5: PITCH_DAY_AFTER.replace(hour=11, minute=0),   # Day after at 11 AM
-    6: PITCH_DAY_AFTER.replace(hour=14, minute=0),   # Day after at 2 PM
-    7: PITCH_DAY_AFTER.replace(hour=17, minute=0),   # Day after at 5 PM
-    8: PITCH_DAY_AFTER.replace(hour=20, minute=0),   # Day after at 8 PM
-    9: PITCH_DAY_AFTER.replace(hour=22, minute=0),
-    10: PITCH_DAY_AFTER.replace(hour=23, minute=0)
+    1: TODAY.replace(hour=12, minute=0),  # Today at 12 PM
+    2: TODAY.replace(hour=14, minute=0),  # Today at 2 PM
+    3: TODAY.replace(hour=16, minute=0),  # Today at 4 PM
+    4: TODAY.replace(hour=18, minute=0),  # Today at 6 PM
+    5: TODAY.replace(hour=20, minute=0),  # Today at 8 PM
+    6: TOMORROW.replace(hour=12, minute=0), # Tomorrow at 12 PM
+    7: TOMORROW.replace(hour=14, minute=0), # Tomorrow at 2 PM
+    8: TOMORROW.replace(hour=16, minute=0), # Tomorrow at 4 PM
+    9: TOMORROW.replace(hour=18, minute=0), # Tomorrow at 6 PM
+    10: TOMORROW.replace(hour=20, minute=0) # Tomorrow at 8 PM
 }
 
-# --- MODIFIED: New fixture list from the provided image ---
+
+# --- EXISTING DATA (Unchanged) ---
 FIXTURE_DATA = {
     1: [("Southside", "Titans"), ("Satans", "Roarers"), ("Trana", "Umang")],
     2: [("Southside", "Roarers"), ("Titans", "Trana"), ("Satans", "Umang")],
@@ -51,7 +54,6 @@ TEAMS = [
 ]
 
 def get_player_data():
-    # This data remains the same
     return {
         "SOU": [{'full_name': 'Cleetus Chandrashekhar', 'price': 15.0, 'position': 'MID'}, {'full_name': 'Aadil Jafferbhoy', 'price': 13.0, 'position': 'DEF'}, {'full_name': 'Mohammedali Rajani', 'price': 5.0, 'position': 'GK'}, {'full_name': 'Alvaro', 'price': 15.0, 'position': 'MID'}, {'full_name': 'Pranal Shetty', 'price': 10.0, 'position': 'DEF'}, {'full_name': 'Anish Bhabdha', 'price': 9.0, 'position': 'FWD'}, {'full_name': 'Aarav Hazari', 'price': 1.0, 'position': 'MID'}, {'full_name': 'Miguel', 'price': 25.0, 'position': 'FWD'}, {'full_name': 'Karan', 'price': 5.0, 'position': 'FWD'}, {'full_name': 'Akhil Hazari', 'price': 3.0, 'position': 'DEF'}, {'full_name': 'Alejandro Guillermo Banares', 'price': 24.0, 'position': 'DEF'}, {'full_name': 'Divyesh Patel', 'price': 1.0, 'position': 'MID'}, {'full_name': 'Pratham M', 'price': 1.0, 'position': 'DEF'}],
         "TRA": [{'full_name': 'Zaid Ansari', 'price': 15.0, 'position': 'FWD'}, {'full_name': 'Hanzalah Mohammed Elyas Kapadia', 'price': 17.0, 'position': 'MID'}, {'full_name': 'Rushab Lakhwani', 'price': 5.0, 'position': 'GK'}, {'full_name': 'Mir Mehta', 'price': 25.0, 'position': 'MID'}, {'full_name': 'Showkat Ansari', 'price': 10.0, 'position': 'DEF'}, {'full_name': 'Tabish Armar', 'price': 5.0, 'position': 'MID'}, {'full_name': 'Aamir Mazhar Ghadially', 'price': 10.0, 'position': 'MID'}, {'full_name': 'Humaid Muazzam Armar', 'price': 7.0, 'position': 'MID'}, {'full_name': 'Aamir Petiwala', 'price': 1.0, 'position': 'FWD'}, {'full_name': 'Gufranullah Rizwanullah Khan', 'price': 7.0, 'position': 'DEF'}, {'full_name': 'Mohammed Abdar Chasmawala', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Armaan Vardhan', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Manav J', 'price': 1.0, 'position': 'DEF'}],
@@ -136,4 +138,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-
