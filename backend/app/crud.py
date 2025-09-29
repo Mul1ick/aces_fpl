@@ -922,7 +922,7 @@ async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
                 where={'id': {'in': new_players_to_flag}},
                 data={'played_first_gameweek': True}
             )
-            alog.info(f"Flagged {update_count_result.count} new players as having played their first gameweek.")
+            alog.info(f"Flagged {update_count_result} new players as having played their first gameweek.")
 
         # --- Step 4: Add 1 free transfer to all users who have played ---
         await transaction.query_raw(

@@ -6,8 +6,124 @@ from prisma import Prisma
 from prisma import models as PrismaModels # Import Prisma's generated models
 from app.schemas import SetArmbandRequest,SaveTeamPayload
 import uuid
+from collections import Counter
 from typing import Optional
 router = APIRouter()
+
+async def auto_correct_squad_formation(db: Prisma, players: list[schemas.PlayerSelection]) -> list[schemas.PlayerSelection]:
+    """
+    Analyzes an 11-player squad, fetches their positions from the DB,
+    and performs automated substitutions to ensure a valid 8-player starting formation.
+    Returns the corrected list of players.
+    """
+    if len(players) != 11:
+        raise HTTPException(status_code=400, detail="Squad must contain exactly 11 players.")
+
+    player_ids = [p.id for p in players]
+    db_players = await db.player.find_many(where={'id': {'in': player_ids}})
+    player_map = {p.id: p for p in db_players}
+
+    # Combine input data (is_benched) with DB data (position)
+    rich_players = []
+    for p_select in players:
+        db_player = player_map.get(p_select.id)
+        if db_player:
+            rich_players.append({
+                'id': db_player.id,
+                'position': db_player.position,
+                'is_benched': p_select.is_benched,
+                'is_captain': p_select.is_captain,
+                'is_vice_captain': p_select.is_vice_captain
+            })
+
+    # Separate into starters and bench for easier logic
+    starters = [p for p in rich_players if not p['is_benched']]
+    bench = [p for p in rich_players if p['is_benched']]
+
+    # --- Auto-Correction Logic ---
+    # This loop continues until the formation is valid
+    while True:
+        counts = Counter(p['position'] for p in starters)
+        is_valid = (
+            len(starters) == 8 and
+            counts.get('GK', 0) == 1 and
+            counts.get('DEF', 0) >= 2 and
+            counts.get('MID', 0) >= 1 and
+            counts.get('FWD', 0) >= 1
+        )
+        if is_valid:
+            break
+
+        # --- FIXING LOGIC ---
+        # Rule 1: Fix Goalkeepers (must be exactly 1)
+        if counts.get('GK', 0) < 1:
+            gk_from_bench = next((p for p in bench if p['position'] == 'GK'), None)
+            starter_to_bench = next((p for p in starters if p['position'] != 'GK'), None)
+            if gk_from_bench and starter_to_bench:
+                starters.append(gk_from_bench)
+                bench.remove(gk_from_bench)
+                bench.append(starter_to_bench)
+                starters.remove(starter_to_bench)
+                continue # Restart validation
+
+        if counts.get('GK', 0) > 1:
+            extra_gk = next(p for p in starters if p['position'] == 'GK')
+            player_from_bench = next((p for p in bench if p['position'] != 'GK'), None)
+            if player_from_bench:
+                bench.append(extra_gk)
+                starters.remove(extra_gk)
+                starters.append(player_from_bench)
+                bench.remove(player_from_bench)
+                continue
+
+        # Rule 2: Fix minimum player counts for other positions
+        for pos, min_count in [('DEF', 2), ('MID', 1), ('FWD', 1)]:
+            if counts.get(pos, 0) < min_count:
+                player_from_bench = next((p for p in bench if p['position'] == pos), None)
+                # Bench a player from an over-represented position
+                starter_to_bench = max(starters, key=lambda p: counts[p['position']] if p['position'] != 'GK' else -1)
+                if player_from_bench and starter_to_bench:
+                    starters.append(player_from_bench)
+                    bench.remove(player_from_bench)
+                    bench.append(starter_to_bench)
+                    starters.remove(starter_to_bench)
+                    continue
+
+        # Rule 3: Ensure exactly 8 starters
+        if len(starters) > 8:
+            starter_to_bench = max(starters, key=lambda p: counts[p['position']] if p['position'] != 'GK' else -1)
+            bench.append(starter_to_bench)
+            starters.remove(starter_to_bench)
+            continue
+        if len(starters) < 8:
+            player_from_bench = next((p for p in bench), None)
+            if player_from_bench:
+                starters.append(player_from_bench)
+                bench.remove(player_from_bench)
+                continue
+        
+        # Failsafe to prevent infinite loops on unfixable squads
+        break
+
+    # Re-assemble the list of PlayerSelection objects
+    final_players = starters + bench
+    for i, p in enumerate(final_players):
+        p['is_benched'] = i >= 8
+        # Ensure captaincy is only on starters
+        if p['is_benched'] and (p['is_captain'] or p['is_vice_captain']):
+            p['is_captain'] = False
+            p['is_vice_captain'] = False
+
+    # If no captain, assign it to the first forward
+    if not any(p['is_captain'] for p in starters):
+        first_fwd = next((p for p in starters if p['position'] == 'FWD'), None)
+        if first_fwd: first_fwd['is_captain'] = True
+        else: starters[0]['is_captain'] = True # Fallback
+
+    return [schemas.PlayerSelection(**p) for p in final_players]
+# --- END: AUTO-CORRECTION FUNCTION ---
+
+
 
 @router.post("/submit-team")
 async def submit_team(
@@ -16,6 +132,9 @@ async def submit_team(
     # CORRECT: Use the Prisma model for the type hint
     current_user: PrismaModels.User = Depends(get_current_user)
 ):
+    
+    corrected_players = await auto_correct_squad_formation(db, team.players)
+
     current_gameweek = await crud.get_current_gameweek(db)
 
     
@@ -23,7 +142,7 @@ async def submit_team(
         db=db,
         user_id=str(current_user.id), # Use str() for safety
         gameweek_id=current_gameweek.id,
-        players=[p.dict() for p in team.players],
+        players=[p.dict() for p in corrected_players],
         team_name=team.team_name
     )
 
@@ -98,6 +217,7 @@ async def save_team(
     db: Prisma = Depends(get_db),
     user=Depends(get_current_user)
 ):
+    corrected_players = await auto_correct_squad_formation(db, payload.players)
     gw = await crud.get_current_gameweek(db)
     if not gw:
         raise HTTPException(404, "No gameweek")
@@ -107,7 +227,7 @@ async def save_team(
         user_id=str(user.id),
         gameweek_id=gw.id,
         # CORRECTED: Convert Pydantic models to dictionaries
-        new_players=[p.dict() for p in payload.players]
+        new_players=[p.dict() for p in corrected_players]
     )
     return updated
 
