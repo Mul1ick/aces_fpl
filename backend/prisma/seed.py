@@ -10,38 +10,48 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from prisma import Prisma
 from app.auth import hash_password
 
-# --- CONFIGURATION FOR COMPRESSED TESTING ---
+# --- CONFIGURATION FOR THE INVESTOR PITCH DEMO ---
 
-# --- MODIFIED ---
-# The schedule now starts very soon and has 15-minute gameweeks.
-TEST_START_TIME = datetime.now(ZoneInfo("Asia/Kolkata")).replace(second=0, microsecond=0) + timedelta(minutes=26) # ~7:45 PM from 7:19 PM
-TEST_START_TIME = TEST_START_TIME.replace(minute=(TEST_START_TIME.minute // 15) * 15) # Snap to the nearest 15-min interval
+# Base date for the simulation (Tomorrow)
+PITCH_DAY_TOMORROW = datetime.now(ZoneInfo("Asia/Kolkata")).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+PITCH_DAY_AFTER = PITCH_DAY_TOMORROW + timedelta(days=1)
 
-
-# Define the exact deadline for each gameweek for the pitch, starting from tomorrow
-GAMEWEEK_SCHEDULE = {i: TEST_START_TIME + timedelta(minutes=15 * (i - 1)) for i in range(1, 11)}
-
-
-# (The rest of the file remains the same - fixtures, players, teams, etc.)
-FIXTURE_DATA = {
-    1: [("Trana", "Titans"), ("Umang", "Satans"), ("Roarers", "Southside")],
-    2: [("Umang", "Roarers"), ("Southside", "Titans"), ("Satans", "Trana")],
-    3: [("Satans", "Titans"), ("Umang", "Southside"), ("Roarers", "Trana")],
-    4: [("Roarers", "Satans"), ("Southside", "Trana"), ("Umang", "Titans")],
-    5: [("Umang", "Trana"), ("Roarers", "Titans"), ("Southside", "Satans")],
-    6: [("Trana", "Titans"), ("Umang", "Satans"), ("Roarers", "Southside")],
-    7: [("Umang", "Roarers"), ("Southside", "Titans"), ("Satans", "Trana")],
-    8: [("Satans", "Titans"), ("Umang", "Southside"), ("Roarers", "Trana")],
-    9: [("Roarers", "Satans"), ("Southside", "Trana"), ("Umang", "Titans")],
-    10: [("Umang", "Trana"), ("Roarers", "Titans"), ("Southside", "Satans")],
+# --- MODIFIED: New compressed schedule for the pitch ---
+GAMEWEEK_SCHEDULE = {
+    1: PITCH_DAY_TOMORROW.replace(hour=11, minute=0),  # Tomorrow at 11 AM
+    2: PITCH_DAY_TOMORROW.replace(hour=14, minute=0),  # Tomorrow at 2 PM
+    3: PITCH_DAY_TOMORROW.replace(hour=17, minute=0),  # Tomorrow at 5 PM
+    4: PITCH_DAY_TOMORROW.replace(hour=20, minute=0),  # Tomorrow at 8 PM
+    5: PITCH_DAY_AFTER.replace(hour=11, minute=0),   # Day after at 11 AM
+    6: PITCH_DAY_AFTER.replace(hour=14, minute=0),   # Day after at 2 PM
+    7: PITCH_DAY_AFTER.replace(hour=17, minute=0),   # Day after at 5 PM
+    8: PITCH_DAY_AFTER.replace(hour=20, minute=0),   # Day after at 8 PM
+    9: PITCH_DAY_AFTER.replace(hour=22, minute=0),
+    10: PITCH_DAY_AFTER.replace(hour=23, minute=0)
 }
+
+# --- MODIFIED: New fixture list from the provided image ---
+FIXTURE_DATA = {
+    1: [("Southside", "Titans"), ("Satans", "Roarers"), ("Trana", "Umang")],
+    2: [("Southside", "Roarers"), ("Titans", "Trana"), ("Satans", "Umang")],
+    3: [("Southside", "Trana"), ("Titans", "Umang"), ("Roarers", "Satans")],
+    4: [("Southside", "Umang"), ("Titans", "Roarers"), ("Trana", "Satans")],
+    5: [("Southside", "Satans"), ("Titans", "Umang"), ("Trana", "Roarers")],
+    6: [("Southside", "Titans"), ("Satans", "Roarers"), ("Trana", "Umang")],
+    7: [("Southside", "Roarers"), ("Titans", "Trana"), ("Satans", "Umang")],
+    8: [("Southside", "Trana"), ("Titans", "Umang"), ("Roarers", "Satans")],
+    9: [("Southside", "Umang"), ("Titans", "Roarers"), ("Trana", "Satans")],
+    10: [("Southside", "Satans"), ("Titans", "Umang"), ("Trana", "Roarers")],
+}
+
 TEAMS = [
     {"name": "Southside", "short_name": "SOU"}, {"name": "Trana", "short_name": "TRA"},
     {"name": "Titans", "short_name": "TIT"}, {"name": "Roarers", "short_name": "ROA"},
     {"name": "Satans", "short_name": "SAT"}, {"name": "Umang", "short_name": "UMA"},
 ]
+
 def get_player_data():
-    # Player data remains the same...
+    # This data remains the same
     return {
         "SOU": [{'full_name': 'Cleetus Chandrashekhar', 'price': 15.0, 'position': 'MID'}, {'full_name': 'Aadil Jafferbhoy', 'price': 13.0, 'position': 'DEF'}, {'full_name': 'Mohammedali Rajani', 'price': 5.0, 'position': 'GK'}, {'full_name': 'Alvaro', 'price': 15.0, 'position': 'MID'}, {'full_name': 'Pranal Shetty', 'price': 10.0, 'position': 'DEF'}, {'full_name': 'Anish Bhabdha', 'price': 9.0, 'position': 'FWD'}, {'full_name': 'Aarav Hazari', 'price': 1.0, 'position': 'MID'}, {'full_name': 'Miguel', 'price': 25.0, 'position': 'FWD'}, {'full_name': 'Karan', 'price': 5.0, 'position': 'FWD'}, {'full_name': 'Akhil Hazari', 'price': 3.0, 'position': 'DEF'}, {'full_name': 'Alejandro Guillermo Banares', 'price': 24.0, 'position': 'DEF'}, {'full_name': 'Divyesh Patel', 'price': 1.0, 'position': 'MID'}, {'full_name': 'Pratham M', 'price': 1.0, 'position': 'DEF'}],
         "TRA": [{'full_name': 'Zaid Ansari', 'price': 15.0, 'position': 'FWD'}, {'full_name': 'Hanzalah Mohammed Elyas Kapadia', 'price': 17.0, 'position': 'MID'}, {'full_name': 'Rushab Lakhwani', 'price': 5.0, 'position': 'GK'}, {'full_name': 'Mir Mehta', 'price': 25.0, 'position': 'MID'}, {'full_name': 'Showkat Ansari', 'price': 10.0, 'position': 'DEF'}, {'full_name': 'Tabish Armar', 'price': 5.0, 'position': 'MID'}, {'full_name': 'Aamir Mazhar Ghadially', 'price': 10.0, 'position': 'MID'}, {'full_name': 'Humaid Muazzam Armar', 'price': 7.0, 'position': 'MID'}, {'full_name': 'Aamir Petiwala', 'price': 1.0, 'position': 'FWD'}, {'full_name': 'Gufranullah Rizwanullah Khan', 'price': 7.0, 'position': 'DEF'}, {'full_name': 'Mohammed Abdar Chasmawala', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Armaan Vardhan', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Manav J', 'price': 1.0, 'position': 'DEF'}],
@@ -54,7 +64,6 @@ PLAYERS = get_player_data()
 
 async def clear_data(db: Prisma):
     print("🧹 Wiping existing data...")
-    # Order matters due to foreign key constraints
     await db.userchip.delete_many()
     await db.transfer_log.delete_many()
     await db.usergameweekscore.delete_many()
@@ -73,7 +82,6 @@ async def main() -> None:
     await db.connect()
     await clear_data(db)
 
-    # --- Seed Admin and Test User ---
     print("Seeding admin and test users...")
     users_to_create = [
         {"email": "admin@acesfpl.com", "full_name": "Admin User", "password": "adminPassword", "role": "admin", "is_active": True},
@@ -86,7 +94,6 @@ async def main() -> None:
         })
     print("✅ Admin and test users created.")
 
-    # --- Seed Teams and Players ---
     print("Seeding teams and players...")
     await db.team.create_many(data=TEAMS, skip_duplicates=True)
     all_teams = await db.team.find_many()
@@ -98,19 +105,13 @@ async def main() -> None:
             await db.player.create_many(data=[{"team_id": team_id, **p} for p in players], skip_duplicates=True)
     print("✅ Teams and players seeded.")
 
-    # --- Create Gameweeks with all as UPCOMING ---
     print("Creating gameweeks for the pitch schedule...")
     gameweek_data = []
     for gw_num, deadline in GAMEWEEK_SCHEDULE.items():
-        gameweek_data.append({
-            "gw_number": gw_num,
-            "deadline": deadline,
-            "status": "UPCOMING"
-        })
+        gameweek_data.append({"gw_number": gw_num, "deadline": deadline, "status": "UPCOMING"})
     await db.gameweek.create_many(data=gameweek_data)
     print(f"✅ All {len(gameweek_data)} gameweeks created with UPCOMING status.")
 
-    # --- Create Fixtures from Hardcoded Data ---
     print("Creating fixtures from schedule...")
     all_gws = await db.gameweek.find_many()
     gameweek_map = {gw.gw_number: gw.id for gw in all_gws}
@@ -120,8 +121,7 @@ async def main() -> None:
         if gameweek_id:
             fixtures_to_create = []
             for home_name, away_name in fixtures:
-                home_id = team_map_name.get(home_name)
-                away_id = team_map_name.get(away_name)
+                home_id = team_map_name.get(home_name); away_id = team_map_name.get(away_name)
                 if home_id and away_id:
                     kickoff_time = GAMEWEEK_SCHEDULE[gw_num]
                     fixtures_to_create.append({
