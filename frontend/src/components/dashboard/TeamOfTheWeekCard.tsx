@@ -33,15 +33,26 @@ interface TeamOfTheWeekCardProps {
 
 
 export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, currentGameweekNumber }) => {
+
+  const canViewTotw = currentGameweekNumber > 1;
+  const totwGameweekToShow = currentGameweekNumber - 1;
+
   return (
     <Card className="h-full border-black border-2">
       <CardHeader>
         {/* --- MODIFIED: Use the prop to create a dynamic link --- */}
-        <Link to={`/team-view/top/${currentGameweekNumber}`} className="flex items-center justify-between group">
-            <CardTitle className="text-xl group-hover:underline">Team of the Week</CardTitle>
-            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
+        <Link
+          to={canViewTotw ? `/team-view/top/${totwGameweekToShow}` : '#'}
+          className={`flex items-center justify-between group ${!canViewTotw && 'pointer-events-none'}`}
+        >
+          <CardTitle className="text-xl group-hover:underline">Team of the Week</CardTitle>
+          {/* Only show the arrow if it's a clickable link */}
+          {canViewTotw && <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />}
         </Link>
-        <p className="text-sm text-gray-500 font-semibold">{team.manager_name} - <span className="font-bold text-black">{team.points} pts</span></p>
+        <p className="text-sm text-gray-500 font-semibold">
+          {/* Display which gameweek's TOTW it is */}
+          {canViewTotw ? `${team.manager_name} - ${team.points} pts (GW${totwGameweekToShow})` : 'Available after Gameweek 1'}
+        </p>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">

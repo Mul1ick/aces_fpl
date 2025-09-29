@@ -1337,8 +1337,7 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
 
     def to_display(entry):
         player_points = points_map.get(entry.player.id, 0)
-        if entry.is_captain:
-            player_points *= 2
+        
             
         return {
             "id": entry.player.id, "full_name": entry.player.full_name,
