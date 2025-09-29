@@ -20,123 +20,84 @@ alog = logging.getLogger("aces.crud")
 
 
 # --- NEW HELPER FUNCTIONS (Add these anywhere in the file) ---
-
-def _is_valid_formation(starting_xi: List[PrismaModels.Player]) -> bool:
-    if len(starting_xi) != 8:
-        alog.warning(f"  [Check Failed] Hypothetical XI has {len(starting_xi)} players, not 8.")
-        return False
-
-    counts = defaultdict(int)
-    for p in starting_xi:
-        counts[p.position] += 1
-    
-    is_valid = (
-        counts['GK'] == 1 and
-        counts['DEF'] >= 2 and
-        counts['MID'] >= 2 and
-        counts['FWD'] >= 1
+async def is_triple_captain_active(db: Prisma, user_id: str, gameweek_id: int) -> bool:
+    row = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'chip': 'TRIPLE_CAPTAIN'}
     )
-    
-    if not is_valid:
-        alog.warning(f"  [Check Failed] Invalid formation: GK:{counts['GK']}, DEF:{counts['DEF']}, MID:{counts['MID']}, FWD:{counts['FWD']}")
-    
-    return is_valid
+    return row is not None
 
-
-async def _handle_captaincy_swap(db: Prisma, user_id: str, gameweek_id: int, minutes_map: dict):
-    """Handles the captaincy swap if the captain did not play."""
-    team = await db.userteam.find_many(
-        where={'user_id': user_id, 'gameweek_id': gameweek_id},
-        include={'player': True}
+async def is_wildcard_active(db: Prisma, user_id: str, gameweek_id: int) -> bool:
+    row = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'chip': 'WILDCARD'}
     )
-    
-    captain = next((p for p in team if p.is_captain), None)
-    vice_captain = next((p for p in team if p.is_vice_captain), None)
+    return row is not None
 
-    if not captain or captain.is_benched or minutes_map.get(captain.player_id, 0) > 0:
-        return # Captain played or doesn't exist
+async def _normalize_8p3(db: Prisma, snapshot: list[dict]) -> list[dict]:
+    # snapshot rows: {'player_id', 'is_benched', 'is_captain', 'is_vice_captain'}
+    if len(snapshot) != 11 or len({r['player_id'] for r in snapshot}) != 11:
+        raise HTTPException(400, "Exactly 11 unique players required.")
 
-    if vice_captain and not vice_captain.is_benched and minutes_map.get(vice_captain.player_id, 0) > 0:
-        alog.info(f"Swapping captaincy from {captain.player.full_name} to {vice_captain.player.full_name} for user {user_id}")
-        await db.userteam.update(
-            where={'id': captain.id},
-            data={'is_captain': False, 'is_vice_captain': True}
-        )
-        await db.userteam.update(
-            where={'id': vice_captain.id},
-            data={'is_captain': True, 'is_vice_captain': False}
-        )
+    ids = [r['player_id'] for r in snapshot]
+    meta = await db.player.find_many(where={'id': {'in': ids}})
+    pos = {p.id: p.position for p in meta}
 
-async def perform_auto_subs_for_user(db: Prisma, user_id: str, gameweek_id: int):
-    alog.info(f"--- Running auto-subs for user: {user_id} ---")
-    team_players = await db.userteam.find_many(
-        where={'user_id': user_id, 'gameweek_id': gameweek_id},
-        include={'player': True}
-    )
-    
-    if not team_players:
-        alog.warning(f"[Auto-Sub] User {user_id} has no team for GW {gameweek_id}.")
-        return
+    by_id = {r['player_id']: {**r} for r in snapshot}
+    gks = [pid for pid in ids if pos[pid] == 'GK']
 
-    player_ids = [p.player_id for p in team_players]
-    stats = await db.gameweekplayerstats.find_many(
-        where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
-    )
-    minutes_map = {s.player_id: s.minutes for s in stats}
-    
-    await _handle_captaincy_swap(db, user_id, gameweek_id, minutes_map)
+    if len(gks) != 2:
+        raise HTTPException(400, "Squad must have exactly 2 goalkeepers.")
 
-    team_players = await db.userteam.find_many(
-        where={'user_id': user_id, 'gameweek_id': gameweek_id},
-        include={'player': True}
-    )
+    # captain/vice must exist, be different, and be starters
+    cap = next((r for r in by_id.values() if r['is_captain']), None)
+    vice = next((r for r in by_id.values() if r['is_vice_captain']), None)
+    if not cap or not vice or cap['player_id'] == vice['player_id']:
+        raise HTTPException(400, "Exactly one captain and one vice-captain required, and they must differ.")
+    cap['is_benched'] = False
+    vice['is_benched'] = False
 
-    starters = [p for p in team_players if not p.is_benched]
-    bench = sorted([p for p in team_players if p.is_benched], key=lambda p: (p.player.position != 'GK', p.id))
-    non_playing_starters = [p for p in starters if minutes_map.get(p.player_id, 0) == 0]
+    # exactly one GK benched
+    benched_gks = [pid for pid in gks if by_id[pid]['is_benched']]
+    if len(benched_gks) < 1:
+        by_id[gks[1]]['is_benched'] = True
+    elif len(benched_gks) > 1:
+        # start the first, bench the second deterministically
+        by_id[benched_gks[0]]['is_benched'] = False
+        by_id[benched_gks[1]]['is_benched'] = True
 
-    if not non_playing_starters:
-        alog.info(f"[Auto-Sub] No non-playing starters found for user {user_id}. No subs needed.")
-        return
-        
-    alog.info(f"[Auto-Sub] Found non-playing starters: {[p.player.full_name for p in non_playing_starters]}")
-    alog.info(f"[Auto-Sub] Bench order: {[p.player.full_name for p in bench]}")
+    # exactly 3 benched total; prefer benching outfielders, never bench cap/vice
+    protected = {cap['player_id'], vice['player_id']}
+    benched = [pid for pid, r in by_id.items() if r['is_benched']]
+    if len(benched) != 3:
+        # unbench extras first
+        while len(benched) > 3:
+            pid = next(p for p in benched if p not in protected and pos[p] != 'GK')
+            by_id[pid]['is_benched'] = False
+            benched.remove(pid)
+        # add benches if short
+        while len(benched) < 3:
+            pid = next(p for p, r in by_id.items()
+                       if not r['is_benched'] and p not in protected and pos[p] != 'GK')
+            by_id[pid]['is_benched'] = True
+            benched.append(pid)
 
-    current_starters = [p.player for p in starters]
+    # starting XI: exactly 1 GK starter and at least 2 DEF starters
+    starters = [pid for pid, r in by_id.items() if not r['is_benched']]
+    if sum(1 for pid in starters if pos[pid] == 'GK') != 1:
+        # flip the benched GK/started GK to satisfy
+        for pid in gks:
+            by_id[pid]['is_benched'] = not by_id[pid]['is_benched']
+        starters = [pid for pid, r in by_id.items() if not r['is_benched']]
+    if sum(1 for pid in starters if pos[pid] == 'DEF') < 2:
+        # force-bench a non-DEF and start a DEF if needed
+        need = 2 - sum(1 for pid in starters if pos[pid] == 'DEF')
+        for _ in range(need):
+            benchable = next(p for p in starters if pos[p] != 'DEF' and p not in protected)
+            startable = next(p for p, r in by_id.items() if r['is_benched'] and pos[p] == 'DEF')
+            by_id[benchable]['is_benched'] = True
+            by_id[startable]['is_benched'] = False
 
-    non_playing_gk = next((p for p in non_playing_starters if p.player.position == 'GK'), None)
-    bench_gk = next((p for p in bench if p.player.position == 'GK'), None)
+    return [by_id[pid] for pid in sorted(by_id)]
 
-    if non_playing_gk and bench_gk and minutes_map.get(bench_gk.player_id, 0) > 0:
-        alog.info(f"[Auto-Sub] Swapping GK {non_playing_gk.player.full_name} for {bench_gk.player.full_name}")
-        await db.userteam.update(where={'id': non_playing_gk.id}, data={'is_benched': True})
-        await db.userteam.update(where={'id': bench_gk.id}, data={'is_benched': False})
-        
-        current_starters = [p for p in current_starters if p.id != non_playing_gk.player_id] + [bench_gk.player]
-        non_playing_starters = [p for p in non_playing_starters if p.id != non_playing_gk.id]
-        bench.remove(bench_gk)
-
-    available_bench = [p for p in bench if p.player.position != 'GK']
-    
-    for starter_to_sub in non_playing_starters:
-        alog.info(f"[Auto-Sub] Attempting to substitute {starter_to_sub.player.full_name} ({starter_to_sub.player.position})")
-        substituted = False
-        for bench_player in available_bench:
-            alog.info(f"  -> Considering bench player: {bench_player.player.full_name} ({bench_player.player.position})")
-            hypothetical_xi = [p for p in current_starters if p.id != starter_to_sub.player_id]
-            hypothetical_xi.append(bench_player.player)
-
-            if _is_valid_formation(hypothetical_xi):
-                alog.info(f"  [Check Passed] Swapping {starter_to_sub.player.full_name} FOR {bench_player.player.full_name}")
-                await db.userteam.update(where={'id': starter_to_sub.id}, data={'is_benched': True})
-                await db.userteam.update(where={'id': bench_player.id}, data={'is_benched': False})
-                
-                current_starters = hypothetical_xi
-                available_bench.remove(bench_player)
-                substituted = True
-                break
-        if not substituted:
-             alog.warning(f"[Auto-Sub] Could not find a valid substitution for {starter_to_sub.player.full_name}")
 
 
 
@@ -643,7 +604,7 @@ async def transfer_player(
             else:
                 # apply a -4 hit for this transfer
                 # upsert GW score row and increment hits by 4
-                await tx.usergamescore.upsert(
+                await tx.usergameweekscore.upsert(
                     where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
                     create={
                         'user_id': user_id,
@@ -855,8 +816,8 @@ async def save_existing_team(
         raise HTTPException(400, f"Starting XI must include exactly 1 goalkeeper (got {len(starting_gks)}).")
 
     # (Optional) enforce your UI buckets: 3 DEF, 3 MID, 3 FWD
-    if not (len(defs) == 3 and len(mids) == 3 and len(fwds) == 3):
-        raise HTTPException(400, "Team must have 3 DEF, 3 MID, and 3 FWD.")
+    # if not (len(defs) == 3 and len(mids) == 3 and len(fwds) == 3):
+    #     raise HTTPException(400, "Team must have 3 DEF, 3 MID, and 3 FWD.")
 
     # Compute transfer logs diff
     incoming_set = set(incoming_ids)
@@ -937,11 +898,7 @@ async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
         return "No active users with teams to process."
 
     # --- Step 1 & 2: Auto-subs and score recalculation for each user ---
-    for user in active_users:
-        await perform_auto_subs_for_user(db, str(user.id), completed_gw_id)
-        await compute_user_score_for_gw(db, str(user.id), completed_gw_id)
     
-    alog.info(f"Completed auto-subs and score recalculations for {len(active_users)} users.")
 
     # --- Step 3: Flag new players who just completed their first gameweek ---
     users_in_completed_gw = await db.userteam.find_many(
@@ -1499,50 +1456,65 @@ async def confirm_transfers(
         # For now, we are focusing on the transfer cost logic.
 
         # --- EXECUTE TRANSFERS ---
-        for transfer_item in transfers:
-            # 1. Find the outgoing player's status before deleting them
-            outgoing_player_entry = next(
-                (p for p in current_team if p.player_id == transfer_item.out_player_id), None
-            )
+        snap = [{
+            "player_id": p.player_id,
+            "is_benched": bool(p.is_benched),
+            "is_captain": bool(p.is_captain),
+            "is_vice_captain": bool(p.is_vice_captain),
+        } for p in current_team]
+        by_id = {r["player_id"]: r for r in snap}
 
-            # 2. Inherit the 'benched' status. Default to bench if not found.
-            is_benched = outgoing_player_entry.is_benched if outgoing_player_entry else True
+        # apply swaps in-memory
+        for t in transfers:
+            out_id, in_id = t.out_player_id, t.in_player_id
+            out_row = by_id.get(out_id)
+            if not out_row:
+                raise HTTPException(400, f"Outgoing player {out_id} is not in your team.")
+            inherited_bench = out_row["is_benched"]
+            was_leader = out_row["is_captain"] or out_row["is_vice_captain"]
+            by_id.pop(out_id)
+            if in_id in by_id:
+                raise HTTPException(400, "Incoming player already in team.")
+            by_id[in_id] = {
+                "player_id": in_id,
+                "is_benched": False if was_leader else inherited_bench,
+                "is_captain": False,
+                "is_vice_captain": False,
+            }
+        has_cap  = any(r["is_captain"] for r in by_id.values())
+        has_vice = any(r["is_vice_captain"] for r in by_id.values())
 
-            # If the outgoing player was captain/vice, the new player is not benched
-            if outgoing_player_entry and (outgoing_player_entry.is_captain or outgoing_player_entry.is_vice_captain):
-                is_benched = False
+        if not (has_cap and has_vice):
+            # clear any partial flags
+            for r in by_id.values():
+                r["is_captain"] = False
+                r["is_vice_captain"] = False
 
-            # 3. Remove the outgoing player
-            await tx.userteam.delete_many(
-                where={
-                    "user_id": user_id,
-                    "gameweek_id": gameweek_id,
-                    "player_id": transfer_item.out_player_id,
-                }
-            )
+            starters = [pid for pid, r in by_id.items() if not r["is_benched"]]
+            pool = starters if len(starters) >= 2 else list(by_id.keys())
 
-            # 4. Add the incoming player with the inherited benched status
-            # Captaincy is NEVER inherited.
-            await tx.userteam.create(
-                data={
-                    "user_id": user_id,
-                    "gameweek_id": gameweek_id,
-                    "player_id": transfer_item.in_player_id,
-                    "is_benched": is_benched,
-                    "is_captain": False,
-                    "is_vice_captain": False,
-                }
-            )
+            cap_id, vice_id = random.sample(pool, 2)
+            by_id[cap_id]["is_captain"] = True
+            by_id[vice_id]["is_vice_captain"] = True
 
-            # 5. Log the transfer
-            await tx.transfer_log.create(
-                data={
-                    "user_id": user_id,
-                    "gameweek_id": gameweek_id,
-                    "out_player": transfer_item.out_player_id,
-                    "in_player": transfer_item.in_player_id,
-                }
-            )
+        # then normalize and write
+        new_snapshot = await _normalize_8p3(tx, list(by_id.values()))
+
+        # --- WRITE + LOG ATOMICALLY ---
+        old_ids = {p.player_id for p in current_team}
+        new_ids = {r["player_id"] for r in new_snapshot}
+        removed_ids = old_ids - new_ids
+        added_ids   = new_ids - old_ids
+
+        await tx.userteam.delete_many(where={"user_id": user_id, "gameweek_id": gameweek_id})
+        await tx.userteam.create_many(data=[
+            {"user_id": user_id, "gameweek_id": gameweek_id, **r} for r in new_snapshot
+        ])
+
+        for pid in removed_ids:
+            await tx.transfer_log.create(data={"user_id": user_id, "gameweek_id": gameweek_id, "out_player": int(pid), "in_player": None})
+        for pid in added_ids:
+            await tx.transfer_log.create(data={"user_id": user_id, "gameweek_id": gameweek_id, "out_player": None, "in_player": int(pid)})
 
 
         # --- UPDATE USER STATE ---
@@ -1565,113 +1537,3 @@ async def confirm_transfers(
     return await get_user_team_full(db, user_id, gameweek_id)
 
 
-async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int):
-    """
-    Calculates a user's score for a specific gameweek, performing automatic substitutions first.
-    This logic is designed for an 8+3 player format.
-    """
-    
-    # 1. FETCH ALL NECESSARY DATA
-    # --------------------------------
-    # Get the user's chosen team for the gameweek
-    user_team_picks = await db.userteam.find_many(
-        where={'user_id': user_id, 'gameweek_id': gameweek_id},
-        include={'player': True} # Include player data to get position
-    )
-
-    if not user_team_picks:
-        return 0 # User has no team for this gameweek
-
-    player_ids = [p.player_id for p in user_team_picks]
-
-    # Get the performance stats for all players in the user's squad
-    player_stats = await db.gameweekplayerstats.find_many(
-        where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
-    )
-    # Create a simple dictionary for fast lookups: { player_id: stats }
-    stats_map = {stat.player_id: stat for stat in player_stats}
-
-
-    # 2. SEPARATE STARTERS, BENCH, AND IDENTIFY NON-PLAYING STARTERS
-    # ---------------------------------------------------------------
-    starters = [p for p in user_team_picks if not p.is_benched]
-    
-    # Order the bench by position: GK first, then others. This sets sub priority.
-    bench = sorted([p for p in user_team_picks if p.is_benched], key=lambda p: 0 if p.player.position == 'GK' else 1)
-    
-    # Find starters who are marked as not having played
-    starters_who_did_not_play = [
-        p for p in starters 
-        if not stats_map.get(p.player_id) or not stats_map[p.player_id].played
-    ]
-
-    final_starters = list(starters) # Create a mutable copy of the starting lineup
-
-    # 3. PERFORM AUTOMATIC SUBSTITUTIONS (if necessary)
-    # ----------------------------------------------------
-    if starters_who_did_not_play:
-        for non_playing_starter in starters_who_did_not_play:
-            for i, substitute in enumerate(bench):
-                
-                # Find a substitute who played and hasn't been used yet
-                sub_stats = stats_map.get(substitute.player_id)
-                if sub_stats and sub_stats.played:
-                    
-                    # Create a temporary lineup to validate the formation
-                    temp_lineup = [p for p in final_starters if p.player_id != non_playing_starter.player_id]
-                    temp_lineup.append(substitute)
-
-                    # --- VALIDATION LOGIC FOR 8+3 FORMAT ---
-                    gk_count = sum(1 for p in temp_lineup if p.player.position == 'GK')
-                    def_count = sum(1 for p in temp_lineup if p.player.position == 'DEF')
-
-                    # Check if the formation is valid (1 GK, at least 2 DEF)
-                    if gk_count == 1 and def_count >= 2:
-                        # If valid, make the substitution permanent for this calculation
-                        final_starters = temp_lineup
-                        
-                        # Remove the used substitute from the bench
-                        bench.pop(i) 
-                        
-                        # Move to the next non-playing starter
-                        break 
-
-    # 4. CALCULATE TOTAL POINTS FOR THE FINAL LINEUP
-    # ------------------------------------------------
-    total_points = 0
-    
-    # Find the original captain and vice-captain picks
-    captain = next((p for p in starters if p.is_captain), None)
-    vice_captain = next((p for p in starters if p.is_vice_captain), None)
-    
-    active_captain = None
-    
-    # Check if the original captain is in the final lineup
-    if captain and any(p.player_id == captain.player_id for p in final_starters):
-        active_captain = captain
-    # If not, check if the vice-captain is in the final lineup
-    elif vice_captain and any(p.player_id == vice_captain.player_id for p in final_starters):
-        active_captain = vice_captain
-
-    # Add up the points for the final 11 starters
-    for starter in final_starters:
-        points = stats_map.get(starter.player_id, None)
-        player_points = points.points if points else 0
-        
-        # Apply captaincy bonus
-        if active_captain and starter.player_id == active_captain.player_id:
-             total_points += (player_points * 2) # Standard captaincy is 2x
-        else:
-             total_points += player_points
-
-    # 5. SAVE THE FINAL SCORE TO THE DATABASE
-    # -----------------------------------------
-    await db.usergameweekscore.upsert(
-        where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
-        data={
-            'create': {'user_id': user_id, 'gameweek_id': gameweek_id, 'total_points': total_points},
-            'update': {'total_points': total_points}
-        }
-    )
-    
-    return total_points
