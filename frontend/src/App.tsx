@@ -18,10 +18,15 @@ import Fixtures from "./pages/Fixtures";
 import Stats from "./pages/Stats";
 import Help from "./pages/Help";
 import TeamView from "./pages/TeamView"; // <-- 1. IMPORT THE NEW PAGE
+import { GoogleOAuthProvider } from '@react-oauth/google';
+
 
 const queryClient = new QueryClient();
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
 
 const App = () => (
+  <GoogleOAuthProvider clientId={googleClientId}>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
@@ -59,6 +64,7 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </GoogleOAuthProvider>
 );
 
 export default App;
