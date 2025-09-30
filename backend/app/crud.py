@@ -538,6 +538,8 @@ async def transfer_player(
     out_player_id: int,
     in_player_id: int,
 ):
+
+    await carry_forward_team(db, user_id, gameweek_id)
     user = await db.user.find_unique(where={'id': user_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
