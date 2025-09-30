@@ -163,28 +163,31 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 
-    useEffect(() => {
-        const fetchPlayers = async () => {
-          try {
-            const response = await fetch(`${API.BASE_URL}/players/`);
-            if (!response.ok) throw new Error('API failed');
-            const data = await response.json();
-            const mapped = data.map((player: any) => ({
-             id: player.id ?? player.full_name,
-              name: player.full_name,
-              pos: player.position === 'ST' ? 'FWD' : player.position,
-              club: player.team?.name || 'Unknown',
-              price: player.price,
-              points: Math.floor(Math.random() * 50) + 100, // Placeholder points
-              tsb: Math.floor(Math.random() * 50) + 30 // Placeholder selection %
-            }));
-            setPlayers(mapped);
-          } catch (err: any) {
-            console.warn('API fetch failed:', err.message);
-           }
-        };
-         fetchPlayers();
-    }, []);
+     useEffect(() => {
+    const fetchPlayers = async () => {
+      try {
+        // MODIFIED: Fetch from the player stats endpoint which includes total points
+        const response = await fetch(API.endpoints.playerStats);
+        if (!response.ok) throw new Error('API failed to fetch player stats');
+        const data = await response.json();
+
+        // MODIFIED: Map the real data from the API response, not placeholders
+        const mapped = data.map((player: any) => ({
+          id: player.id,
+          name: player.full_name,
+          pos: player.position === 'ST' ? 'FWD' : player.position,
+          club: player.team?.name || 'Unknown',
+          price: player.price,
+          points: player.total_points, // Use the real total_points field from the backend
+          tsb: Math.floor(Math.random() * 50) + 30 // TSB can remain a placeholder for now
+        }));
+        setPlayers(mapped);
+      } catch (err: any) {
+        console.warn('API fetch failed:', err.message);
+      }
+    };
+    fetchPlayers();
+  }, []);
 
     useEffect(() => {
         if (positionFilter) {

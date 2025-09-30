@@ -61,13 +61,100 @@ TEAMS = [
 ]
 
 def get_player_data():
+    """
+    Contains the corrected player data with positions mapped to schema (ATT -> FWD).
+    """
     return {
-        "SOU": [{'full_name': 'Cleetus Chandrashekhar', 'price': 15.0, 'position': 'MID'}, {'full_name': 'Aadil Jafferbhoy', 'price': 13.0, 'position': 'DEF'}, {'full_name': 'Mohammedali Rajani', 'price': 5.0, 'position': 'GK'}, {'full_name': 'Alvaro', 'price': 15.0, 'position': 'MID'}, {'full_name': 'Pranal Shetty', 'price': 10.0, 'position': 'DEF'}, {'full_name': 'Anish Bhabdha', 'price': 9.0, 'position': 'FWD'}, {'full_name': 'Aarav Hazari', 'price': 1.0, 'position': 'MID'}, {'full_name': 'Miguel', 'price': 25.0, 'position': 'FWD'}, {'full_name': 'Karan', 'price': 5.0, 'position': 'FWD'}, {'full_name': 'Akhil Hazari', 'price': 3.0, 'position': 'DEF'}, {'full_name': 'Alejandro Guillermo Banares', 'price': 24.0, 'position': 'DEF'}, {'full_name': 'Divyesh Patel', 'price': 1.0, 'position': 'MID'}, {'full_name': 'Pratham M', 'price': 1.0, 'position': 'DEF'}],
-        "TRA": [{'full_name': 'Zaid Ansari', 'price': 15.0, 'position': 'FWD'}, {'full_name': 'Hanzalah Mohammed Elyas Kapadia', 'price': 17.0, 'position': 'MID'}, {'full_name': 'Rushab Lakhwani', 'price': 5.0, 'position': 'GK'}, {'full_name': 'Mir Mehta', 'price': 25.0, 'position': 'MID'}, {'full_name': 'Showkat Ansari', 'price': 10.0, 'position': 'DEF'}, {'full_name': 'Tabish Armar', 'price': 5.0, 'position': 'MID'}, {'full_name': 'Aamir Mazhar Ghadially', 'price': 10.0, 'position': 'MID'}, {'full_name': 'Humaid Muazzam Armar', 'price': 7.0, 'position': 'MID'}, {'full_name': 'Aamir Petiwala', 'price': 1.0, 'position': 'FWD'}, {'full_name': 'Gufranullah Rizwanullah Khan', 'price': 7.0, 'position': 'DEF'}, {'full_name': 'Mohammed Abdar Chasmawala', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Armaan Vardhan', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Manav J', 'price': 1.0, 'position': 'DEF'}],
-        "TIT": [{'full_name': 'Raj Bhadhuria', 'price': 25.0, 'position': 'FWD'}, {'full_name': 'Gyan Savir Saldanha', 'price': 10.0, 'position': 'FWD'}, {'full_name': 'Yug Nair', 'price': 10.0, 'position': 'GK'}, {'full_name': 'Rahul Sachdev', 'price': 13.0, 'position': 'FWD'}, {'full_name': 'Jeet Antani', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Tanish Jain', 'price': 5.0, 'position': 'DEF'}, {'full_name': 'Kabir Khan', 'price': 11.0, 'position': 'MID'}, {'full_name': 'Param Sabnani', 'price': 11.0, 'position': 'DEF'}, {'full_name': 'Rishabh Lunia', 'price': 5.0, 'position': 'MID'}, {'full_name': 'Manav Gagvani', 'price': 10.0, 'position': 'FWD'}, {'full_name': 'Aditya Sandeep Bamb', 'price': 14.0, 'position': 'DEF'}, {'full_name': 'Ishaan Rajnish Jindal', 'price': 11.0, 'position': 'FWD'}, {'full_name': 'Tushar Kant', 'price': 1.0, 'position': 'DEF'}],
-        "ROA": [{'full_name': 'Karan Khanna', 'price': 25.0, 'position': 'MID'}, {'full_name': 'Dave Deohans', 'price': 15.0, 'position': 'MID'}, {'full_name': 'Dane Pereira', 'price': 5.0, 'position': 'GK'}, {'full_name': 'Siddharth Castellino', 'price': 10.0, 'position': 'MID'}, {'full_name': 'Ibadur Haque', 'price': 5.0, 'position': 'FWD'}, {'full_name': 'Shlok Vyas', 'price': 20.0, 'position': 'MID'}, {'full_name': 'Saheb Singh Satinder Pal Ahuja', 'price': 15.0, 'position': 'DEF'}, {'full_name': 'Kirk Anthony Quadros', 'price': 10.0, 'position': 'FWD'}, {'full_name': 'Uzair Patankar', 'price': 17.0, 'position': 'MID'}, {'full_name': 'Nelson Wilfred Aranha', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Srivinayak Shivkumar Tatikonda', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Akshay Karwa', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Abhishek Negi', 'price': 1.0, 'position': 'DEF'}],
-        "SAT": [{'full_name': 'Pranit Vyas', 'price': 25.0, 'position': 'FWD'}, {'full_name': 'Rohan Jadhav', 'price': 24.0, 'position': 'DEF'}, {'full_name': 'Anirudh Iyer', 'price': 8.0, 'position': 'GK'}, {'full_name': 'Jagdish Lobo', 'price': 10.0, 'position': 'DEF'}, {'full_name': 'Rajeev Asija', 'price': 5.0, 'position': 'MID'}, {'full_name': 'Abdur Rehman Noor Mohamed Azeez', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Amogh Sanjeev Jadal', 'price': 11.0, 'position': 'MID'}, {'full_name': 'Nathan Clifton Murzello', 'price': 10.0, 'position': 'MID'}, {'full_name': 'Shrineel Belgaonkar', 'price': 1.0, 'position': 'FWD'}, {'full_name': 'Siddharth Rupali Bhonsle', 'price': 9.0, 'position': 'MID'}, {'full_name': 'Inshaal Sheredil Dhanjee', 'price': 1.0, 'position': 'FWD'}, {'full_name': 'Shubhrajyoti Das', 'price': 11.0, 'position': 'DEF'}, {'full_name': 'Mathais Coutinho', 'price': 10.0, 'position': 'MID'}],
-        "UMA": [{'full_name': 'Titus Andrew Uttankar', 'price': 25.0, 'position': 'MID'}, {'full_name': 'Pranit Vikas Gaikwad', 'price': 10.0, 'position': 'FWD'}, {'full_name': 'Yashraj Singh', 'price': 12.0, 'position': 'GK'}, {'full_name': 'Kaif Muneer', 'price': 25.0, 'position': 'MID'}, {'full_name': 'Krish Sharma', 'price': 9.0, 'position': 'MID'}, {'full_name': 'Aneesh Malankar', 'price': 5.0, 'position': 'FWD'}, {'full_name': 'Joel Fernandes', 'price': 5.0, 'position': 'MID'}, {'full_name': 'Joshua Vessoakar', 'price': 21.0, 'position': 'DEF'}, {'full_name': 'Shubham Pandey', 'price': 6.0, 'position': 'DEF'}, {'full_name': 'Dhaval Dinesh Savla', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Dev Gupta', 'price': 3.0, 'position': 'MID'}, {'full_name': 'Tejash Pavanjyot Kohli', 'price': 1.0, 'position': 'MID'}, {'full_name': 'Rohil Malankar', 'price': 1.0, 'position': 'FWD'}]
+        "SOU": [
+            {'full_name': 'Cleetus Chandrashekhar', 'price': 15.0, 'position': 'MID'},
+            {'full_name': 'Aadil Jafferbhoy', 'price': 13.0, 'position': 'DEF'},
+            {'full_name': 'Mohammedali Rajani', 'price': 5.0, 'position': 'GK'},
+            {'full_name': 'Alvaro', 'price': 15.0, 'position': 'MID'},
+            {'full_name': 'Pranal Shetty', 'price': 10.0, 'position': 'DEF'},
+            {'full_name': 'Anish Bhabdha', 'price': 9.0, 'position': 'FWD'},
+            {'full_name': 'Aarav Hazari', 'price': 1.0, 'position': 'MID'},
+            {'full_name': 'Miguel', 'price': 25.0, 'position': 'FWD'},
+            {'full_name': 'Karan', 'price': 5.0, 'position': 'FWD'},
+            {'full_name': 'Akhil Hazari', 'price': 3.0, 'position': 'DEF'},
+            {'full_name': 'Alejandro Guillermo Banares', 'price': 24.0, 'position': 'DEF'},
+            {'full_name': 'Divyesh Patel', 'price': 1.0, 'position': 'MID'},
+            {'full_name': 'Pratham M', 'price': 1.0, 'position': 'DEF'}
+        ],
+        "TRA": [
+            {'full_name': 'Zaid Ansari', 'price': 15.0, 'position': 'FWD'},
+            {'full_name': 'Hanzalah Mohammed Elyas Kapadia', 'price': 17.0, 'position': 'MID'},
+            {'full_name': 'Rushab Lakhwani', 'price': 5.0, 'position': 'GK'},
+            {'full_name': 'Mir Mehta', 'price': 25.0, 'position': 'MID'},
+            {'full_name': 'Showkat Ansari', 'price': 10.0, 'position': 'DEF'},
+            {'full_name': 'Tabish Armar', 'price': 5.0, 'position': 'MID'},
+            {'full_name': 'Aamir Mazhar Ghadially', 'price': 10.0, 'position': 'MID'},
+            {'full_name': 'Humaid Muazzam Armar', 'price': 7.0, 'position': 'MID'},
+            {'full_name': 'Aamir Petiwala', 'price': 1.0, 'position': 'FWD'},
+            {'full_name': 'Gufranullah Rizwanullah Khan', 'price': 7.0, 'position': 'FWD'},
+            {'full_name': 'Mohammed Abdar Chasmawala', 'price': 1.0, 'position': 'DEF'},
+            {'full_name': 'Armaan Vardhan', 'price': 1.0, 'position': 'DEF'},
+            {'full_name': 'Manav J', 'price': 1.0, 'position': 'DEF'}
+        ],
+        "TIT": [
+            {'full_name': 'Raj Bhadhuria', 'price': 25.0, 'position': 'FWD'},
+            {'full_name': 'Gyan Savir Saldanha', 'price': 10.0, 'position': 'FWD'},
+            {'full_name': 'Yug Nair', 'price': 10.0, 'position': 'GK'},
+            {'full_name': 'Rahul Sachdev', 'price': 13.0, 'position': 'FWD'},
+            {'full_name': 'Jeet Antani', 'price': 1.0, 'position': 'DEF'},
+            {'full_name': 'Tanish Jain', 'price': 5.0, 'position': 'DEF'},
+            {'full_name': 'Kabir Khan', 'price': 11.0, 'position': 'MID'},
+            {'full_name': 'Param Sabnani', 'price': 11.0, 'position': 'FWD'},
+            {'full_name': 'Rishabh Lunia', 'price': 5.0, 'position': 'DEF'},
+            {'full_name': 'Manav Gagvani', 'price': 10.0, 'position': 'FWD'},
+            {'full_name': 'Aditya Sandeep Bamb', 'price': 14.0, 'position': 'DEF'},
+            {'full_name': 'Ishaan Rajnish Jindal', 'price': 11.0, 'position': 'FWD'},
+            {'full_name': 'Tushar Kant', 'price': 1.0, 'position': 'DEF'}
+        ],
+        "ROA": [
+            {'full_name': 'Karan Khanna', 'price': 25.0, 'position': 'MID'},
+            {'full_name': 'Dave Deohans', 'price': 15.0, 'position': 'MID'},
+            {'full_name': 'Dane Pereira', 'price': 5.0, 'position': 'GK'},
+            {'full_name': 'Siddharth Castellino', 'price': 10.0, 'position': 'MID'},
+            {'full_name': 'Ibadur Haque', 'price': 5.0, 'position': 'FWD'},
+            {'full_name': 'Shlok Vyas', 'price': 20.0, 'position': 'MID'},
+            {'full_name': 'Saheb Singh Satinder Pal Ahuja', 'price': 15.0, 'position': 'DEF'},
+            {'full_name': 'Kirk Anthony Quadros', 'price': 10.0, 'position': 'FWD'},
+            {'full_name': 'Uzair Patankar', 'price': 17.0, 'position': 'MID'},
+            {'full_name': 'Nelson Wilfred Aranha', 'price': 1.0, 'position': 'DEF'},
+            {'full_name': 'Srivinayak Shivkumar Tatikonda', 'price': 1.0, 'position': 'DEF'},
+            {'full_name': 'Akshay Karwa', 'price': 1.0, 'position': 'DEF'},
+            {'full_name': 'Abhishek Negi', 'price': 1.0, 'position': 'DEF'}
+        ],
+        "SAT": [
+            {'full_name': 'Pranit Vyas', 'price': 25.0, 'position': 'FWD'},
+            {'full_name': 'Rohan Jadhav', 'price': 24.0, 'position': 'DEF'},
+            {'full_name': 'Anirudh Iyer', 'price': 8.0, 'position': 'GK'},
+            {'full_name': 'Jagdish Lobo', 'price': 10.0, 'position': 'FWD'},
+            {'full_name': 'Rajeev Asija', 'price': 5.0, 'position': 'MID'},
+            {'full_name': 'Abdur Rehman Noor Mohamed Azeez', 'price': 1.0, 'position': 'DEF'},
+            {'full_name': 'Amogh Sanjeev Jadal', 'price': 11.0, 'position': 'MID'},
+            {'full_name': 'Nathan Clifton Murzello', 'price': 10.0, 'position': 'MID'},
+            {'full_name': 'Shrineel Belgaonkar', 'price': 1.0, 'position': 'FWD'},
+            {'full_name': 'Siddharth Rupali Bhonsle', 'price': 9.0, 'position': 'MID'},
+            {'full_name': 'Inshaal Sheredil Dhanjee', 'price': 1.0, 'position': 'FWD'},
+            {'full_name': 'Shubhrajyoti Das', 'price': 11.0, 'position': 'DEF'},
+            {'full_name': 'Mathais Coutinho', 'price': 10.0, 'position': 'MID'}
+        ],
+        "UMA": [
+            {'full_name': 'Titus Andrew Uttankar', 'price': 25.0, 'position': 'MID'},
+            {'full_name': 'Pranit Vikas Gaikwad', 'price': 10.0, 'position': 'FWD'},
+            {'full_name': 'Yashraj Singh', 'price': 12.0, 'position': 'GK'},
+            {'full_name': 'Kaif Muneer', 'price': 25.0, 'position': 'MID'},
+            {'full_name': 'Krish Sharma', 'price': 9.0, 'position': 'MID'},
+            {'full_name': 'Aneesh Malankar', 'price': 5.0, 'position': 'FWD'},
+            {'full_name': 'Joel Fernandes', 'price': 5.0, 'position': 'MID'},
+            {'full_name': 'Joshua Vessoakar', 'price': 21.0, 'position': 'DEF'},
+            {'full_name': 'Shubham Pandey', 'price': 6.0, 'position': 'DEF'},
+            {'full_name': 'Dhaval Dinesh Savla', 'price': 1.0, 'position': 'DEF'},
+            {'full_name': 'Dev Gupta', 'price': 3.0, 'position': 'MID'},
+            {'full_name': 'Tejash Pavanjyot Kohli', 'price': 1.0, 'position': 'MID'},
+            {'full_name': 'Rohil Malankar', 'price': 1.0, 'position': 'FWD'}
+        ]
     }
 
 async def clear_data(db: Prisma):
@@ -86,7 +173,6 @@ async def clear_data(db: Prisma):
     print("✅ Data wiped successfully.")
 
 async def main() -> None:
-    # --- GENERATE THE STATIC SCHEDULE ---
     GAMEWEEK_SCHEDULE = generate_static_schedule(dates=GAMEWEEK_DATES, deadline_hour=17, deadline_minute=0)
     PLAYERS = get_player_data()
     
@@ -138,7 +224,6 @@ async def main() -> None:
                     home_id = team_map_name.get(home_name)
                     away_id = team_map_name.get(away_name)
                     if home_id and away_id:
-                        # The kickoff time is the same as the gameweek deadline for simplicity
                         kickoff_time = GAMEWEEK_SCHEDULE.get(gw_num)
                         if kickoff_time:
                             fixtures_to_create.append({
