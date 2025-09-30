@@ -1026,6 +1026,7 @@ async def cancel_chip(db: Prisma, user_id: str, gameweek_id: int | None):
 
 
 async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) -> int:
+    await carry_forward_team(db, user_id, gameweek_id)
     # Fetch team for the GW
     entries = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id}
