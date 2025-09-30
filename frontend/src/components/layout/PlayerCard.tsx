@@ -1,9 +1,8 @@
-// frontend/src/components/layout/PlayerCard.tsx
-
 import React from 'react';
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { getTeamJersey } from '@/lib/player-utils';
+import { cn } from '../../lib/utils';
+import { getTeamJersey } from '../../lib/player-utils';
+import { ChipName } from '../../lib/api';
 
 // --- TYPESCRIPT INTERFACES ---
 interface Player {
@@ -22,15 +21,21 @@ interface PlayerCardProps {
   isBench?: boolean;
   displayMode?: 'points' | 'fixture';
   showArmbands?: boolean;
+  activeChip?: ChipName | null; // Add the new prop here
 }
 
 // --- PLAYER CARD COMPONENT ---
-const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displayMode = 'points', showArmbands = true }) => {
+const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displayMode = 'points', showArmbands = true, activeChip }) => {
   const jerseySrc = getTeamJersey(player.team);
 
-  const displayPoints = player.isCaptain 
-    ? (player.points ?? 0) * 2 
-    : player.points;
+  // THIS IS THE KEY LOGIC CHANGE
+  const isCaptain = player.isCaptain || (player as any).is_captain;
+  const isViceCaptain = player.isVice || (player as any).is_vice_captain;
+
+  const multiplier = isCaptain
+    ? (activeChip === 'TRIPLE_CAPTAIN' ? 3 : 2)
+    : 1;
+  const displayPoints = (player.points ?? 0) * multiplier;
 
   return (
     <motion.div
@@ -49,12 +54,12 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displa
             alt={`${player.team} jersey`}
             className="w-full h-full object-contain"
           />
-          {showArmbands && (player.isCaptain || player.isVice) && (
+          {showArmbands && (isCaptain || isViceCaptain) && (
             <div className={cn(
               "absolute top-0.5 left-0.5 rounded-full flex items-center justify-center font-bold text-white text-[10px] w-4 h-4 border border-black/50",
-              player.isCaptain ? 'bg-[#FF2882]' : 'bg-gray-700'
+              isCaptain ? 'bg-[#FF2882]' : 'bg-gray-700'
             )}>
-               {player.isCaptain ? 'C' : 'V'}
+               {isCaptain ? 'C' : 'V'}
             </div>
           )}
         </div>

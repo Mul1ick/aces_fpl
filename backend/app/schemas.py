@@ -269,3 +269,36 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     user: UserOut
 
+
+# Add these classes to backend/app/schemas.py
+
+class PlayerHistoryItem(BaseModel):
+    gw: int
+    opp: str
+    result: str
+    pts: int
+    mp: int
+    gs: int
+    a: int
+    cs: int
+    gc: int
+    yc: int
+    rc: int
+
+    
+class UpcomingFixtureItem(BaseModel):
+    gw: int
+    opp_short: str  # e.g., "SOU"
+    opp_long: str   # e.g., "Southside"
+    is_home: bool    
+
+class PlayerDetailResponse(BaseModel):
+    id: int
+    full_name: str
+    position: str
+    team_name: str
+    price: float
+    total_points: int
+    history: List[PlayerHistoryItem]
+    upcoming_fixtures: List[UpcomingFixtureItem]
+

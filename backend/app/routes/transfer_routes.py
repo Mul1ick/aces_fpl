@@ -34,24 +34,24 @@ async def confirm_transfers(
     current_user: PrismaModels.User = Depends(get_current_user),
 ):
     """
-    Confirms transfers for the next UPCOMING gameweek.
+    Confirms transfers for the CURRENT LIVE gameweek.
     """
-    # Find the gameweek that is open for transfers
-    upcoming_gw = await db.gameweek.find_first(
-        where={'status': 'UPCOMING'},
+    # Find the currently LIVE gameweek that is open for transfers
+    live_gw = await db.gameweek.find_first(
+        where={'status': 'LIVE'},
         order={'gw_number': 'asc'}
     )
-    if not upcoming_gw:
+    if not live_gw:
         raise HTTPException(status_code=400, detail="There is no gameweek currently open for transfers.")
     
-    # Also check the deadline as an extra layer of security
-    if upcoming_gw.deadline < datetime.now(timezone.utc):
-         raise HTTPException(status_code=400, detail=f"The deadline for Gameweek {upcoming_gw.gw_number} has passed.")
+    # Check the deadline as a layer of security
+    if live_gw.deadline < datetime.now(timezone.utc):
+         raise HTTPException(status_code=400, detail=f"The deadline for Gameweek {live_gw.gw_number} has passed.")
 
-    # Call the existing crud function, but pass the upcoming gameweek's ID
+    # Call the crud function with the LIVE gameweek's ID
     return await crud.confirm_transfers(
         db=db,
         user_id=str(current_user.id),
-        gameweek_id=upcoming_gw.id,
+        gameweek_id=live_gw.id,
         transfers=payload.transfers,
     )

@@ -867,77 +867,93 @@ async def user_has_team(db: Prisma, user_id: str) -> bool:
 
 # In backend/app/crud.py
 
-async def perform_gameweek_rollover_tasks(db: Prisma, completed_gw_id: int):
-    alog.info(f"Starting rollover tasks for Gameweek {completed_gw_id}...")
+async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
+    """
+    Handles all tasks required when a gameweek is finalized and rolls over to the next.
+    - Copies every user's team from the live gameweek to the next one.
+    - Resets/adds free transfers for every user.
+    - Sets a flag for users who have completed Gameweek 1.
+    """
+    alog.info(f"--- Starting Gameweek Rollover for GW ID: {live_gw_id} ---")
 
-    # --- START: NEW STATUS UPDATE LOGIC ---
-    async with db.tx() as transaction:
-        # 1. Mark the completed gameweek as FINISHED
-        completed_gw = await transaction.gameweek.update(
-            where={"id": completed_gw_id},
-            data={"status": "FINISHED"}
-        )
-        if not completed_gw:
-            raise Exception(f"Could not find the gameweek to finalize: ID {completed_gw_id}")
-        alog.info(f"Gameweek {completed_gw.gw_number} status set to FINISHED.")
+    live_gw = await db.gameweek.find_unique(where={'id': live_gw_id})
+    if not live_gw:
+        alog.error(f"Rollover failed: Could not find live_gw with id {live_gw_id}")
+        return
 
-        # 2. Find the next gameweek by number and set it to LIVE
-        next_gw_number = completed_gw.gw_number + 1
-        await transaction.gameweek.update_many(
-            where={"gw_number": next_gw_number},
-            data={"status": "LIVE"}
-        )
-        alog.info(f"Gameweek {next_gw_number} status set to LIVE.")
-    # --- END: NEW STATUS UPDATE LOGIC ---
-
-    active_users = await db.user.find_many(
-        where={'is_active': True, 'fantasy_team': {'is_not': None}}
+    # 1. Find the next gameweek
+    next_gw = await db.gameweek.find_first(
+        where={'gw_number': live_gw.gw_number + 1}
     )
+    if not next_gw:
+        alog.warning("End of season: No next gameweek found. Rollover tasks skipped.")
+        return
+
+    alog.info(f"Transitioning from GW {live_gw.gw_number} to GW {next_gw.gw_number}")
+
+    # 2. Get all active users with a fantasy team
+    active_users = await db.user.find_many(where={'is_active': True, 'fantasy_team': {'is_not': None}})
     if not active_users:
-        alog.info(f"No active users with teams to process for Gameweek {completed_gw_id}.")
-        return "No active users with teams to process."
+        alog.info("No active users with teams to roll over.")
+        return
+        
+    alog.info(f"Found {len(active_users)} active users with teams to process.")
 
-    # --- Step 1 & 2: Auto-subs and score recalculation for each user ---
-    
+    # 3. For each user, copy their team from the live GW to the next GW
+    for user in active_users:
+        user_team_for_live_gw = await db.userteam.find_many(
+            where={'user_id': user.id, 'gameweek_id': live_gw.id}
+        )
+        
+        if not user_team_for_live_gw:
+            alog.warning(f"User {user.email} (ID: {user.id}) had no team in GW {live_gw.gw_number} to copy.")
+            continue
 
-    # --- Step 3: Flag new players who just completed their first gameweek ---
-    users_in_completed_gw = await db.userteam.find_many(
-        where={'gameweek_id': completed_gw_id},
-        distinct=['user_id']
-    )
-    user_ids_in_gw = {u.user_id for u in users_in_completed_gw}
-    first_gameweek_entries = await db.userteam.group_by(
-        by=['user_id'],
-        min={'gameweek_id': True},
-        where={'user_id': {'in': list(user_ids_in_gw)}}
-    )
-    new_players_to_flag = [
-        entry['user_id'] for entry in first_gameweek_entries
-        if entry['_min']['gameweek_id'] == completed_gw_id
-    ]
+        new_team_data = [
+            {
+                "user_id": user.id,
+                "gameweek_id": next_gw.id,
+                "player_id": p.player_id,
+                "is_captain": p.is_captain,
+                "is_vice_captain": p.is_vice_captain,
+                "is_benched": p.is_benched
+            } for p in user_team_for_live_gw
+        ]
 
-    async with db.tx() as transaction:
-        if new_players_to_flag:
-            update_count_result = await transaction.user.update_many(
-                where={'id': {'in': new_players_to_flag}},
+        # Use create_many for efficiency
+        await db.userteam.create_many(data=new_team_data, skip_duplicates=True)
+        alog.info(f"Copied team for user {user.email} to GW {next_gw.gw_number}.")
+
+    # 4. Set 'played_first_gameweek' flag for users after GW1 is finalized
+    if live_gw.gw_number == 1:
+        user_ids_in_gw1 = [
+            ut.user_id for ut in await db.userteam.find_many(
+                where={'gameweek_id': live_gw.id},
+                distinct=['user_id']
+            )
+        ]
+        if user_ids_in_gw1:
+            await db.user.update_many(
+                where={'id': {'in': user_ids_in_gw1}},
                 data={'played_first_gameweek': True}
             )
-            alog.info(f"Flagged {update_count_result} new players as having played their first gameweek.")
+            alog.info(f"Set 'played_first_gameweek' flag for {len(user_ids_in_gw1)} users after GW1.")
 
-        # --- Step 4: Add 1 free transfer to all users who have played ---
-        await transaction.query_raw(
-            """
-            UPDATE "users"
-            SET free_transfers = LEAST(free_transfers + 1, 2)
-            WHERE played_first_gameweek = true
-            """
+    # 5. Update free transfers for all active users who have started playing
+    # Rule: Give 1 free transfer, with a maximum of 2.
+    users_to_update = await db.user.find_many(
+        where={'is_active': True, 'played_first_gameweek': True, 'free_transfers': {'lt': 2}}
+    )
+    user_ids_to_increment = [u.id for u in users_to_update]
+
+    if user_ids_to_increment:
+        await db.user.update_many(
+            where={'id': {'in': user_ids_to_increment}},
+            data={'free_transfers': {'increment': 1}}
         )
-        alog.info(f"Updated free transfers for all eligible users.")
+        alog.info(f"Incremented free transfers for {len(user_ids_to_increment)} users.")
 
-    message = f"Rollover complete for Gameweek {completed_gw_id}."
-    alog.info(message)
-    return message
-
+    alog.info(f"--- Gameweek Rollover for GW ID: {live_gw_id} Completed ---")
 
 async def _resolve_gw(db: Prisma, gameweek_id: int | None):
     if gameweek_id is not None:
