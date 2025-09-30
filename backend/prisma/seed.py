@@ -41,6 +41,7 @@ def generate_static_schedule(dates: dict, deadline_hour: int, deadline_minute: i
 
 # --- CORE DATA (MATCHES, TEAMS, PLAYERS) ---
 
+# CORRECTED FIXTURE DATA BASED ON THE NEW IMAGE
 FIXTURE_DATA = {
     1: [("Trana", "Titans"), ("Umang", "Satans"), ("Roarers", "Southside")],
     2: [("Umang", "Roarers"), ("Southside", "Titans"), ("Satans", "Trana")],

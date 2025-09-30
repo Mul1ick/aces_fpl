@@ -101,11 +101,9 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
         const data: TeamResponse = await response.json();
         const allPlayers = [...(data.starting || []), ...(data.bench || [])];
         const populatedSquad = transformApiDataToSquad(allPlayers);
-        
         setSquad(populatedSquad);
-        setInitialSquadObject(populatedSquad); // CORRECTED
-
-        // --- MODIFIED --- Store the fetched team name
+        // Use JSON.parse and JSON.stringify to create a deep copy
+        setInitialSquadObject(JSON.parse(JSON.stringify(populatedSquad)));
         setExistingTeamName(data.team_name || '');
       } catch (error) {
         console.error("Failed to fetch team:", error);

@@ -139,7 +139,7 @@ const PlayerFilterControls = ({ filters, setFilters, resetFilters, allTeamNames 
             </FilterModal>
              <FilterModal isOpen={isPriceOpen} onClose={() => setIsPriceOpen(false)} title="Filter by Price">
                 <div className="p-4">
-                     <Slider defaultValue={[3.5, 14.0]} min={3.5} max={14.0} step={0.1} value={priceRange} onValueChange={setPriceRange} />
+                     <Slider defaultValue={[1.0, 25.0]} min={1.0} max={25.0} step={0.1} value={priceRange} onValueChange={setPriceRange} />
                     <div className="flex justify-between mt-2 text-sm font-bold">
                         <span>£{priceRange[0].toFixed(1)}m</span>
                         <span>£{priceRange[1].toFixed(1)}m</span>
@@ -207,12 +207,12 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     }, [squad]);
 
     const resetFilters = () => {
-        setSearchQuery('');
-        setSelectedPositions(positionFilter ? [positionFilter] : []);
-        setSelectedClubs([]);
-        setSortBy('points');
-        setPriceRange([3.5, 14.0]);
-    };
+    setSearchQuery('');
+    setSelectedPositions(positionFilter ? [positionFilter] : []);
+    setSelectedClubs([]);
+    setSortBy('points');
+    setPriceRange([1.0, 25.0]);
+};
 
     const isFiltered = useMemo(() => {
         // A view is considered "filtered" if any filter is active.
