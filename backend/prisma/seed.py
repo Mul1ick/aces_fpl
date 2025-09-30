@@ -1,6 +1,5 @@
-# FILE: backend/prisma/seed.py
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 import sys
 import os
 from zoneinfo import ZoneInfo
@@ -11,40 +10,48 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from prisma import Prisma
 from app.auth import hash_password
 
-# --- NEW CONFIGURATION FOR DEMO ---
+# --- STATIC GAMEWEEK SCHEDULE CONFIGURATION ---
+# This schedule is based on the provided fixture image, with a fixed 5 PM deadline.
 
-# Base dates for the simulation, set to your current request time
-TODAY = datetime(2025, 9, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
-TOMORROW = TODAY + timedelta(days=1)
-
-# --- UPDATED GAMEWEEK SCHEDULE ---
-# Gameweeks 1-5 are on September 30th, and 6-10 are on October 1st.
-GAMEWEEK_SCHEDULE = {
-    1: TODAY.replace(hour=12, minute=0),  # Today at 12 PM
-    2: TODAY.replace(hour=14, minute=0),  # Today at 2 PM
-    3: TODAY.replace(hour=16, minute=0),  # Today at 4 PM
-    4: TODAY.replace(hour=18, minute=0),  # Today at 6 PM
-    5: TODAY.replace(hour=20, minute=0),  # Today at 8 PM
-    6: TOMORROW.replace(hour=12, minute=0), # Tomorrow at 12 PM
-    7: TOMORROW.replace(hour=14, minute=0), # Tomorrow at 2 PM
-    8: TOMORROW.replace(hour=16, minute=0), # Tomorrow at 4 PM
-    9: TOMORROW.replace(hour=18, minute=0), # Tomorrow at 6 PM
-    10: TOMORROW.replace(hour=20, minute=0) # Tomorrow at 8 PM
+GAMEWEEK_DATES = {
+    1: "05/10/2025",
+    2: "12/10/2025",
+    3: "26/10/2025",
+    4: "02/11/2025",
+    5: "09/11/2025",
+    6: "16/11/2025",
+    7: "23/11/2025",
+    8: "30/11/2025",
+    9: "07/12/2025",
+    10: "14/12/2025",
 }
 
+def generate_static_schedule(dates: dict, deadline_hour: int, deadline_minute: int) -> dict:
+    """
+    Generates a static, real-world gameweek schedule from a dictionary of dates.
+    """
+    schedule = {}
+    tz = ZoneInfo("Asia/Kolkata")
+    for gw_num, date_str in dates.items():
+        day, month, year = map(int, date_str.split('/'))
+        deadline = datetime(year, month, day, hour=deadline_hour, minute=deadline_minute, tzinfo=tz)
+        schedule[gw_num] = deadline
+    print(f"✅ Generated static schedule. GW1 deadline: {schedule[1].strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    return schedule
 
-# --- EXISTING DATA (Unchanged) ---
+# --- CORE DATA (MATCHES, TEAMS, PLAYERS) ---
+
 FIXTURE_DATA = {
-    1: [("Southside", "Titans"), ("Satans", "Roarers"), ("Trana", "Umang")],
-    2: [("Southside", "Roarers"), ("Titans", "Trana"), ("Satans", "Umang")],
-    3: [("Southside", "Trana"), ("Titans", "Umang"), ("Roarers", "Satans")],
-    4: [("Southside", "Umang"), ("Titans", "Roarers"), ("Trana", "Satans")],
-    5: [("Southside", "Satans"), ("Titans", "Umang"), ("Trana", "Roarers")],
-    6: [("Southside", "Titans"), ("Satans", "Roarers"), ("Trana", "Umang")],
-    7: [("Southside", "Roarers"), ("Titans", "Trana"), ("Satans", "Umang")],
-    8: [("Southside", "Trana"), ("Titans", "Umang"), ("Roarers", "Satans")],
-    9: [("Southside", "Umang"), ("Titans", "Roarers"), ("Trana", "Satans")],
-    10: [("Southside", "Satans"), ("Titans", "Umang"), ("Trana", "Roarers")],
+    1: [("Trana", "Titans"), ("Umang", "Satans"), ("Roarers", "Southside")],
+    2: [("Umang", "Roarers"), ("Southside", "Titans"), ("Satans", "Trana")],
+    3: [("Satans", "Titans"), ("Umang", "Southside"), ("Roarers", "Trana")],
+    4: [("Roarers", "Satans"), ("Southside", "Trana"), ("Umang", "Titans")],
+    5: [("Umang", "Trana"), ("Roarers", "Titans"), ("Southside", "Satans")],
+    6: [("Trana", "Titans"), ("Umang", "Satans"), ("Roarers", "Southside")],
+    7: [("Umang", "Roarers"), ("Southside", "Titans"), ("Satans", "Trana")],
+    8: [("Satans", "Titans"), ("Umang", "Southside"), ("Roarers", "Trana")],
+    9: [("Roarers", "Satans"), ("Southside", "Trana"), ("Umang", "Titans")],
+    10: [("Umang", "Trana"), ("Roarers", "Titans"), ("Southside", "Satans")],
 }
 
 TEAMS = [
@@ -62,7 +69,6 @@ def get_player_data():
         "SAT": [{'full_name': 'Pranit Vyas', 'price': 25.0, 'position': 'FWD'}, {'full_name': 'Rohan Jadhav', 'price': 24.0, 'position': 'DEF'}, {'full_name': 'Anirudh Iyer', 'price': 8.0, 'position': 'GK'}, {'full_name': 'Jagdish Lobo', 'price': 10.0, 'position': 'DEF'}, {'full_name': 'Rajeev Asija', 'price': 5.0, 'position': 'MID'}, {'full_name': 'Abdur Rehman Noor Mohamed Azeez', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Amogh Sanjeev Jadal', 'price': 11.0, 'position': 'MID'}, {'full_name': 'Nathan Clifton Murzello', 'price': 10.0, 'position': 'MID'}, {'full_name': 'Shrineel Belgaonkar', 'price': 1.0, 'position': 'FWD'}, {'full_name': 'Siddharth Rupali Bhonsle', 'price': 9.0, 'position': 'MID'}, {'full_name': 'Inshaal Sheredil Dhanjee', 'price': 1.0, 'position': 'FWD'}, {'full_name': 'Shubhrajyoti Das', 'price': 11.0, 'position': 'DEF'}, {'full_name': 'Mathais Coutinho', 'price': 10.0, 'position': 'MID'}],
         "UMA": [{'full_name': 'Titus Andrew Uttankar', 'price': 25.0, 'position': 'MID'}, {'full_name': 'Pranit Vikas Gaikwad', 'price': 10.0, 'position': 'FWD'}, {'full_name': 'Yashraj Singh', 'price': 12.0, 'position': 'GK'}, {'full_name': 'Kaif Muneer', 'price': 25.0, 'position': 'MID'}, {'full_name': 'Krish Sharma', 'price': 9.0, 'position': 'MID'}, {'full_name': 'Aneesh Malankar', 'price': 5.0, 'position': 'FWD'}, {'full_name': 'Joel Fernandes', 'price': 5.0, 'position': 'MID'}, {'full_name': 'Joshua Vessoakar', 'price': 21.0, 'position': 'DEF'}, {'full_name': 'Shubham Pandey', 'price': 6.0, 'position': 'DEF'}, {'full_name': 'Dhaval Dinesh Savla', 'price': 1.0, 'position': 'DEF'}, {'full_name': 'Dev Gupta', 'price': 3.0, 'position': 'MID'}, {'full_name': 'Tejash Pavanjyot Kohli', 'price': 1.0, 'position': 'MID'}, {'full_name': 'Rohil Malankar', 'price': 1.0, 'position': 'FWD'}]
     }
-PLAYERS = get_player_data()
 
 async def clear_data(db: Prisma):
     print("🧹 Wiping existing data...")
@@ -80,61 +86,75 @@ async def clear_data(db: Prisma):
     print("✅ Data wiped successfully.")
 
 async def main() -> None:
+    # --- GENERATE THE STATIC SCHEDULE ---
+    GAMEWEEK_SCHEDULE = generate_static_schedule(dates=GAMEWEEK_DATES, deadline_hour=17, deadline_minute=0)
+    PLAYERS = get_player_data()
+    
     db = Prisma()
     await db.connect()
-    await clear_data(db)
+    
+    try:
+        await clear_data(db)
 
-    print("Seeding admin and test users...")
-    users_to_create = [
-        {"email": "admin@acesfpl.com", "full_name": "Admin User", "password": "adminPassword", "role": "admin", "is_active": True},
-        {"email": "test@example.com", "full_name": "Test User", "password": "password", "role": "user", "is_active": True}
-    ]
-    for user_data in users_to_create:
-        await db.user.create(data={
-            "email": user_data["email"], "hashed_password": hash_password(user_data["password"]),
-            "role": user_data["role"], "is_active": user_data["is_active"], "full_name": user_data["full_name"],
-        })
-    print("✅ Admin and test users created.")
+        print("👤 Seeding admin and test users...")
+        users_to_create = [
+            {"email": "admin@acesfpl.com", "full_name": "Admin User", "password": "adminPassword", "role": "admin", "is_active": True},
+            {"email": "test@example.com", "full_name": "Test User", "password": "password", "role": "user", "is_active": True}
+        ]
+        for user_data in users_to_create:
+            await db.user.create(data={
+                "email": user_data["email"], "hashed_password": hash_password(user_data["password"]),
+                "role": user_data["role"], "is_active": user_data["is_active"], "full_name": user_data["full_name"],
+            })
+        print("✅ Users created.")
 
-    print("Seeding teams and players...")
-    await db.team.create_many(data=TEAMS, skip_duplicates=True)
-    all_teams = await db.team.find_many()
-    team_map_name = {team.name: team.id for team in all_teams}
-    team_map_short = {team.short_name: team.id for team in all_teams}
-    for short_name, players in PLAYERS.items():
-        team_id = team_map_short.get(short_name)
-        if team_id:
-            await db.player.create_many(data=[{"team_id": team_id, **p} for p in players], skip_duplicates=True)
-    print("✅ Teams and players seeded.")
+        print("⚽ Seeding teams and players...")
+        await db.team.create_many(data=TEAMS, skip_duplicates=True)
+        all_teams = await db.team.find_many()
+        team_map_name = {team.name: team.id for team in all_teams}
+        team_map_short = {team.short_name: team.id for team in all_teams}
+        for short_name, players in PLAYERS.items():
+            team_id = team_map_short.get(short_name)
+            if team_id:
+                await db.player.create_many(data=[{"team_id": team_id, **p} for p in players], skip_duplicates=True)
+        print("✅ Teams and players seeded.")
 
-    print("Creating gameweeks for the pitch schedule...")
-    gameweek_data = []
-    for gw_num, deadline in GAMEWEEK_SCHEDULE.items():
-        gameweek_data.append({"gw_number": gw_num, "deadline": deadline, "status": "UPCOMING"})
-    await db.gameweek.create_many(data=gameweek_data)
-    print(f"✅ All {len(gameweek_data)} gameweeks created with UPCOMING status.")
+        print("📅 Creating gameweeks with the official schedule...")
+        gameweek_data = []
+        for gw_num, deadline in GAMEWEEK_SCHEDULE.items():
+            gameweek_data.append({"gw_number": gw_num, "deadline": deadline, "status": "UPCOMING"})
+        await db.gameweek.create_many(data=gameweek_data)
+        print(f"✅ All {len(gameweek_data)} gameweeks created.")
 
-    print("Creating fixtures from schedule...")
-    all_gws = await db.gameweek.find_many()
-    gameweek_map = {gw.gw_number: gw.id for gw in all_gws}
+        print("🗓️ Creating fixtures from the official schedule...")
+        all_gws = await db.gameweek.find_many()
+        gameweek_map = {gw.gw_number: gw.id for gw in all_gws}
 
-    for gw_num, fixtures in FIXTURE_DATA.items():
-        gameweek_id = gameweek_map.get(gw_num)
-        if gameweek_id:
-            fixtures_to_create = []
-            for home_name, away_name in fixtures:
-                home_id = team_map_name.get(home_name); away_id = team_map_name.get(away_name)
-                if home_id and away_id:
-                    kickoff_time = GAMEWEEK_SCHEDULE[gw_num]
-                    fixtures_to_create.append({
-                        "gameweek_id": gameweek_id, "home_team_id": home_id,
-                        "away_team_id": away_id, "kickoff": kickoff_time
-                    })
-            if fixtures_to_create:
-                await db.fixture.create_many(data=fixtures_to_create, skip_duplicates=True)
-    print("✅ All fixtures created.")
+        for gw_num, fixtures in FIXTURE_DATA.items():
+            gameweek_id = gameweek_map.get(gw_num)
+            if gameweek_id:
+                fixtures_to_create = []
+                for home_name, away_name in fixtures:
+                    home_id = team_map_name.get(home_name)
+                    away_id = team_map_name.get(away_name)
+                    if home_id and away_id:
+                        # The kickoff time is the same as the gameweek deadline for simplicity
+                        kickoff_time = GAMEWEEK_SCHEDULE.get(gw_num)
+                        if kickoff_time:
+                            fixtures_to_create.append({
+                                "gameweek_id": gameweek_id, "home_team_id": home_id,
+                                "away_team_id": away_id, "kickoff": kickoff_time
+                            })
+                if fixtures_to_create:
+                    await db.fixture.create_many(data=fixtures_to_create, skip_duplicates=True)
+        print("✅ All fixtures created.")
 
-    await db.disconnect()
+    except Exception as e:
+        print(f"❌ An error occurred during seeding: {e}")
+    finally:
+        await db.disconnect()
+        print("Seeding process complete.")
 
 if __name__ == "__main__":
     asyncio.run(main())
+
