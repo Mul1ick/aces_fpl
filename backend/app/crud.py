@@ -538,6 +538,8 @@ async def transfer_player(
     out_player_id: int,
     in_player_id: int,
 ):
+
+    await carry_forward_team(db, user_id, gameweek_id)
     user = await db.user.find_unique(where={'id': user_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1026,6 +1028,7 @@ async def cancel_chip(db: Prisma, user_id: str, gameweek_id: int | None):
 
 
 async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) -> int:
+    await carry_forward_team(db, user_id, gameweek_id)
     # Fetch team for the GW
     entries = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id}
