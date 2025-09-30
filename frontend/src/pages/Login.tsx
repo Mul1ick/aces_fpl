@@ -475,7 +475,7 @@ const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
                     onError={() => {
                       setErrors({ general: 'Google login failed. Please try again.' });
                     }}
-                    useOneTap
+                    useOneTap={false}
                     theme="filled_black"
                     shape="pill"
                   />
