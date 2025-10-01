@@ -116,18 +116,21 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
 // --- MOCK DATA & ASSETS ---
-import redLogo from '@/assets/images/team-logos/red.png';
-import blueLogo from '@/assets/images/team-logos/blue.png';
-import blackLogo from '@/assets/images/team-logos/black.png';
-import whiteLogo from '@/assets/images/team-logos/white.png';
+import southsideLogo from '@/assets/images/team-logos/southside-logo.png';
+import roarersLogo from '@/assets/images/team-logos/roarers-logo.png';
+import satansLogo from '@/assets/images/team-logos/satans-logo.png';
+import titansLogo from '@/assets/images/team-logos/titans-logo.png';
+import tranaLogo from '@/assets/images/team-logos/trana-logo.png';
+import umangLogo from '@/assets/images/team-logos/umang-logo.png';
 
-const mockTeams = [
-    { name: 'Arsenal', logo: redLogo }, 
-    { name: 'Chelsea', logo: blueLogo }, 
-    { name: 'Liverpool', logo: redLogo }, 
-    { name: 'Man City', logo: blueLogo },
-    { name: 'Man Utd', logo: redLogo }, 
-    { name: 'Newcastle', logo: blackLogo },
+
+const Teams = [
+    { name: 'Southside', logo: southsideLogo }, 
+    { name: 'Roarers', logo: roarersLogo }, 
+    { name: 'Satans', logo: satansLogo }, 
+    { name: 'Titans', logo: titansLogo },
+    { name: 'Trana', logo: tranaLogo }, 
+    { name: 'Umang', logo: umangLogo },
 ];
 
 interface FilterSelection {
@@ -209,7 +212,7 @@ export const StatsToolbar: React.FC<StatsToolbarProps> = ({ onFilterChange, onRe
             </FilterSection>
             <FilterSection title="Teams">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 px-4">
-                    {mockTeams.map(team => (
+                    {Teams.map(team => (
                         <button key={team.name} onClick={() => handleSelect({ type: 'team', value: team.name })} className="flex items-center space-x-2 text-left p-2 hover:bg-gray-100 rounded-lg">
                             <img src={team.logo} alt={team.name} className="w-6 h-6" />
                             <span className="text-body">{team.name}</span>
