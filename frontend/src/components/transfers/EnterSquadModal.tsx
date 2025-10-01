@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { X } from 'lucide-react';
 
 interface EnterSquadModalProps {
@@ -14,13 +13,13 @@ interface EnterSquadModalProps {
 
 export const EnterSquadModal: React.FC<EnterSquadModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const [teamName, setTeamName] = useState('');
-  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleConfirm = () => {
-    if (teamName.trim() && termsAccepted) {
+    if (teamName.trim()) {
       onConfirm(teamName);
     } else {
-      alert('Please fill in all fields and accept the terms.');
+      // This is a fallback, the button will be disabled if the name is empty.
+      alert('Please enter a team name.');
     }
   };
 
@@ -61,28 +60,17 @@ export const EnterSquadModal: React.FC<EnterSquadModalProps> = ({ isOpen, onClos
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                 />
+                {/* --- ADDED: Disclaimer text --- */}
+                <p className="text-xs text-gray-500 mt-2">Team names cannot be changed inbetween season.</p>
               </div>
 
-              <div className="flex items-start space-x-2">
-                <Checkbox id="terms" checked={termsAccepted} onCheckedChange={setTermsAccepted} />
-                <div className="grid gap-1.5 leading-none">
-                  <label
-                    htmlFor="terms"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    I accept the Terms & Conditions
-                  </label>
-                  <p className="text-xs text-gray-500">
-                    By creating a Fantasy team you will automatically receive updates relating to Fantasy if you are already opted into our general Premier League emails. 
-                    (<a href="#" className="underline">Read full terms</a>)
-                  </p>
-                </div>
-              </div>
+              {/* --- REMOVED: Checkbox and terms section --- */}
             </div>
 
             <div className="grid grid-cols-2 gap-4 mt-6">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleConfirm} disabled={!termsAccepted || !teamName.trim()}>Enter Squad</Button>
+              {/* --- MODIFIED: Updated disabled logic --- */}
+              <Button onClick={handleConfirm} disabled={!teamName.trim()}>Enter Squad</Button>
             </div>
           </motion.div>
         </motion.div>

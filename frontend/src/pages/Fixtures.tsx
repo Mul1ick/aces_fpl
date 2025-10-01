@@ -22,7 +22,7 @@ interface MatchUI {
 }
 
 interface GameweekDataUI {
-  gameweek: number; // This will now correctly be the GW number
+  gameweek: number;
   title: string;
   deadline?: string;
   matches: MatchUI[];
@@ -58,7 +58,6 @@ const Fixtures: React.FC = () => {
 
     (async () => {
       try {
-        // Fetch fixtures, current GW, and ALL gameweeks concurrently
         const [fixturesRes, currentGwRes, allGameweeksRes] = await Promise.all([
             fetch(API.endpoints.fixtures, { headers }),
             fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers }),
@@ -76,21 +75,20 @@ const Fixtures: React.FC = () => {
         const currentGwData: GameweekFromAPI | null = currentGwRes.ok ? await currentGwRes.json() : null;
         const allGameweeks: GameweekFromAPI[] = await allGameweeksRes.json();
 
-        // Create a map from gameweek ID to gameweek NUMBER
+        // --- MODIFIED: Create maps for both number and deadline for easier lookup ---
         const gameweekIdToNumberMap = new Map(allGameweeks.map(gw => [gw.id, gw.gw_number]));
+        const gameweekIdToDeadlineMap = new Map(allGameweeks.map(gw => [gw.id, gw.deadline]));
 
-        // Group by gameweek_id
         const grouped = fixtures.reduce<Record<number, FixtureFromAPI[]>>((acc, f) => {
           acc[f.gameweek_id] = acc[f.gameweek_id] || [];
           acc[f.gameweek_id].push(f);
           return acc;
         }, {});
 
-        // Transform to UI-friendly structure
         const byGw: Record<number, GameweekDataUI> = {};
         Object.entries(grouped).forEach(([gwIdStr, list]) => {
           const gwId = Number(gwIdStr);
-          const gwNumber = gameweekIdToNumberMap.get(gwId) || gwId; // Use map, fallback to ID
+          const gwNumber = gameweekIdToNumberMap.get(gwId) || gwId;
           
           const matches: MatchUI[] = list
             .sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
@@ -133,15 +131,15 @@ const Fixtures: React.FC = () => {
               };
             });
 
-          // Use the correct gwNumber for title and data
+          // --- FIXED: Assign the deadline from the map ---
           byGw[gwId] = {
             gameweek: gwNumber,
             title: `Gameweek ${gwNumber}`,
+            deadline: gameweekIdToDeadlineMap.get(gwId), // This line adds the deadline
             matches,
           };
         });
 
-        // Sort keys by the actual gameweek number for correct navigation order
         const keys = Object.keys(byGw)
           .map(Number)
           .sort((a, b) => (gameweekIdToNumberMap.get(a) || 0) - (gameweekIdToNumberMap.get(b) || 0));

@@ -14,10 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { API } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-// --- ADDED: Imports for date formatting ---
 import { format, isValid } from 'date-fns';
 
-// --- ASSET IMPORTS ---
 import pitchBackground from '@/assets/images/pitch.png';
 import acesLogo from "@/assets/aces-logo.png";
 
@@ -36,7 +34,7 @@ const TeamPageSkeleton = () => (
                 style={{ backgroundImage: `url(${pitchBackground})`, backgroundSize: 'cover', backgroundPosition: 'center top' }}
             >
                 <div className="flex justify-center"><Skeleton className="h-28 w-20 rounded-md" /></div>
-                 <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>
+                <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>
                 <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>
                 <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>
             </main>
@@ -53,7 +51,7 @@ const TeamPageSkeleton = () => (
             <div className="p-4">
                 <Skeleton className="h-48 w-full rounded-lg" />
             </div>
-     </div>
+        </div>
     </div>
 );
 
@@ -70,8 +68,12 @@ const Team: React.FC = () => {
     const [hubStats, setHubStats] = useState(null);
     const [leaderboard, setLeaderboard] = useState([]);
     const [isExtraDataLoading, setIsExtraDataLoading] = useState(true);
-    // --- ADDED: State to hold current gameweek data ---
-    const [gameweek, setGameweek] = useState<{ gw_number: number; deadline: string } | null>(null);
+    const [gameweek, setGameweek] = useState<{ gw_number: number; deadline: string; id: number } | null>(null);
+
+    // --- ADDED: State for fixtures ---
+    const [allGameweeks, setAllGameweeks] = useState<any[]>([]);
+    const [allFixtures, setAllFixtures] = useState<any[]>([]);
+    const [fixtureView, setFixtureView] = useState<'previous' | 'current' | 'next'>('current');
 
     const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") || "" : "";
 
@@ -84,12 +86,14 @@ const Team: React.FC = () => {
 
         const fetchAllData = async () => {
             try {
-                // --- MODIFIED: Fetch gameweek data along with other requests ---
-                const [teamRes, hubRes, leaderboardRes, gameweekRes] = await Promise.all([
+                // --- MODIFIED: Fetch gameweeks and fixtures ---
+                const [teamRes, hubRes, leaderboardRes, gameweekRes, allGameweeksRes, allFixturesRes] = await Promise.all([
                     fetch(API.endpoints.team(), { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: { Authorization: `Bearer ${token}` } })
+                    fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(API.endpoints.gameweek, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(API.endpoints.fixtures, { headers: { Authorization: `Bearer ${token}` } })
                 ]);
 
                 if (!teamRes.ok) throw new Error("Failed to fetch team data");
@@ -111,13 +115,15 @@ const Team: React.FC = () => {
                 setSquad(currentSquad);
                 setInitialSquadState(JSON.stringify(currentSquad));
                 
-                // Process Hub, Leaderboard, and Gameweek Data
+                // Process Hub, Leaderboard, Gameweek and Fixture Data
                 if (hubRes.ok) setHubStats(await hubRes.json());
                 if (leaderboardRes.ok) setLeaderboard(await leaderboardRes.json());
                 if (gameweekRes.ok) setGameweek(await gameweekRes.json());
+                if (allGameweeksRes.ok) setAllGameweeks(await allGameweeksRes.json());
+                if (allFixturesRes.ok) setAllFixtures(await allFixturesRes.json());
 
             } catch (err) {
-                 console.error("Failed to fetch initial data:", err);
+                console.error("Failed to fetch initial data:", err);
                 setSquad({ starting: [], bench: [] });
                 toast({ variant: "destructive", title: "Could not load your team." });
             } finally {
@@ -134,6 +140,24 @@ const Team: React.FC = () => {
         const userEntry: any = leaderboard.find((entry: any) => entry.manager_email === user.email);
         return userEntry?.rank;
     }, [leaderboard, user]);
+
+    // --- ADDED: Memo hook to filter fixtures for the selected view ---
+    const displayedFixtures = useMemo(() => {
+        if (!gameweek || allFixtures.length === 0 || allGameweeks.length === 0) return [];
+
+        const currentGw = allGameweeks.find(gw => gw.id === gameweek.id);
+        if (!currentGw) return [];
+        
+        let targetGwNumber;
+        if (fixtureView === 'current') targetGwNumber = currentGw.gw_number;
+        else if (fixtureView === 'previous') targetGwNumber = currentGw.gw_number - 1;
+        else targetGwNumber = currentGw.gw_number + 1;
+
+        const targetGw = allGameweeks.find(gw => gw.gw_number === targetGwNumber);
+        if (!targetGw) return [];
+        
+        return allFixtures.filter(f => f.gameweek_id === targetGw.id);
+    }, [fixtureView, gameweek, allFixtures, allGameweeks]);
 
     const isDirty = useMemo(() => {
         return JSON.stringify(squad) !== initialSquadState;
@@ -213,7 +237,7 @@ const Team: React.FC = () => {
             if (targetPlayer) {
                 if (kind === 'C') {
                     targetPlayer.isCaptain = true;
-                     if (targetPlayer.isVice) targetPlayer.isVice = false;
+                    if (targetPlayer.isVice) targetPlayer.isVice = false;
                 }
                 if (kind === 'VC') {
                     targetPlayer.isVice = true;
@@ -355,7 +379,7 @@ const Team: React.FC = () => {
            <div className="flex flex-col flex-1 lg:w-3/5">
             <motion.div variants={itemVariants} className="p-4 space-y-4">
                 <div className="flex justify-between items-center">
-                   <div>
+                    <div>
                         <h1 className="text-2xl font-bold">Pick Team</h1>
                          <p className="text-sm text-gray-500">{deadlineText}</p>
                     </div>
@@ -367,14 +391,14 @@ const Team: React.FC = () => {
               variants={itemVariants}
               className="flex-1 relative flex flex-col justify-around py-4"
               style={{ 
-                 backgroundImage: `url(${pitchBackground})`, 
+                  backgroundImage: `url(${pitchBackground})`, 
                 backgroundSize: 'cover', 
                 backgroundPosition: 'center top',
               }}
              >
               {positionOrder.map((pos) => (
                 <motion.div
-                  key={pos}
+                   key={pos}
                    className="flex justify-center items-center gap-x-8 sm:gap-x-12"
                   variants={containerVariants}
                 >
@@ -428,10 +452,16 @@ const Team: React.FC = () => {
                 >
                     Save Changes
                 </Button>
-             </motion.div>
+            </motion.div>
 
             <motion.div variants={itemVariants} className="p-4">
-                <FixturesCard />
+                {/* --- MODIFIED: Pass fixture data and handlers to the card --- */}
+                <FixturesCard 
+                    fixtures={displayedFixtures}
+                    view={fixtureView}
+                    setView={setFixtureView}
+                    currentGwNumber={gameweek?.gw_number}
+                />
             </motion.div>
           </div>
           
@@ -447,6 +477,7 @@ const Team: React.FC = () => {
               />
           </motion.div>
 
+          
           <AnimatePresence>
              {detailedPlayer && <EditablePlayerCard player={detailedPlayer} onClose={() => setDetailedPlayer(null)} onSubstitute={handleSelectForSub} onSetArmband={setArmband} onViewProfile={handleViewProfile} />}
           </AnimatePresence>
@@ -456,7 +487,7 @@ const Team: React.FC = () => {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Team Saved!</AlertDialogTitle>
                 </AlertDialogHeader>
-                 <AlertDialogAction onClick={() => setIsSavedModalOpen(false)}>
+                <AlertDialogAction onClick={() => setIsSavedModalOpen(false)}>
                     Continue
                 </AlertDialogAction>
             </AlertDialogContent>

@@ -21,6 +21,7 @@ export const GameweekNavigator: React.FC<GameweekNavigatorProps> = ({
 }) => {
   return (
     <div className="flex items-center justify-between p-4">
+      
       <Button
         variant="ghost"
         size="icon"
@@ -33,7 +34,8 @@ export const GameweekNavigator: React.FC<GameweekNavigatorProps> = ({
 
       <div className="text-center">
         <h2 className="text-xl md:text-2xl font-bold text-text">{gameweekTitle}</h2>
-        <p className="text-xs text-text-muted">Deadline: {gameweekDeadline}</p>
+        {/* --- MODIFIED THIS LINE --- */}
+        <p className="text-sm font-bold text-text mt-1">Deadline: {gameweekDeadline}</p>
       </div>
 
       <Button
@@ -48,4 +50,3 @@ export const GameweekNavigator: React.FC<GameweekNavigatorProps> = ({
     </div>
   );
 };
-

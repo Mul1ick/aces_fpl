@@ -16,10 +16,10 @@ import tshirtRed from '@/assets/images/jerseys/tshirt-red.png'
 const TEAM_JERSEYS = {
   'Satans': satansJersey,
     'Roarers': roarersJersey,
-    'Traana': traanaJersey,
+    'Trana': traanaJersey,
     'Southside': southsideJersey,
     'Titans': titansJersey,
-    'Umang Foundation Trust': umaagJersey,
+    'Umang': umaagJersey,
 };
 
 interface EditablePlayerCardProps {
@@ -27,7 +27,7 @@ interface EditablePlayerCardProps {
   onClose: () => void;
   onSubstitute: (player: any) => void;
   onSetArmband: (playerId: number, kind: 'C' | 'VC') => void;
-  onViewProfile: () => void; // Added this prop
+  onViewProfile: () => void;
 }
 
 const FixtureRow = ({ gameweek, opponent, points }) => (
@@ -41,6 +41,7 @@ const FixtureRow = ({ gameweek, opponent, points }) => (
 export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, onClose, onSubstitute,  onSetArmband, onViewProfile }) => {
   if (!player) return null;
 
+  // --- MODIFIED: Use player.team which is a string ---
   const jerseySrc = TEAM_JERSEYS[player.team] || tshirtRed;
   const isCaptain = !!player.isCaptain || !!player.is_captain;
   const isVice    = !!player.isVice || !!player.is_vice_captain;
@@ -63,11 +64,14 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
         <Card className="border-2 border-gray-300">
           <CardHeader className="bg-gray-100 p-4">
             <div className="flex items-center space-x-4">
+               {/* --- MODIFIED: Use player.team for alt text --- */}
                <img src={jerseySrc} alt={`${player.team} jersey`} className="w-16 h-auto" />
                 <div>
+                    {/* --- MODIFIED: Use player.position --- */}
                     <p className="text-xs text-gray-500 font-bold">{player.position}</p>
                     <CardTitle className="text-2xl font-bold">{player.full_name}</CardTitle>
-                    <p className="text-md font-semibold text-gray-700">{player.team?.name}</p>
+                    {/* --- MODIFIED: Use player.team directly --- */}
+                    <p className="text-md font-semibold text-gray-700">{player.team}</p>
                 </div>
             </div>
           </CardHeader>
@@ -91,7 +95,7 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
                         />
                       ))}
                 </div>
-             </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-2 mt-6">
                <Button
@@ -110,7 +114,6 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
                  <Star className="w-4 h-4 mr-2" />
                 {isVice ? 'Vice (current)' : 'Make Vice-Captain'}
               </Button>
-              {/* --- MODIFIED: Added onClick handler --- */}
                <Button variant="outline" className="col-span-2" onClick={onViewProfile}>
                 <User className="w-4 h-4 mr-2" />
                  Full Profile
@@ -118,7 +121,7 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
                 <Button
                 variant="destructive"
                 className="col-span-2"
-                 onClick={() => onSubstitute(player)}
+                onClick={() => onSubstitute(player)}
               >
                 <ChevronsRight className="w-4 h-4 mr-2" />
                 Substitute
@@ -126,7 +129,7 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
             </div>
            </CardContent>
           <button onClick={onClose} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">
-            <X className="w-5 h-5 text-gray-500" />
+             <X className="w-5 h-5 text-gray-500" />
           </button>
         </Card>
       </motion.div>

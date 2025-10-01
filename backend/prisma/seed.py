@@ -11,8 +11,6 @@ from prisma import Prisma
 from app.auth import hash_password
 
 # --- STATIC GAMEWEEK SCHEDULE CONFIGURATION ---
-# This schedule is based on the provided fixture image, with a fixed 5 PM deadline.
-
 GAMEWEEK_DATES = {
     1: "05/10/2025",
     2: "12/10/2025",
@@ -34,6 +32,7 @@ def generate_static_schedule(dates: dict, deadline_hour: int, deadline_minute: i
     tz = ZoneInfo("Asia/Kolkata")
     for gw_num, date_str in dates.items():
         day, month, year = map(int, date_str.split('/'))
+        # The deadline remains the same, independent of kickoff times
         deadline = datetime(year, month, day, hour=deadline_hour, minute=deadline_minute, tzinfo=tz)
         schedule[gw_num] = deadline
     print(f"✅ Generated static schedule. GW1 deadline: {schedule[1].strftime('%Y-%m-%d %H:%M:%S %Z')}")
@@ -41,18 +40,18 @@ def generate_static_schedule(dates: dict, deadline_hour: int, deadline_minute: i
 
 # --- CORE DATA (MATCHES, TEAMS, PLAYERS) ---
 
-# CORRECTED FIXTURE DATA BASED ON THE NEW IMAGE
+# --- MODIFICATION 1: Added specific kickoff times (in 24-hour format) to each fixture ---
 FIXTURE_DATA = {
-    1: [("Trana", "Titans"), ("Umang", "Satans"), ("Roarers", "Southside")],
-    2: [("Umang", "Roarers"), ("Southside", "Titans"), ("Satans", "Trana")],
-    3: [("Satans", "Titans"), ("Umang", "Southside"), ("Roarers", "Trana")],
-    4: [("Roarers", "Satans"), ("Southside", "Trana"), ("Umang", "Titans")],
-    5: [("Umang", "Trana"), ("Roarers", "Titans"), ("Southside", "Satans")],
-    6: [("Trana", "Titans"), ("Umang", "Satans"), ("Roarers", "Southside")],
-    7: [("Umang", "Roarers"), ("Southside", "Titans"), ("Satans", "Trana")],
-    8: [("Satans", "Titans"), ("Umang", "Southside"), ("Roarers", "Trana")],
-    9: [("Roarers", "Satans"), ("Southside", "Trana"), ("Umang", "Titans")],
-    10: [("Umang", "Trana"), ("Roarers", "Titans"), ("Southside", "Satans")],
+    1: [("Trana", "Titans", "19:00"), ("Umang", "Satans", "20:00"), ("Roarers", "Southside", "21:00")],
+    2: [("Umang", "Roarers", "19:00"), ("Southside", "Titans", "20:00"), ("Satans", "Trana", "21:00")],
+    3: [("Satans", "Titans", "19:00"), ("Umang", "Southside", "20:00"), ("Roarers", "Trana", "21:00")],
+    4: [("Roarers", "Satans", "19:00"), ("Southside", "Trana", "20:00"), ("Umang", "Titans", "21:00")],
+    5: [("Umang", "Trana", "19:00"), ("Roarers", "Titans", "20:00"), ("Southside", "Satans", "21:00")],
+    6: [("Trana", "Titans", "19:00"), ("Umang", "Satans", "20:00"), ("Roarers", "Southside", "21:00")],
+    7: [("Umang", "Roarers", "19:00"), ("Southside", "Titans", "20:00"), ("Satans", "Trana", "21:00")],
+    8: [("Satans", "Titans", "19:00"), ("Umang", "Southside", "20:00"), ("Roarers", "Trana", "21:00")],
+    9: [("Roarers", "Satans", "19:00"), ("Southside", "Trana", "20:00"), ("Umang", "Titans", "21:00")],
+    10: [("Umang", "Trana", "18:00"), ("Roarers", "Titans", "18:00"), ("Southside", "Satans", "18:00")],
 }
 
 TEAMS = [
@@ -70,7 +69,7 @@ def get_player_data():
             {'full_name': 'Cleetus Chandrashekhar', 'price': 15.0, 'position': 'MID'},
             {'full_name': 'Aadil Jafferbhoy', 'price': 13.0, 'position': 'DEF'},
             {'full_name': 'Mohammedali Rajani', 'price': 5.0, 'position': 'GK'},
-            {'full_name': 'Alvaro', 'price': 15.0, 'position': 'MID'},
+            {'full_name': 'Alvaro', 'price': 15.0, 'position': 'DEF'},
             {'full_name': 'Pranal Shetty', 'price': 10.0, 'position': 'DEF'},
             {'full_name': 'Anish Bhabdha', 'price': 9.0, 'position': 'FWD'},
             {'full_name': 'Aarav Hazari', 'price': 1.0, 'position': 'MID'},
@@ -97,17 +96,17 @@ def get_player_data():
             {'full_name': 'Manav J', 'price': 1.0, 'position': 'DEF'}
         ],
         "TIT": [
-            {'full_name': 'Raj Bhadhuria', 'price': 25.0, 'position': 'FWD'},
-            {'full_name': 'Gyan Savir Saldanha', 'price': 10.0, 'position': 'FWD'},
+            {'full_name': 'Raj Bhadhuria', 'price': 25.0, 'position': 'MID'},
+            {'full_name': 'Gyan Savir Saldanha', 'price': 10.0, 'position': 'MID'},
             {'full_name': 'Yug Nair', 'price': 10.0, 'position': 'GK'},
             {'full_name': 'Rahul Sachdev', 'price': 13.0, 'position': 'FWD'},
             {'full_name': 'Jeet Antani', 'price': 1.0, 'position': 'DEF'},
-            {'full_name': 'Tanish Jain', 'price': 5.0, 'position': 'DEF'},
-            {'full_name': 'Kabir Khan', 'price': 11.0, 'position': 'MID'},
-            {'full_name': 'Param Sabnani', 'price': 11.0, 'position': 'FWD'},
+            {'full_name': 'Tanish Jain', 'price': 5.0, 'position': 'FWD'},
+            {'full_name': 'Kabir Khan', 'price': 11.0, 'position': 'DEF'},
+            {'full_name': 'Param Sabnani', 'price': 11.0, 'position': 'MID'},
             {'full_name': 'Rishabh Lunia', 'price': 5.0, 'position': 'DEF'},
             {'full_name': 'Manav Gagvani', 'price': 10.0, 'position': 'FWD'},
-            {'full_name': 'Aditya Sandeep Bamb', 'price': 14.0, 'position': 'DEF'},
+            {'full_name': 'Aditya Sandeep Bamb', 'price': 14.0, 'position': 'MID'},
             {'full_name': 'Ishaan Rajnish Jindal', 'price': 11.0, 'position': 'FWD'},
             {'full_name': 'Tushar Kant', 'price': 1.0, 'position': 'DEF'}
         ],
@@ -220,15 +219,23 @@ async def main() -> None:
             gameweek_id = gameweek_map.get(gw_num)
             if gameweek_id:
                 fixtures_to_create = []
-                for home_name, away_name in fixtures:
+                # --- MODIFICATION 2: Updated logic to use specific kickoff times ---
+                for home_name, away_name, time_str in fixtures:
                     home_id = team_map_name.get(home_name)
                     away_id = team_map_name.get(away_name)
                     if home_id and away_id:
-                        kickoff_time = GAMEWEEK_SCHEDULE.get(gw_num)
-                        if kickoff_time:
+                        # Get the base date from the gameweek schedule
+                        gameweek_date = GAMEWEEK_SCHEDULE.get(gw_num)
+                        if gameweek_date:
+                            # Parse the specific time and combine it with the date
+                            hour, minute = map(int, time_str.split(':'))
+                            kickoff_time = gameweek_date.replace(hour=hour, minute=minute)
+                            
                             fixtures_to_create.append({
-                                "gameweek_id": gameweek_id, "home_team_id": home_id,
-                                "away_team_id": away_id, "kickoff": kickoff_time
+                                "gameweek_id": gameweek_id,
+                                "home_team_id": home_id,
+                                "away_team_id": away_id,
+                                "kickoff": kickoff_time
                             })
                 if fixtures_to_create:
                     await db.fixture.create_many(data=fixtures_to_create, skip_duplicates=True)
@@ -242,4 +249,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-

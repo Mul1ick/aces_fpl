@@ -1,6 +1,5 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-// --- MODIFIED: Import the correct, centralized jersey helper ---
 import { getTeamJersey } from '@/lib/player-utils';
 
 interface TransferListViewProps {
@@ -29,17 +28,17 @@ export const TransferListView: React.FC<TransferListViewProps> = ({ squad }) => 
     <tr className={cn("border-b border-gray-200", player.is_benched && "bg-gray-50 opacity-80")}>
       <td className="p-3">
         <div className="flex items-center space-x-3">
-          {/* --- MODIFIED: Use the correct property 'player.teamName' --- */}
           <img src={getTeamJersey(player.teamName)} alt="jersey" className="w-8 h-10 object-contain" />
           <div>
-            <p className="font-bold text-sm">{player.full_name}</p>
-            {/* --- MODIFIED: Use the correct property 'player.teamName' --- */}
+            {/* --- MODIFIED: Use player.name instead of player.full_name --- */}
+            <p className="font-bold text-sm">{player.name}</p>
             <p className="text-xs text-gray-500">{player.pos} · {player.teamName}</p>
           </div>
         </div>
       </td>
       <td className="p-3 text-center font-bold text-sm">£{player.price.toFixed(1)}m</td>
-      <td className="p-3 text-center text-xs font-semibold text-gray-600">{player.fixture_str || '—'}</td>
+      {/* --- MODIFIED: Use player.fixture instead of player.fixture_str --- */}
+      <td className="p-3 text-center text-xs font-semibold text-gray-600">{player.fixture || '—'}</td>
     </tr>
   );
 
