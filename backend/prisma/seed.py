@@ -186,7 +186,6 @@ async def main() -> None:
         print("👤 Seeding admin and test users...")
         users_to_create = [
             {"email": "admin@acesfpl.com", "full_name": "Admin User", "password": "adminPassword", "role": "admin", "is_active": True},
-            {"email": "test@example.com", "full_name": "Test User", "password": "password", "role": "user", "is_active": True}
         ]
         for user_data in users_to_create:
             await db.user.create(data={
