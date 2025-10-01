@@ -77,14 +77,6 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
                    <p className="font-bold text-lg">£{Number(player?.price ?? 0).toFixed(1)}m</p>
                    <p className="text-xs text-gray-500">Price</p>
                 </div>
-                 <div>
-                    <p className="font-bold text-lg">9.0</p>
-                    <p className="text-xs text-gray-500">Form</p>
-                </div>
-                 <div>
-                    <p className="font-bold text-lg">4.0%</p>
-                    <p className="text-xs text-gray-500">TSB %</p>
-                 </div>
             </div>
             
             <div>

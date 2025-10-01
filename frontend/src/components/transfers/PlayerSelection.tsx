@@ -212,7 +212,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     setSelectedClubs([]);
     setSortBy('points');
     setPriceRange([1.0, 25.0]);
-};
+    };
 
     const isFiltered = useMemo(() => {
         // A view is considered "filtered" if any filter is active.
