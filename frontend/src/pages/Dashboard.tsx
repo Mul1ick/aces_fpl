@@ -258,27 +258,39 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
     }
   }, [user]);
 
-  useEffect(() => {
+   useEffect(() => {
     const fetchTeamOfTheWeek = async () => {
       const token = localStorage.getItem("access_token");
       if (!token) return;
-      try {
-        const response = await fetch(API.endpoints.teamOfTheWeek, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setTeamOfTheWeek(data);
+
+      // --- ADDED: Only fetch if the gameweek is greater than 1 ---
+      if (gameweek && gameweek.gw_number > 1) {
+        try {
+          const response = await fetch(API.endpoints.teamOfTheWeek, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setTeamOfTheWeek(data);
+          } else {
+            // If it fails for other reasons, clear the state
+            setTeamOfTheWeek(null);
+          }
+        } catch (error) {
+          console.error("Failed to fetch Team of the Week:", error);
+          setTeamOfTheWeek(null);
         }
-      } catch (error) {
-        console.error("Failed to fetch Team of the Week:", error);
+      } else {
+        // If it's Gameweek 1, ensure the state is null
+        setTeamOfTheWeek(null);
       }
     };
     
+    // Run this effect when the user or gameweek data is available
     if (user) {
         fetchTeamOfTheWeek();
     }
-  }, [user]);
+  }, [user, gameweek]); // --- MODIFIED: Added gameweek as a dependency ---
 
   return (
     <div className="bg-white min-h-screen text-black">

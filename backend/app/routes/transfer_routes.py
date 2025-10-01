@@ -34,24 +34,37 @@ async def confirm_transfers(
     current_user: PrismaModels.User = Depends(get_current_user),
 ):
     """
-    Confirms transfers for the CURRENT LIVE gameweek.
+    Confirms transfers for the current LIVE or next UPCOMING gameweek.
     """
-    # Find the currently LIVE gameweek that is open for transfers
-    live_gw = await db.gameweek.find_first(
+    # --- MODIFIED LOGIC START ---
+
+    # 1. First, try to find a gameweek that is currently LIVE.
+    target_gw = await db.gameweek.find_first(
         where={'status': 'LIVE'},
         order={'gw_number': 'asc'}
     )
-    if not live_gw:
-        raise HTTPException(status_code=400, detail="There is no gameweek currently open for transfers.")
-    
-    # Check the deadline as a layer of security
-    if live_gw.deadline < datetime.now(timezone.utc):
-         raise HTTPException(status_code=400, detail=f"The deadline for Gameweek {live_gw.gw_number} has passed.")
 
-    # Call the crud function with the LIVE gameweek's ID
+    # 2. If no gameweek is LIVE (e.g., pre-season), find the next UPCOMING one.
+    if not target_gw:
+        target_gw = await db.gameweek.find_first(
+            where={'status': 'UPCOMING'},
+            order={'gw_number': 'asc'}
+        )
+
+    # 3. If no LIVE or UPCOMING gameweek is found, then it's an error.
+    if not target_gw:
+        raise HTTPException(status_code=400, detail="There is no gameweek currently open for transfers.")
+
+    # --- MODIFIED LOGIC END ---
+
+    # Check the deadline as a layer of security
+    if target_gw.deadline < datetime.now(timezone.utc):
+         raise HTTPException(status_code=400, detail=f"The deadline for Gameweek {target_gw.gw_number} has passed.")
+
+    # Call the crud function with the correctly identified gameweek's ID
     return await crud.confirm_transfers(
         db=db,
         user_id=str(current_user.id),
-        gameweek_id=live_gw.id,
+        gameweek_id=target_gw.id,
         transfers=payload.transfers,
     )

@@ -101,14 +101,26 @@ const Team: React.FC = () => {
 
                 // Process Team Data
                 const teamData: TeamResponse = await teamRes.json();
-                const transformPlayer = (p: any) => ({
-                    id: p.id, name: p.full_name, full_name: p.full_name, pos: p.position,
-                    position: p.position, team: p.team?.name, team_obj: p.team,
-                    price: p.price, points: p.points, fixture: p.fixture_str, fixture_str: p.fixture_str,
-                    isCaptain: p.is_captain, isVice: p.is_vice_captain, is_captain: p.is_captain,
-                    is_vice_captain: p.is_vice_captain, is_benched: p.is_benched,
-                    recent_fixtures: p.recent_fixtures, raw_stats: p.raw_stats, breakdown: p.breakdown,
-                });
+                
+                const transformPlayer = (p: any) => {
+                    // This finds the correct current fixture from the data the modal uses.
+                    const correctFixtureData = p.recent_fixtures?.[0];
+                    const correctFixtureString = correctFixtureData ? `${correctFixtureData.opp} (${correctFixtureData.ha})` : '-';
+
+                    return {
+                        id: p.id, name: p.full_name, full_name: p.full_name, pos: p.position,
+                        position: p.position, team: p.team?.name, team_obj: p.team,
+                        price: p.price, points: p.points, 
+                        // --- THIS IS THE FIX ---
+                        // Both fixture properties now use the correct data source.
+                        fixture: correctFixtureString, 
+                        fixture_str: correctFixtureString,
+                        isCaptain: p.is_captain, isVice: p.is_vice_captain, is_captain: p.is_captain,
+                        is_vice_captain: p.is_vice_captain, is_benched: p.is_benched,
+                        recent_fixtures: p.recent_fixtures, raw_stats: p.raw_stats, breakdown: p.breakdown,
+                    };
+                };
+
                 const starting = teamData.starting.map(transformPlayer);
                 const bench = teamData.bench.map(transformPlayer);
                 const currentSquad = { starting, bench, team_name: teamData.team_name };

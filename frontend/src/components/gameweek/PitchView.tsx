@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import PlayerCard from '@/components/layout/PlayerCard'; 
 import pitchBackground from '@/assets/images/pitch.png';
 import { ChipName } from '@/lib/api';
@@ -7,11 +7,19 @@ interface PitchViewProps {
   playersByPos: any;
   bench: any[];
   onPlayerClick: (player: any) => void;
-  activeChip?: ChipName | null; // This prop is now correctly added
+  activeChip?: ChipName | null;
 }
 
 export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPlayerClick, activeChip }) => {
   
+  // --- ADDED: Logic to separate the goalkeeper from other subs ---
+  const benchLayout = useMemo(() => {
+    if (!bench) return { goalkeeper: null, outfielders: [] };
+    const goalkeeper = bench.find(p => p.position === 'GK') || null;
+    const outfielders = bench.filter(p => p.position !== 'GK');
+    return { goalkeeper, outfielders };
+  }, [bench]);
+
   return (
     <>
       <main 
@@ -36,7 +44,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isCaptain: p.is_captain,
                   isVice: p.is_vice_captain
                 }} 
-                activeChip={activeChip} // Pass prop down
+                activeChip={activeChip}
               />
             </div>
           ))}
@@ -56,7 +64,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isCaptain: p.is_captain,
                   isVice: p.is_vice_captain
                 }} 
-                activeChip={activeChip} // Pass prop down
+                activeChip={activeChip}
               />
             </div>
            ))}
@@ -76,7 +84,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isCaptain: p.is_captain,
                   isVice: p.is_vice_captain
                 }} 
-                activeChip={activeChip} // Pass prop down
+                activeChip={activeChip}
               />
             </div>
           ))}
@@ -96,18 +104,38 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isCaptain: p.is_captain,
                   isVice: p.is_vice_captain
                 }} 
-                activeChip={activeChip} // Pass prop down
+                activeChip={activeChip}
               />
             </div>
           ))}
         </div>
       </main>
 
+      {/* --- MODIFIED: Updated footer to match the Pick Team page layout --- */}
       <footer className="flex-shrink-0 p-3 bg-gray-100 border-t">
-        <div className="grid grid-cols-3 gap-4 place-items-center">
-          {bench.map((p: any) => (
-            <div key={p.id} onClick={() => onPlayerClick(p)} className="cursor-pointer">
+        <div className="flex justify-center items-center gap-x-12">
+          {benchLayout.goalkeeper && (
+            <div key={benchLayout.goalkeeper.id} onClick={() => onPlayerClick(benchLayout.goalkeeper)} className="cursor-pointer">
               <PlayerCard 
+                isBench={true}
+                player={{
+                  id: benchLayout.goalkeeper.id,
+                  name: benchLayout.goalkeeper.full_name,
+                  pos: benchLayout.goalkeeper.position,
+                  team: benchLayout.goalkeeper.team.name,
+                  points: benchLayout.goalkeeper.points,
+                  isCaptain: benchLayout.goalkeeper.is_captain,
+                  isVice: benchLayout.goalkeeper.is_vice_captain
+                }} 
+                activeChip={activeChip}
+              />
+            </div>
+          )}
+          <div className="h-16 w-px bg-gray-300"></div>
+          <div className="grid grid-cols-2 gap-12">
+            {benchLayout.outfielders.map((p: any) => (
+              <div key={p.id} onClick={() => onPlayerClick(p)} className="cursor-pointer">
+                <PlayerCard 
                   isBench={true}
                   player={{
                     id: p.id,
@@ -118,13 +146,13 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                     isCaptain: p.is_captain,
                     isVice: p.is_vice_captain
                   }} 
-                  activeChip={activeChip} // Pass prop down
-              />
-            </div>
-           ))}
+                  activeChip={activeChip}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </footer>
     </>
   );
 };
-

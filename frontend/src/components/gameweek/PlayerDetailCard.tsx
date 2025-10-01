@@ -3,9 +3,6 @@ import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
-// --- ASSET IMPORTS ---
-import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
 import { getTeamJersey } from '@/lib/player-utils';
 
 interface PlayerDetailCardProps {
@@ -47,7 +44,6 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
           <CardHeader className="p-4 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-2xl font-bold text-black">{player.name || player.full_name}</CardTitle>
-              {/* --- MODIFIED: Reads from player.fixture_str instead of player.fixture --- */}
               <p className="text-sm text-gray-500">vs. {player.fixture_str}</p>
             </div>
             <img src={jerseySrc} alt={`${player.team.name} jersey`} className="w-12 h-auto" />
@@ -56,7 +52,8 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
             <div className="flex justify-between items-center mb-4">
               <div>
                 <p className="font-bold text-black">{player.team?.name || 'N/A'}</p>
-                <p className="text-xs text-gray-500">Full Time</p>
+                {/* --- THIS LINE WAS REMOVED --- */}
+                {/* <p className="text-xs text-gray-500">Full Time</p> */}
               </div>
               <p className="text-3xl font-bold text-black">{player.points} pts</p>
             </div>
@@ -79,6 +76,9 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
                 )}
             </div>
 
+            <Button className="w-full mt-6" variant="outline">
+              View Full Profile
+            </Button>
           </CardContent>
           <button onClick={onClose} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">
             <X className="w-5 h-5 text-gray-500" />
