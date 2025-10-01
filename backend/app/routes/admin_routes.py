@@ -221,6 +221,7 @@ async def admin_submit_fixture_stats(gameweek_id: int, payload: schemas.SubmitFi
             if not player: continue
             total_points = calculate_player_points(player.position, s)
             stat_data = s.model_dump(); del stat_data['player_id']
+            
             await tx.gameweekplayerstats.upsert(
                 where={"gameweek_id_player_id": {"gameweek_id": gameweek_id, "player_id": s.player_id}},
                 data={"create": {"gameweek_id": gameweek_id, "player_id": s.player_id, **stat_data, "points": total_points}, "update": {**stat_data, "points": total_points}}

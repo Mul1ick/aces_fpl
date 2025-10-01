@@ -277,7 +277,6 @@ class PlayerHistoryItem(BaseModel):
     opp: str
     result: str
     pts: int
-    mp: int
     gs: int
     a: int
     cs: int

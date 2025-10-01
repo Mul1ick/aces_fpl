@@ -38,7 +38,6 @@ const HistoryRow = ({ gw, opp, result, pts, ...stats }: any) => (
             </div>
         </td>
         <td className="p-2 font-bold text-black">{pts}</td>
-        <td className="p-2">{stats.mp}</td>
         <td className="p-2">{stats.gs}</td>
         <td className="p-2">{stats.a}</td>
         <td className="p-2">{stats.cs}</td>
@@ -175,7 +174,6 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ player, is
                                         <th className="p-2 font-semibold">GW</th>
                                         <th className="p-2 font-semibold text-left">OPP</th>
                                         <th className="p-2 font-semibold">PTS</th>
-                                        <th className="p-2 font-semibold">MP</th>
                                         <th className="p-2 font-semibold">GS</th>
                                         <th className="p-2 font-semibold">A</th>
                                         <th className="p-2 font-semibold">CS</th>

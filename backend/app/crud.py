@@ -370,7 +370,7 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
 
     def _breakdown_for(position: str, st: Any) -> tuple[dict, list[dict]]:
         raw = {
-            "minutes": int(st.minutes or 0),
+            "played": bool(st.played or False),
             "goals_scored": int(st.goals_scored or 0),
             "assists": int(st.assists or 0),
             "yellow_cards": int(st.yellow_cards or 0),
@@ -380,7 +380,7 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
         pos = (position or "").upper()
         goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
         breakdown = [
-            {"label": "Appearance",   "value": 1 if raw["minutes"] > 0 else 0, "points": 1 if raw["minutes"] > 0 else 0},
+            {"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
             {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
             {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
             {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
@@ -1127,7 +1127,7 @@ async def get_player_card(
         if not st_row:
             return {}, []
         raw = {
-            "minutes": int(st_row.minutes or 0),
+            "played": bool(st_row.played or False),
             "goals_scored": int(st_row.goals_scored or 0),
             "assists": int(st_row.assists or 0),
             "yellow_cards": int(st_row.yellow_cards or 0),
@@ -1137,7 +1137,7 @@ async def get_player_card(
         pos = (position or "").upper()
         goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
         breakdown = [
-            {"label": "Appearance",   "value": 1 if raw["minutes"] > 0 else 0, "points": 1 if raw["minutes"] > 0 else 0},
+            {"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
             {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
             {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
             {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
