@@ -37,7 +37,7 @@ async def confirm_transfers(
     Confirms transfers for the current LIVE or next UPCOMING gameweek.
     """
     # --- MODIFIED LOGIC START ---
-
+    
     # 1. First, try to find a gameweek that is currently LIVE.
     target_gw = await db.gameweek.find_first(
         where={'status': 'LIVE'},
@@ -54,7 +54,7 @@ async def confirm_transfers(
     # 3. If no LIVE or UPCOMING gameweek is found, then it's an error.
     if not target_gw:
         raise HTTPException(status_code=400, detail="There is no gameweek currently open for transfers.")
-
+    
     # --- MODIFIED LOGIC END ---
 
     # Check the deadline as a layer of security

@@ -303,35 +303,32 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     pts_map: Dict[int, int] = {s.player_id: s.points for s in stats}
     stats_map: Dict[int, Any] = {s.player_id: s for s in stats}
 
-    # 3) Current and next gameweeks
+    # 3) Get current gameweek object (needed for 'recent fixtures' logic)
     cur_gw = await db.gameweek.find_unique(where={'id': gameweek_id})
     if not cur_gw:
         raise HTTPException(status_code=404, detail="Gameweek not found")
-    next_gw = await db.gameweek.find_unique(where={'gw_number': cur_gw.gw_number + 1})
 
-    team_ids: List[int] = list({e.player.team_id for e in entries})
+    # 4) Build fixture_str for CURRENT GW
+    fixture_map_current: Dict[int, str] = {}
+    fixtures_current = await db.fixture.find_many(
+        where={
+            'gameweek_id': gameweek_id,
+            'OR': [
+                {'home_team_id': {'in': team_ids}},
+                {'away_team_id': {'in': team_ids}},
+            ]
+        },
+        include={'home': True, 'away': True}
+    )
 
-    # 4) Build fixture_str for NEXT GW (kept for your UI)
-    fixture_map_next: Dict[int, str] = {}
-    if next_gw:
-        fixtures_next = await db.fixture.find_many(
-            where={
-                'gameweek_id': next_gw.id,
-                'OR': [
-                    {'home_team_id': {'in': team_ids}},
-                    {'away_team_id': {'in': team_ids}},
-                ]
-            },
-            include={'home': True, 'away': True}
-        )
-        def fmt_next(opp_short: str, venue: str) -> str:
-            return f"{opp_short} ({venue}) "
-        for f in fixtures_next:
-            if f.home_team_id in team_ids:
-                fixture_map_next[f.home_team_id] = fmt_next(f.away.short_name, 'H')
-            if f.away_team_id in team_ids:
-                fixture_map_next[f.away_team_id] = fmt_next(f.home.short_name, 'A')
+    def fmt_fixture(opp_short: str, venue: str) -> str:
+        return f"{opp_short} ({venue}) "
 
+    for f in fixtures_current:
+        if f.home_team_id in team_ids:
+            fixture_map_current[f.home_team_id] = fmt_fixture(f.away.short_name, 'H')
+        if f.away_team_id in team_ids:
+            fixture_map_current[f.away_team_id] = fmt_fixture(f.home.short_name, 'A')
 
     # 5) Recent fixtures (last two + current) with points per player
     #    a) find GW rows
@@ -403,7 +400,7 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
             "team": {"id": club.id, "name": club.name, "short_name": club.short_name},
             "is_benched": entry.is_benched,
             "points": pts_map.get(entry.player.id, 0),
-            "fixture_str": fixture_map_next.get(club.id, "—"),
+            "fixture_str": fixture_map_current.get(club.id, "—"),
         }
 
         st = stats_map.get(entry.player.id)
@@ -438,7 +435,6 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
         "starting": starting,
         "bench": bench
     }
-
 
 
 
