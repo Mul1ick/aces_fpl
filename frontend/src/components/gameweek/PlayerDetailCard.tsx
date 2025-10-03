@@ -76,9 +76,7 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
                 )}
             </div>
 
-            <Button className="w-full mt-6" variant="outline">
-              View Full Profile
-            </Button>
+            
           </CardContent>
           <button onClick={onClose} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">
             <X className="w-5 h-5 text-gray-500" />
