@@ -1308,10 +1308,15 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
     if gameweek_number:
         target_gw = await db.gameweek.find_unique(where={'gw_number': gameweek_number})
     else:
-        now_utc = datetime.now(timezone.utc)
+        # 1. CHANGE: Logic for finding the gameweek was updated.
+        # ---------------------------------------------------------------------
+        # Instead of just finding the latest gameweek whose deadline has passed,
+        # this now finds the latest gameweek that has an official 'FINISHED' status.
+        # This is more reliable because it ensures the Team of the Week is only
+        # shown after you, the admin, have finalized all scores and bonus points.
         target_gw = await db.gameweek.find_first(
-            where={'deadline': {'lt': now_utc}},
-            order={'deadline': 'desc'}
+            where={'status': 'FINISHED'},
+            order={'gw_number': 'desc'}
         )
 
     if not target_gw:
@@ -1353,10 +1358,17 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
     def to_display(entry):
         player_points = points_map.get(entry.player.id, 0)
         
-            
         return {
             "id": entry.player.id, "full_name": entry.player.full_name,
-            "position": entry.player.position, "price": entry.player.price,
+            "position": entry.player.position,
+            
+            # 2. CHANGE: Fixed a bug with the player price.
+            # ---------------------------------------------------------------------
+            # The database stores 'price' as a special Decimal type.
+            # We must convert it to a float() so the API can send it as a
+            # standard number that the frontend can understand.
+            "price": float(entry.player.price),
+            
             "is_captain": entry.is_captain, "is_vice_captain": entry.is_vice_captain,
             "is_benched": entry.is_benched, "team": entry.player.team,
             "points": player_points
@@ -1371,7 +1383,6 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
         "starting": [p for p in all_players if not p["is_benched"]],
         "bench": [p for p in all_players if p["is_benched"]]
     }
-
 # In backend/app/crud.py
 
 from collections import Counter # Make sure this is imported at the top

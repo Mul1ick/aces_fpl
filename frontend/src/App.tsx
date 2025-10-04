@@ -17,7 +17,8 @@ import NotFound from "./pages/NotFound";
 import Fixtures from "./pages/Fixtures";
 import Stats from "./pages/Stats";
 import Help from "./pages/Help";
-import TeamView from "./pages/TeamView"; // <-- 1. IMPORT THE NEW PAGE
+import TeamView from "./pages/TeamView";
+import TeamOfTheWeek from "./pages/TeamOfTheWeek"; // ✅ 1. ADD THIS IMPORT
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 
@@ -27,43 +28,44 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const App = () => (
   <GoogleOAuthProvider clientId={googleClientId}>
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <div className="min-h-screen bg-pl-purple">
-            <Routes>
-              {/* --- Routes WITHOUT the Navbar --- */}
-              <Route path="/" element={<Splash />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Login />} />
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <div className="min-h-screen bg-pl-purple">
+              <Routes>
+                {/* --- Routes WITHOUT the Navbar --- */}
+                <Route path="/" element={<Splash />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Login />} />
 
-              {/* --- Routes WITH the Navbar (wrapped by MainLayout) --- */}
-              <Route element={<MainLayout />}>
-                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
-                <Route path="/transfers" element={<ProtectedRoute><Transfers /></ProtectedRoute>} />
-                <Route path="/gameweek/:gw" element={<ProtectedRoute><Gameweek /></ProtectedRoute>} />
-                <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-                <Route path="/fixtures" element={<ProtectedRoute><Fixtures /></ProtectedRoute>} />
-                <Route path="/stats" element={<ProtectedRoute><Stats /></ProtectedRoute>} />
-                <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+                {/* --- Routes WITH the Navbar (wrapped by MainLayout) --- */}
+                <Route element={<MainLayout />}>
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
+                  <Route path="/transfers" element={<ProtectedRoute><Transfers /></ProtectedRoute>} />
+                  <Route path="/gameweek/:gw" element={<ProtectedRoute><Gameweek /></ProtectedRoute>} />
+                  <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+                  <Route path="/fixtures" element={<ProtectedRoute><Fixtures /></ProtectedRoute>} />
+                  <Route path="/stats" element={<ProtectedRoute><Stats /></ProtectedRoute>} />
+                  <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+                  
+                  <Route path="/team-view/:userId/:gw" element={<ProtectedRoute><TeamView /></ProtectedRoute>} />
 
-                {/* --- 2. ADD THE NEW ROUTES BELOW --- */}
-                
-                <Route path="/team-view/:userId/:gw" element={<ProtectedRoute><TeamView /></ProtectedRoute>} />
-              </Route>
+                  {/* ✅ 2. ADD THIS NEW, DEDICATED ROUTE */}
+                  <Route path="/team-of-the-week/:gw" element={<ProtectedRoute><TeamOfTheWeek /></ProtectedRoute>} />
+                </Route>
 
-              {/* --- Catch-all Not Found Route --- */}
-               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </div>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+                {/* --- Catch-all Not Found Route --- */}
+                 <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   </GoogleOAuthProvider>
 );
 
