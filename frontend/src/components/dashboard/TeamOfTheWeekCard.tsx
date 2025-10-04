@@ -4,20 +4,10 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+// ✅ ADD THIS LINE
+import { getTeamJersey } from '@/lib/player-utils';
 
-// --- ASSET IMPORTS ---
-import tshirtRed from '@/assets/images/jerseys/tshirt-red.png';
-import tshirtBlue from '@/assets/images/jerseys/tshirt-blue.png';
-import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png';
-import tshirtBlack from '@/assets/images/jerseys/tshirt-black.png';
-import tshirtNavy from '@/assets/images/jerseys/tshirt-navy.png';
-import tshirtGreen from '@/assets/images/jerseys/tshirt-green.png';
 
-const TEAM_JERSEYS = {
-  'LIV': tshirtRed, 'TOT': tshirtWhite, 'AVL': tshirtNavy,
-  'BRE': tshirtRed, 'ARS': tshirtRed, 'NEW': tshirtBlack,
-  'CHE': tshirtBlue, 'MCI': tshirtBlue,
-};
 
 interface TeamOfTheWeek {
   manager_name: string;
@@ -59,7 +49,7 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
           <h4 className="font-bold text-gray-500 text-sm">Starting XI</h4>
           {team.starting.map(player => (
             <div key={player.id} className="flex items-center space-x-3 text-sm">
-              <img src={TEAM_JERSEYS[player.team.short_name]} alt={`${player.team.short_name} jersey`} className="w-6 h-8 object-contain"/>
+              <img src={getTeamJersey(player.team.name)} alt={`${player.team.name} jersey`} className="w-6 h-8 object-contain"/>
               <div className="flex-1">
                 <p className="font-bold text-black">{player.full_name}</p>
                <p className="text-xs text-gray-500">{player.team.short_name} · {player.position}</p>
@@ -70,7 +60,7 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
           <h4 className="font-bold text-gray-500 text-sm pt-2 border-t">Bench</h4>
            {team.bench.map(player => (
             <div key={player.id} className="flex items-center space-x-3 text-sm">
-              <img src={TEAM_JERSEYS[player.team.short_name]} alt={`${player.team.short_name} jersey`} className="w-6 h-8 object-contain"/>
+              <img src={getTeamJersey(player.team.name)} alt={`${player.team.name} jersey`} className="w-6 h-8 object-contain"/>
               <div className="flex-1">
                 <p className="font-bold text-black">{player.full_name}</p>
                 <p className="text-xs text-gray-500">{player.team.short_name} · {player.position}</p>
