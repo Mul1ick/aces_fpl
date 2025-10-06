@@ -31,15 +31,31 @@ async def chip_status(
 
 @router.post("/play")
 async def play(req: schemas.PlayChipRequest, db: Prisma = Depends(get_db), user=Depends(auth.get_current_user)):
-    # Resolving gameweek by ID here remains correct as per schema
-    gw_id = req.gameweek_id
-    if not gw_id:
-        current_gw = await crud.get_current_gameweek(db)
-        if not current_gw:
-            raise HTTPException(status_code=404, detail="No active gameweek to play a chip.")
-        gw_id = current_gw.id
+    """
+    Plays a chip for the current LIVE or next UPCOMING gameweek.
+    """
+    gameweek_id_to_use = req.gameweek_id
+
+    # If the frontend doesn't specify a gameweek, find the correct one for an action.
+    if not gameweek_id_to_use:
+        # 1. Prioritize the LIVE gameweek, as actions apply to it.
+        gw = await db.gameweek.find_first(
+            where={'status': 'LIVE'},
+            order={'gw_number': 'asc'}
+        )
+        # 2. If no gameweek is live, find the next UPCOMING one.
+        if not gw:
+            gw = await db.gameweek.find_first(
+                where={'status': 'UPCOMING'},
+                order={'gw_number': 'asc'}
+            )
         
-    return await crud.play_chip(db, str(user.id), req.chip, gw_id)
+        if not gw:
+            raise HTTPException(status_code=404, detail="No active gameweek to play a chip.")
+        
+        gameweek_id_to_use = gw.id
+        
+    return await crud.play_chip(db, str(user.id), req.chip, gameweek_id_to_use)
 
 @router.delete("/cancel")
 async def cancel(gameweek_id: int | None = None, db: Prisma = Depends(get_db), user=Depends(auth.get_current_user)):

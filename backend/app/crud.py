@@ -195,31 +195,51 @@ async def get_dashboard_stats(db: Prisma):
 # --- GAMEWEEK FUNCTION ---
 
 async def get_current_gameweek(db: Prisma):
+    """
+    Finds the current gameweek with FPL-like logic for display purposes.
+    - If a LIVE gameweek's deadline has passed, it is the current one.
+    - Otherwise, it shows the most recently FINISHED gameweek.
+    - As a fallback for pre-season, it shows the first UPCOMING gameweek.
+    """
     now_utc = datetime.now(timezone.utc)
+    gw = None
 
-    # try next upcoming (future deadline)
-    gw = await db.gameweek.find_first(
-        where={'deadline': {'gt': now_utc}},
-        order={'deadline': 'asc'}
+    # 1. Check for a live gameweek whose deadline has passed.
+    live_gameweek = await db.gameweek.find_first(
+        where={'status': 'LIVE'},
+        order={'gw_number': 'asc'}
     )
-    if not gw:
-        # fallback: most recent past
-        gw = await db.gameweek.find_first(order={'deadline': 'desc'})
-        if not gw:
-            raise HTTPException(status_code=404, detail="No gameweeks configured in the database.")
+    if live_gameweek and live_gameweek.deadline < now_utc:
+        gw = live_gameweek
 
-    # 🔑 build the API schema your frontend expects
+    # 2. If no active gameweek, get the most recently finished one.
+    if not gw:
+        gw = await db.gameweek.find_first(
+            where={'status': 'FINISHED'},
+            order={'gw_number': 'desc'}
+        )
+
+    # 3. Fallback for pre-season.
+    if not gw:
+        gw = await db.gameweek.find_first(
+            where={'status': 'UPCOMING'},
+            order={'gw_number': 'asc'}
+        )
+
+    if not gw:
+        raise HTTPException(status_code=404, detail="No gameweeks configured in the database.")
+
+    # This part correctly formats the data for the frontend.
     return schemas.Gameweek(
         id=gw.id,
         gw_number=gw.gw_number,
         deadline=gw.deadline,
         name=f"Gameweek {gw.gw_number}",
-        finished=gw.deadline < now_utc,
-        is_current=gw.deadline > now_utc,  # adjust if you track `is_current` in DB
-        is_next=False,                     # adjust if you track `is_next` in DB
-        data_checked=False,                # placeholder, update if stored in DB
+        finished=gw.status == 'FINISHED',
+        is_current=gw.status == 'LIVE' and gw.deadline < now_utc,
+        is_next=gw.status == 'UPCOMING',
+        data_checked=False, # This is a placeholder as it's not in your schema
     )
-
 
 # --- TEAM FUNCTIONS ---
 

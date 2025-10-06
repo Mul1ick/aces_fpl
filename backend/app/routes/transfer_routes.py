@@ -15,14 +15,34 @@ async def transfer_stats(
     db: Prisma = Depends(get_db),
     gameweek_id: int | None = Query(default=None)
 ):
-    # default to current GW if not provided
-    if gameweek_id is None:
-        gw = await get_current_gameweek(db)
-        gameweek_id = gw.id
+    """
+    Gets transfer stats. This logic is now independent and always looks
+    for the next actionable gameweek (LIVE or UPCOMING).
+    """
+    target_gameweek_id = gameweek_id
 
-    stats = await get_transfer_stats(db, gameweek_id)
+    # If no specific gameweek is requested, find the next one for transfers.
+    if target_gameweek_id is None:
+        # Prioritize the LIVE gameweek, as transfers apply to it.
+        gw = await db.gameweek.find_first(
+            where={'status': 'LIVE'},
+            order={'gw_number': 'asc'}
+        )
+        # If no gameweek is live, find the next UPCOMING one.
+        if not gw:
+            gw = await db.gameweek.find_first(
+                where={'status': 'UPCOMING'},
+                order={'gw_number': 'asc'}
+            )
+        
+        if not gw:
+             raise HTTPException(status_code=404, detail="No gameweek open for transfers.")
+        
+        target_gameweek_id = gw.id
+
+    stats = await get_transfer_stats(db, target_gameweek_id)
     return {
-        "gameweek_id": gameweek_id,
+        "gameweek_id": target_gameweek_id,
         "most_in": stats["most_in"],
         "most_out": stats["most_out"],
     }

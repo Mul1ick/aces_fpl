@@ -91,7 +91,8 @@ const Team: React.FC = () => {
                     fetch(API.endpoints.team(), { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: { Authorization: `Bearer ${token}` } }),
+                    //fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(`${API.BASE_URL}/gameweeks/next-actionable`, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.gameweek, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.fixtures, { headers: { Authorization: `Bearer ${token}` } })
                 ]);
@@ -396,7 +397,7 @@ const Team: React.FC = () => {
                          <p className="text-sm text-gray-500">{deadlineText}</p>
                     </div>
                 </div>
-                {token && <GameweekChips token={token} />}
+                {token && <GameweekChips token={token} gw={gameweek?.gw_number} />}
             </motion.div>
             
              <motion.main 

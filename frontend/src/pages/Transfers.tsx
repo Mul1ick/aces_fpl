@@ -120,7 +120,7 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
     if (!isAuthLoading) {
       fetchAndSetTeam();
       
-      fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      fetch(`${API.BASE_URL}/gameweeks/next-actionable`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
         .then(res => res.json())
         .then(setGameweek)
         .catch(() => console.error("Failed to fetch gameweek data"));

@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/fpl-button";
 import { Card, CardContent } from "@/components/ui/fpl-card";
 import { Input } from "@/components/ui/input";
-import acesLogo from "@/assets/aces-logo.png";
+import acesLogo from "@/assets/aces-logo-black.png";
 import { useNavigate } from "react-router-dom";
 import { API } from "@/lib/api";
 
@@ -187,7 +187,7 @@ const handleRowClick = (entry: LeaderboardEntry) => {
           
           {/* Header Section */}
           <motion.div variants={containerVariants} className="mb-6 text-center">
-            <img src={acesLogo} alt="Aces FPL Logo" className="w-16 h-16 mx-auto mb-2" />
+            <img src={acesLogo} alt="Aces FPL Logo" className="w-auto h-6 mx-auto mb-2" />
             <h1 className="text-4xl md:text-5xl font-extrabold text-pl-white">
               FANTASY PREMIER LEAGUE
             </h1>
