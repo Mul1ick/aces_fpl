@@ -74,6 +74,7 @@ export const transformApiPlayer = (rawPlayer: any): any => {
     position: position === 'ST' ? 'FWD' : position,
     club: clubName,
     teamName: clubName,
+    team:clubName,
     price: rawPlayer.price,
     points: rawPlayer.points,
     tsb: rawPlayer.tsb, // Team Selected By %

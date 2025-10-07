@@ -69,7 +69,7 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
                 <div>
                     {/* --- MODIFIED: Use player.position --- */}
                     <p className="text-xs text-gray-500 font-bold">{player.position}</p>
-                    <CardTitle className="text-2xl font-bold">{player.full_name}</CardTitle>
+                    <CardTitle className="text-2xl font-bold">{player.name}</CardTitle>
                     {/* --- MODIFIED: Use player.team directly --- */}
                     <p className="text-md font-semibold text-gray-700">{player.team}</p>
                 </div>

@@ -25,3 +25,5 @@ venv/
 # Secrets
 env
 .env
+
+/node_modules
