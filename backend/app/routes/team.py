@@ -217,7 +217,7 @@ async def save_team(
     db: Prisma = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    corrected_players = await auto_correct_squad_formation(db, payload.players)
+    # corrected_players = await auto_correct_squad_formation(db, payload.players)
     gw = await crud.get_current_gameweek(db)
     if not gw:
         raise HTTPException(404, "No gameweek")
@@ -227,7 +227,7 @@ async def save_team(
         user_id=str(user.id),
         gameweek_id=gw.id,
         # CORRECTED: Convert Pydantic models to dictionaries
-        new_players=[p.dict() for p in corrected_players]
+        new_players=[p.dict() for p in payload.players]
     )
     return updated
 
