@@ -227,7 +227,7 @@ const Team: React.FC = () => {
 
     const handleSelectForSub = (playerToSub: any) => {
         const isBenched = squad.bench.some(p => p.id === playerToSub.id);
-        setSelectedPlayer({ ...playerToSub, is_benched: isBenched });
+        setSelectedPlayer({ ...playerToSub, isBenched: isBenched });
         setDetailedPlayer(null);
     };
 
@@ -294,13 +294,13 @@ const Team: React.FC = () => {
             return;
         }
         
-        const payload = {
+       const payload = {
             players: allPlayers.map((p) => ({
                 id: p.id,
                 position: p.pos,
                 is_captain: p.isCaptain,
                 is_vice_captain: p.isVice,
-                is_benched: p.isBenched,
+                is_benched: p.isBenched, // This line is the change
             }))
         };
 
@@ -318,15 +318,10 @@ const Team: React.FC = () => {
             
             const updatedSquadData: TeamResponse = await response.json();
             
-            const transformBackendResponse = (players: any[]) => players.map(p => ({
-                id: p.id, name: p.full_name, team: p.team.name, pos: p.position,
-                fixture_str: p.fixture_str, points: p.points, isCaptain: p.is_captain,
-                isVice: p.is_vice_captain, is_benched: p.is_benched,
-            }));
-            
             const newSquadState = { 
-                starting: transformBackendResponse(updatedSquadData.starting), 
-                bench: transformBackendResponse(updatedSquadData.bench),
+                // USE the global transformApiPlayer function instead
+                starting: updatedSquadData.starting.map(transformApiPlayer), 
+                bench: updatedSquadData.bench.map(transformApiPlayer), 
                 team_name: updatedSquadData.team_name
             };
             
