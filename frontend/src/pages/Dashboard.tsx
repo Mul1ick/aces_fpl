@@ -20,11 +20,14 @@ type TransferStatItem = {
   team?: { short_name?: string; name?: string };
 };
 
+// 1. MODIFIED TYPE DEFINITION
 type GameweekStats = {
   gw_number: number;
-  most_captained?: string;
-  most_vice_captained?: string;
-  most_selected?: string;
+  status?: string; // <-- This was the missing piece
+  // These types are also corrected to match your components
+  most_captained?: { name: string; team_name: string; };
+  most_vice_captained?: { name: string; team_name: string; };
+  most_selected?: { name: string; team_name: string; };
   chips_played?: number;
 };
 
@@ -46,9 +49,7 @@ type TransferStatsResponse =
 const Dashboard: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [squad, setSquad] = useState<TeamResponse | null>(null);
-  // const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
-  // const [gameweek, setGameweek] = useState<{ gw_number: number } | null>(null);
-const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
+  const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
   const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
 
   const [gameweekStats, setGameweekStats] = useState({
@@ -56,6 +57,10 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
     average_points: 0,
     highest_points: 0,
   });
+
+  // 2. ADDED NEW STATE VARIABLE
+  const [displayGameweek, setDisplayGameweek] = useState<any | null>(null);
+
   const [hubStats, setHubStats] = useState({
     overall_points: 0,
     gameweek_points: 0,
@@ -67,7 +72,6 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
 
   });
   
-  // ✅ ADD THESE STATE VARIABLES
   const [leaderboard, setLeaderboard] = useState([]);
   const [userRank, setUserRank] = useState<number | null>(null);
 
@@ -149,7 +153,6 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
     }
   }, [user]);
   
-  // ✅ ADD THIS EFFECT TO FETCH LEADERBOARD DATA
   useEffect(() => {
     const fetchLeaderboard = async () => {
       const token = localStorage.getItem("access_token");
@@ -172,7 +175,6 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
     }
   }, [user]);
 
-  // ✅ ADD THIS EFFECT TO CALCULATE USER RANK
   useEffect(() => {
     if (user && leaderboard.length > 0) {
       const userEntry = leaderboard.find(
@@ -192,29 +194,53 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
     return <NewUserDashboard />;
   }
 
+  // 3. REPLACED THIS useEffect
   useEffect(() => {
-    const fetchGameweekStats = async () => {
+    const fetchDisplayGameweekStats = async () => {
       const token = localStorage.getItem("access_token");
-      if (!token) return;
+      if (!token || !gameweek) return; // Wait for the main gameweek object to be fetched first
+
+      let gwNumberToFetch = gameweek.gw_number;
+      let status = gameweek.status;
+
+      // This is the core logic fix:
+      // If the current gameweek is LIVE *or* UPCOMING, and it's not GW1...
+      if ((status === 'LIVE' || status === 'UPCOMING') && gameweek.gw_number > 1) {
+        // ...then we want to fetch stats for the PREVIOUS gameweek.
+        gwNumberToFetch = gameweek.gw_number - 1;
+      }
+      
+      // If status is 'FINISHED', or if it's GW1 (in any state),
+      // it will correctly fetch stats for the current gw_number.
+
       try {
-        const response = await fetch(API.endpoints.gameweekStats, {
+        // Fetch stats for the *correct* gameweek number
+        const statsEndpoint = `${API.BASE_URL}/gameweeks/${gwNumberToFetch}/stats`;
+        const response = await fetch(statsEndpoint, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
         if (response.ok) {
           const data = await response.json();
-          setGameweekStats(data);
+          setGameweekStats(data); // Set the points (e.g., for GW1)
+        } else {
+          // Fallback if stats for GW1 aren't ready (e.g., 0 points)
+          setGameweekStats({ user_points: 0, average_points: 0, highest_points: 0 });
         }
+        // *Always* set the display gameweek number
+        setDisplayGameweek({ gw_number: gwNumberToFetch });
+
       } catch (error) {
-        console.error("Failed to fetch gameweek stats:", error);
+        console.error("Failed to fetch display gameweek stats:", error);
+        setGameweekStats({ user_points: 0, average_points: 0, highest_points: 0 });
+        setDisplayGameweek({ gw_number: gwNumberToFetch });
       }
     };
 
-    if (user) {
-        fetchGameweekStats();
-    }
-  }, [user]);
+    // This effect runs when 'user' or the 'gameweek' object changes
+    fetchDisplayGameweekStats();
+  }, [user, gameweek]);
   
-
   useEffect(() => {
     const fetchTeam = async () => {
       const token = localStorage.getItem("access_token");
@@ -258,22 +284,41 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
     }
   }, [user]);
 
+   // 4. REPLACED THIS useEffect
    useEffect(() => {
     const fetchTeamOfTheWeek = async () => {
       const token = localStorage.getItem("access_token");
       if (!token) return;
 
-      // --- ADDED: Only fetch if the gameweek is greater than 1 ---
-      if (gameweek && gameweek.gw_number > 1) {
+      // Use displayGameweek or gameweek to decide
+      const gwToFetch = displayGameweek?.gw_number;
+
+      // Only fetch if the gameweek is greater than 0
+      if (gwToFetch && gwToFetch > 0) {
         try {
-          const response = await fetch(API.endpoints.teamOfTheWeek, {
+          // 1. First, try to fetch the TOTW for the current display gameweek (e.g., GW4)
+          const response = await fetch(API.endpoints.teamOfTheWeekByGameweek(gwToFetch), {
             headers: { Authorization: `Bearer ${token}` },
           });
+          
           if (response.ok) {
             const data = await response.json();
             setTeamOfTheWeek(data);
+          } else if (response.status === 404 && gwToFetch > 1) {
+            // 2. If it's not found (404) and it's not GW1,
+            //    try to fetch the *previous* gameweek's TOTW (e.g., GW3)
+            const prevGwResponse = await fetch(API.endpoints.teamOfTheWeekByGameweek(gwToFetch - 1), {
+               headers: { Authorization: `Bearer ${token}` },
+            });
+            if (prevGwResponse.ok) {
+               const data = await prevGwResponse.json();
+               setTeamOfTheWeek(data);
+            } else {
+               // If that also fails, set to null
+               setTeamOfTheWeek(null);
+            }
           } else {
-            // If it fails for other reasons, clear the state
+            // For any other error, set to null
             setTeamOfTheWeek(null);
           }
         } catch (error) {
@@ -281,16 +326,15 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
           setTeamOfTheWeek(null);
         }
       } else {
-        // If it's Gameweek 1, ensure the state is null
+        // If it's Gameweek 1 (or 0), ensure the state is null
         setTeamOfTheWeek(null);
       }
     };
     
-    // Run this effect when the user or gameweek data is available
-    if (user) {
+    if (user && (gameweek || displayGameweek)) {
         fetchTeamOfTheWeek();
     }
-  }, [user, gameweek]); // --- MODIFIED: Added gameweek as a dependency ---
+  }, [user, gameweek, displayGameweek]); // This dependency array is correct
 
   return (
     <div className="bg-white min-h-screen text-black">
@@ -309,11 +353,12 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
                   averagePoints={gameweekStats.average_points}
                   highestPoints={gameweekStats.highest_points}
                   teamName={squad?.team_name}
-                  currentGameweekNumber={gameweek?.gw_number || 1}
+                  
+                  // 4. UPDATED PROP
+                  currentGameweekNumber={displayGameweek?.gw_number || gameweek?.gw_number || 1}
                  />
                 </motion.div>
                 <motion.div variants={itemVariants}>
-                  {/* ✅ MODIFIED: Pass the userRank prop here */}
                   <ManagerHubCard stats={hubStats} overallRank={userRank} />
                 </motion.div>
               </div>
@@ -322,17 +367,39 @@ const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
               <motion.div variants={itemVariants}>
                 <Card className="h-full border-gray-200">
                     <CardHeader>
-                         <CardTitle className="text-2xl">Gameweek Status</CardTitle>
+                      <CardTitle className="text-2xl">Gameweek Status</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-8">
-                        <GameweekStatusCard stats={gameweek} />
+                        {/* This card *correctly* uses 'gameweek' (the upcoming GW) */}
+                        <GameweekStatusCard stats={gameweek} /> 
                         <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
-                        {teamOfTheWeek && (
-              <TeamOfTheWeekCard 
-                team={teamOfTheWeek} 
-                currentGameweekNumber={gameweek?.gw_number || 1} 
-              />
-            )}
+                        
+                        {/* 5. REPLACED RENDER LOGIC */}
+                        {teamOfTheWeek ? (
+                          // IF teamOfTheWeek exists, show it
+                          <TeamOfTheWeekCard 
+                            team={teamOfTheWeek} 
+                            currentGameweekNumber={displayGameweek?.gw_number || gameweek?.gw_number || 1} 
+                          />
+                        ) : (
+                          // ELSE, show the placeholder
+                          <Card className="h-full border-black border-2">
+                            <CardHeader>
+                              <CardTitle className="text-xl">Team of the Week</CardTitle>
+                              <p className="text-sm text-gray-500 font-semibold">
+                                { (displayGameweek?.gw_number || gameweek?.gw_number || 1) <= 1 
+                                  ? "Available after Gameweek 1"
+                                  : "Team of the Week is not yet available."
+                                }
+                              </p>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-3 text-center text-gray-400 pt-8 pb-8">
+                                Check back here after the gameweek is finalized.
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
                     </CardContent>
                 </Card>
               </motion.div>

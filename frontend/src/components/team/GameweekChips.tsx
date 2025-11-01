@@ -135,10 +135,6 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
                     <h3 className="text-xl font-bold text-black">{selectedChip.name}</h3>
                 </div>
                 <p className="text-sm text-gray-600 my-4 text-center">{selectedChip.description}</p>
-                <div className="text-xs text-gray-500 space-y-1 text-center">
-                    <p>You lose the first {selectedChip.name} after the Gameweek 19 deadline, Wed 31 Dec 00:00.</p>
-                    <p>The second {selectedChip.name} will be available after Wed 31 Dec 00:00.</p>
-                </div>
                 <Button className="w-full mt-6" onClick={onPlayChip} disabled={loading}>Play Chip</Button>
               </div>
               <button onClick={() => setSelectedChip(null)} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">

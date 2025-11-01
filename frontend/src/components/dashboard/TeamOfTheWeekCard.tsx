@@ -17,8 +17,8 @@ interface TeamOfTheWeekCardProps {
 }
 
 export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, currentGameweekNumber }) => {
-  const canViewTotw = currentGameweekNumber > 1;
-  const totwGameweekToShow = currentGameweekNumber - 1;
+  const canViewTotw = currentGameweekNumber > 0; // This allows it to show for GW1
+const totwGameweekToShow = currentGameweekNumber; // This makes it show 'GW1' instead of 'GW0'
 
   return (
     <Card className="h-full border-black border-2">
