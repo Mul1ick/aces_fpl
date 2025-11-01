@@ -187,13 +187,13 @@ const Team: React.FC = () => {
 
     const handlePlayerClick = (clickedPlayer: any) => {
         if (selectedPlayer) {
-            if (selectedPlayer.id === clickedPlayer.id || selectedPlayer.is_benched === clickedPlayer.is_benched) {
+            if (selectedPlayer.id === clickedPlayer.id || selectedPlayer.isBenched === clickedPlayer.isBenched) {
                  setSelectedPlayer(null);
                 return;
             }
 
-            const starter = selectedPlayer.is_benched ? clickedPlayer : selectedPlayer;
-            const benched = selectedPlayer.is_benched ? selectedPlayer : clickedPlayer;
+            const starter = selectedPlayer.isBenched ? clickedPlayer : selectedPlayer;
+            const benched = selectedPlayer.isBenched ? selectedPlayer : clickedPlayer;
 
             const tempStartingXI = squad.starting.filter(p => p.id !== starter.id).concat(benched);
             const goalkeepers = tempStartingXI.filter(p => p.pos === 'GK').length;
@@ -203,8 +203,8 @@ const Team: React.FC = () => {
                 return;
             }
             
-            let newStarterPlayer = { ...benched, is_benched: false, isCaptain: false, isVice: false };
-            let newBenchedPlayer = { ...starter, is_benched: true, isCaptain: false, isVice: false };
+            let newStarterPlayer = { ...benched, isBenched: false, isCaptain: false, isVice: false };
+            let newBenchedPlayer = { ...starter, isBenched: true, isCaptain: false, isVice: false };
 
             if (starter.isCaptain) {
                 newStarterPlayer.isCaptain = true;
@@ -300,7 +300,7 @@ const Team: React.FC = () => {
                 position: p.pos,
                 is_captain: p.isCaptain,
                 is_vice_captain: p.isVice,
-                is_benched: p.is_benched,
+                is_benched: p.isBenched,
             }))
         };
 
