@@ -1045,6 +1045,20 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
         )
         hits = getattr(ugws, 'transfer_hits', 0) if ugws else 0
         return gross - hits
+    
+    # --- START OF FIX ---
+    
+    # 1. Fetch stats for all players in the user's team
+    player_ids = [e.player_id for e in entries]
+    stats_entries = await db.gameweekplayerstats.find_many(
+        where={'gameweek_id': gameweek_id, 'player_id': {'in': player_ids}}
+    )
+    
+    # 2. Create maps for both points and played status
+    pts_map = {s.player_id: s.points for s in stats_entries}
+    played_map = {s.player_id: s.played for s in stats_entries} # Map of {player_id: bool}
+
+    # --- END OF FIX ---
 
     # Build points map for the GW
     stats = await db.gameweekplayerstats.find_many(where={'gameweek_id': gameweek_id})
@@ -1054,16 +1068,22 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
     cap = next((e for e in starters if e.is_captain), None)
     vice = next((e for e in starters if e.is_vice_captain), None)
 
-    base = sum(pts.get(e.player_id, 0) for e in starters)
+    base = sum(pts_map.get(e.player_id, 0) for e in starters)
 
     triple = await is_triple_captain_active(db, user_id, gameweek_id)
 
-    # Choose multiplier target: captain if played else vice if played
+    # --- START OF FIX ---
+    
+    # 3. Choose multiplier target: captain if played else vice if played
     bonus_target = None
-    if cap and (cap.player_id in pts):
+    # Check the played_map (defaulting to False if not found)
+    if cap and played_map.get(cap.player_id, False):
         bonus_target = cap.player_id
-    elif vice and (vice.player_id in pts):
+    elif vice and played_map.get(vice.player_id, False):
         bonus_target = vice.player_id
+
+    # --- END OF FIX ---
+
 
     if bonus_target is not None:
         if triple:
