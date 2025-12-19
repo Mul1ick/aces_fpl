@@ -1,16 +1,17 @@
-from passlib.context import CryptContext
+import os
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from app.database import get_db
-from app import crud
-import os
-from dotenv import load_dotenv
 from prisma import Prisma
 from prisma import models as PrismaModels
 
+from app.database import get_db
 
+# --- IMPORT REPOS (No more crud!) ---
+from app.repositories.user_repo import get_user_by_id, get_user_by_email
 
 # ----------------- LOAD ENV ------------------
 load_dotenv()
@@ -56,7 +57,8 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    user = await crud.get_user_by_id(db, user_id)
+    # REFACTORED: Use Repo directly
+    user = await get_user_by_id(db, user_id)
     if user is None:
         raise credentials_exception
 
@@ -80,14 +82,19 @@ async def get_current_admin_user(current_user: PrismaModels.User = Depends(get_c
 async def authenticate_user(db: Prisma, email: str, password: str):
     """
     Return the user if credentials are valid, else None.
-    Works with either `hashed_password` or `password_hash` field names.
     """
-    user = await crud.get_user_by_email(db, email)
+    # REFACTORED: Use Repo directly
+    user = await get_user_by_email(db, email)
     if not user:
         return None
 
-    # Try common hash field names
-    hashed = getattr(user, "hashed_password", None) or getattr(user, "password_hash", None)
+    # Check for password hash (Prisma default field is usually 'hashed_password')
+    hashed = getattr(user, "hashed_password", None)
+    
+    # Fallback if you used 'password_hash' in older migrations
+    if not hashed:
+        hashed = getattr(user, "password_hash", None)
+
     if not hashed:
         return None
 
@@ -95,4 +102,3 @@ async def authenticate_user(db: Prisma, email: str, password: str):
         return None
 
     return user
-

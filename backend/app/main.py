@@ -3,7 +3,7 @@ load_dotenv() # <-- MUST BE THE FIRST THING AFTER IMPORTS
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes,fixture_routes,transfer_routes,chip_routes
+from app.controllers import auth_routes, user_routes, player_routes, team, gameweek_routes, leaderboard_routes, admin_routes,fixture_routes,transfer_routes,chip_routes
 import logging
 from app.database import db_client
 import os
