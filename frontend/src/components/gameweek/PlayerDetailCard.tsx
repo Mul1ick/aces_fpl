@@ -2,28 +2,31 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { getTeamJersey } from '@/lib/player-utils';
+import { ChipName } from '@/lib/api';
 
 interface PlayerDetailCardProps {
   player: any;
   onClose: () => void;
+  activeChip?: ChipName | null; // Added activeChip prop
 }
 
-const StatRow = ({ label, value, points }) => (
-    <div className="flex justify-between items-center py-2 border-b border-gray-200 text-sm">
-        <p className="text-gray-600">{label}</p>
-        <div className="flex items-center">
-            <p className="w-8 text-center text-black">{value}</p>
-            <p className="font-bold w-12 text-right text-black">{points} pts</p>
-        </div>
-    </div>
-);
-
-export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onClose }) => {
+export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onClose, activeChip }) => {
   if (!player) return null;
 
   const jerseySrc = getTeamJersey(player.team?.name);
+
+  // --- Points Calculation Logic ---
+  // Check for captaincy flags (handles both naming conventions from API)
+  const isCaptain = player.isCaptain || player.is_captain;
+  
+  // Determine multiplier based on chip status
+  const multiplier = isCaptain
+    ? (activeChip === 'TRIPLE_CAPTAIN' ? 3 : 2)
+    : 1;
+
+  // Calculate the final display points
+  const displayPoints = (player.points ?? 0) * multiplier;
 
   return (
     <motion.div
@@ -44,18 +47,27 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
           <CardHeader className="p-4 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-2xl font-bold text-black">{player.name || player.full_name}</CardTitle>
-              <p className="text-sm text-gray-500">vs. {player.fixture_str}</p>
+              <p className="text-sm text-gray-500">vs. {player.fixture_str || '-'}</p>
             </div>
-            <img src={jerseySrc} alt={`${player.team.name} jersey`} className="w-12 h-auto" />
+            <img src={jerseySrc} alt={`${player.team?.name} jersey`} className="w-12 h-auto" />
           </CardHeader>
           <CardContent className="p-4">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <p className="font-bold text-black">{player.team?.name || 'N/A'}</p>
-                {/* --- THIS LINE WAS REMOVED --- */}
-                {/* <p className="text-xs text-gray-500">Full Time</p> */}
+                <p className="text-xs text-gray-500">{player.position}</p>
               </div>
-              <p className="text-3xl font-bold text-black">{player.points} pts</p>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-black">
+                  {displayPoints} pts
+                </p>
+                {/* Visual indicator for the multiplier */}
+                {multiplier > 1 && (
+                  <p className="text-xs font-bold text-white bg-pl-purple px-2 py-0.5 rounded-full inline-block">
+                    {activeChip === 'TRIPLE_CAPTAIN' ? 'Triple Captain' : 'Captain'} ({multiplier}x)
+                  </p>
+                )}
+              </div>
             </div>
             
             <div>
@@ -63,22 +75,21 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
                 {player?.breakdown && player.breakdown.length > 0 ? (
                   <div className="grid grid-cols-2 gap-y-1 text-sm">
                     {player.breakdown.map((row: any) => (
-                      <div key={row.label} className="col-span-2 flex justify-between">
-                        <span className="text-muted-foreground">
+                      <div key={row.label} className="col-span-2 flex justify-between border-b border-gray-100 py-1 last:border-0">
+                        <span className="text-gray-600">
                           {row.label}{typeof row.value === "number" ? ` (${row.value})` : ""}
                         </span>
-                        <span className="font-medium">{row.points}</span>
+                        {/* Breakdown usually shows base points, total shows multiplied */}
+                        <span className="font-medium text-black">{row.points}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No breakdown available.</p>
+                  <p className="text-sm text-gray-500 italic">No breakdown available.</p>
                 )}
             </div>
-
-            
           </CardContent>
-          <button onClick={onClose} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">
+          <button onClick={onClose} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200 transition-colors">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </Card>

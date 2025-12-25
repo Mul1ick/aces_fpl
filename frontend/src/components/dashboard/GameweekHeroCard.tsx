@@ -65,8 +65,9 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamNam
             </div>
           </motion.div>
 
-          <div 
-            onClick={() => navigate(`/gameweek/${currentGameweek}/top`)} // This can link to a top player's gameweek page
+          <motion.div 
+            whileHover={{ scale: 1.1 }}
+            onClick={() => navigate(`/team-of-the-week/${currentGameweekNumber}`)} 
             className="cursor-pointer flex flex-col items-center"
           >
             <p className="text-3xl font-bold tabular-nums">{highestPoints}</p>
@@ -74,7 +75,8 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamNam
                 <p className="text-sm text-white/80 font-medium">Highest</p>
                 <ChevronRight className="w-4 h-4 text-white/80 ml-1" />
             </div>
-          </div>
+          </motion.div>
+
         </div>
 
         {/* CTA Buttons */}

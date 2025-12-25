@@ -1,19 +1,16 @@
-// frontend/src/pages/TeamOfTheWeek.tsx
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameweekHeader } from '@/components/gameweek/GameweekHeader';
 import { PitchView } from '@/components/gameweek/PitchView';
 import { ListView } from '@/components/gameweek/ListView';
 import { PlayerDetailCard } from '@/components/gameweek/PlayerDetailCard';
-import { API } from '@/lib/api';
+import { TeamViewInfoCard } from '@/components/team/TeamViewInfoCard';
+import { API, ChipName } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-// ✅ 1. IMPORT THE INFO CARD COMPONENT
-import { TeamViewInfoCard } from '@/components/team/TeamViewInfoCard';
 
-// Define the structure for a player on this page
+// ... (keep types and LoadingSkeleton as they were) ...
 type PlayerView = {
   id: number;
   full_name: string;
@@ -25,7 +22,6 @@ type PlayerView = {
   is_benched: boolean;
 };
 
-// Define the structure for the API response
 type TeamOfTheWeekData = {
   manager_name: string;
   team_name: string;
@@ -36,18 +32,15 @@ type TeamOfTheWeekData = {
 
 const LoadingSkeleton = () => (
     <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
-        {/* Desktop Skeleton */}
         <div className="hidden lg:block lg:w-2/5 p-4">
             <Skeleton className="h-full w-full rounded-lg" />
         </div>
-        {/* Main Content Skeleton */}
         <div className="flex flex-col flex-1 lg:w-3/5 p-4 space-y-4">
             <Skeleton className="h-48 w-full rounded-lg" />
             <Skeleton className="h-96 w-full rounded-lg" />
         </div>
     </div>
 );
-
 
 const TeamOfTheWeek: React.FC = () => {
   const { gw } = useParams();
@@ -95,6 +88,24 @@ const TeamOfTheWeek: React.FC = () => {
     return () => controller.abort();
   }, [gw, toast]);
 
+  // --- NEW: DEDUCE ACTIVE CHIP ---
+  const derivedActiveChip = useMemo<ChipName | null>(() => {
+    if (!teamData || !teamData.starting) return null;
+
+    const captain = teamData.starting.find((p) => p.is_captain);
+    if (!captain || captain.points === 0) return null;
+
+    const rawTotal = teamData.starting.reduce((sum, p) => sum + p.points, 0);
+    const bonusPoints = teamData.points - rawTotal;
+
+    // If bonus points are roughly equal to 2x captain points, it's Triple Captain
+    if (Math.abs(bonusPoints - (captain.points * 2)) < 0.1) {
+      return 'TRIPLE_CAPTAIN';
+    }
+    return null;
+  }, [teamData]);
+  // -------------------------------
+
   const handleNavigation = (direction: 'next' | 'prev') => {
     const currentGw = parseInt(gw || '1', 10);
     const newGw = direction === 'next' ? currentGw + 1 : currentGw - 1;
@@ -103,14 +114,8 @@ const TeamOfTheWeek: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return <LoadingSkeleton />;
-  }
-
-  if (error) {
-    return <div className="p-4 text-center text-red-500 font-bold">{error}</div>;
-  }
-
+  if (loading) return <LoadingSkeleton />;
+  if (error) return <div className="p-4 text-center text-red-500 font-bold">{error}</div>;
   if (!teamData) return null;
 
   const playersByPos = {
@@ -124,10 +129,8 @@ const TeamOfTheWeek: React.FC = () => {
 
   return (
     <>
-      {/* ✅ 2. WRAP EVERYTHING IN THE TWO-COLUMN LAYOUT STRUCTURE */}
       <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
         
-        {/* Left Column (Manager Info on Desktop) */}
         <div className="hidden lg:block lg:w-2/5 p-4">
           <div className="lg:sticky lg:top-4">
             <TeamViewInfoCard
@@ -135,18 +138,15 @@ const TeamOfTheWeek: React.FC = () => {
               teamName={teamData.team_name}
               managerName={teamData.manager_name}
               stats={{
-                // For TOTW, overall points and gameweek points are the same.
                 overall_points: teamData.points,
                 total_players: allPlayers.length,
                 gameweek_points: teamData.points,
               }}
-              // Rank is not applicable for TOTW, so we pass undefined.
               overallRank={undefined}
             />
           </div>
         </div>
 
-        {/* Right Column / Main Content */}
         <div className="flex flex-col flex-1 lg:w-3/5">
           <div className="lg:m-4 lg:border-2 lg:border-gray-300 lg:rounded-lg flex flex-col flex-grow">
             <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] p-4 lg:rounded-t-lg">
@@ -165,14 +165,17 @@ const TeamOfTheWeek: React.FC = () => {
                 playersByPos={playersByPos}
                 bench={teamData.bench}
                 onPlayerClick={setDetailedPlayer}
+                activeChip={derivedActiveChip} // Pass derived chip
               />
             ) : (
-              <ListView players={allPlayers} />
+              <ListView 
+                players={allPlayers} 
+                activeChip={derivedActiveChip} // Pass derived chip
+              />
             )}
           </div>
         </div>
 
-        {/* Manager Info Card (Mobile Only) */}
         <div className="block lg:hidden p-4">
           <TeamViewInfoCard
             isLoading={loading}
@@ -190,7 +193,11 @@ const TeamOfTheWeek: React.FC = () => {
 
       <AnimatePresence>
         {detailedPlayer && (
-          <PlayerDetailCard player={detailedPlayer} onClose={() => setDetailedPlayer(null)} />
+          <PlayerDetailCard 
+            player={detailedPlayer} 
+            onClose={() => setDetailedPlayer(null)} 
+            activeChip={derivedActiveChip} // Pass derived chip
+          />
         )}
       </AnimatePresence>
     </>

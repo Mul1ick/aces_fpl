@@ -5,10 +5,10 @@ import { GameweekHeader } from '@/components/gameweek/GameweekHeader';
 import { PitchView } from '@/components/gameweek/PitchView';
 import { ListView } from '@/components/gameweek/ListView';
 import { PlayerDetailCard } from '@/components/gameweek/PlayerDetailCard';
-import { TeamViewInfoCard } from '@/components/team/TeamViewInfoCard'; // <-- 1. IMPORT THE NEW CARD
+import { TeamViewInfoCard } from '@/components/team/TeamViewInfoCard';
 import { API } from '@/lib/api';
 
-// --- Placeholder Data for an 8+3 Squad ---
+// --- Types ---
 type Position = 'GK' | 'DEF' | 'MID' | 'FWD' | string;
 type PlayerView = {
   id: number | string;
@@ -19,8 +19,14 @@ type PlayerView = {
   is_captain: boolean;
   is_vice_captain: boolean;
   is_benched: boolean;
+  // Stats fields
+  breakdown?: any[];
+  raw_stats?: any;
+  fixture_str?: string;
 };
+
 type TeamStats = { overall_points?: number; total_players?: number; gameweek_points?: number };
+
 type TeamData = {
   team_name: string;
   manager_name?: string;
@@ -33,114 +39,110 @@ type TeamData = {
   transfers?: string;
   starting: PlayerView[];
   bench: PlayerView[];
+  active_chip?: string | null; // <--- ADDED TYPE
 };
 
 const TeamView: React.FC = () => {
   const { gw, userId } = useParams();
   const navigate = useNavigate();
   const [view, setView] = useState<'pitch' | 'list'>('pitch');
-const [teamData, setTeamData] = useState<TeamData | null>(null);
-const [detailedPlayer, setDetailedPlayer] = useState<PlayerView | null>(null);
-const [loading, setLoading] = useState(false);
-const [error, setError] = useState<string | null>(null);
+  const [teamData, setTeamData] = useState<TeamData | null>(null);
+  const [detailedPlayer, setDetailedPlayer] = useState<PlayerView | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-useEffect(() => {
-  if (!gw || !userId) return;
-  const controller = new AbortController();
+  useEffect(() => {
+    if (!gw || !userId) return;
+    const controller = new AbortController();
 
-  (async () => {
-    setLoading(true);
-    setError(null);
-    setTeamData(null);
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) throw new Error('Not authenticated');
+    (async () => {
+      setLoading(true);
+      setError(null);
+      setTeamData(null);
+      try {
+        const token = localStorage.getItem('access_token');
+        if (!token) throw new Error('Not authenticated');
 
-      const isTeamOfTheWeek = userId === 'top';
-      const endpoint = isTeamOfTheWeek
-        ? API.endpoints.teamOfTheWeekByGameweek(Number(gw))
-        : API.endpoints.userTeam(userId, Number(gw));
-      
-      console.log(`Fetching from: ${endpoint}`); // Helpful for debugging
+        const isTeamOfTheWeek = userId === 'top';
+        const endpoint = isTeamOfTheWeek
+          ? API.endpoints.teamOfTheWeekByGameweek(Number(gw))
+          : API.endpoints.userTeam(userId, Number(gw));
+        
+        const res = await fetch(endpoint, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
 
-      const res = await fetch(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
-      });
+        const rawText = await res.text();
+        let data: any = {};
+        try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* keep {} */ }
 
+        if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
 
-      const rawText = await res.text();
-      let data: any = {};
-      try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* keep {} */ }
+        const normPos = (pos?: string): Position => {
+          if (!pos) return '';
+          const p = pos.toUpperCase();
+          if (p === 'GK' || p.startsWith('G')) return 'GK';
+          if (p === 'DEF' || p.startsWith('D')) return 'DEF';
+          if (p === 'MID' || p.startsWith('M')) return 'MID';
+          if (p === 'FWD' || p.startsWith('F')) return 'FWD';
+          return p;
+        };
 
-      // quick visibility while debugging
-      console.log('TeamView response', res.status, data);
+        const normalize = (players?: any[]): PlayerView[] =>
+          (players ?? []).map((p: any) => ({
+            id: p.id,
+            full_name: p.full_name ?? p.name ?? '',
+            position: normPos(p.position ?? p.pos),
+            team: { name: p.team?.name ?? p.team_name ?? '' },
+            points: Number(p.points ?? p.gw_points ?? 0),
+            is_captain: Boolean(p.is_captain ?? p.captain),
+            is_vice_captain: Boolean(p.is_vice_captain ?? p.vice_captain),
+            is_benched: Boolean(p.is_benched ?? p.bench),
+            // Ensure stats are passed through
+            breakdown: p.breakdown || [],
+            raw_stats: p.raw_stats || {},
+            fixture_str: p.fixture_str || ''
+          }));
 
-      if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+        const squad = data?.squad || {};
+        const startingRaw =
+          (Array.isArray(data?.starting) && data.starting) ||
+          (Array.isArray(squad?.starting) && squad.starting) ||
+          (Array.isArray(squad?.starting11) && squad.starting11) ||
+          (Array.isArray(data?.players) && data.players.filter((x: any) => !x.is_benched)) ||
+          [];
 
-      const normPos = (pos?: string): Position => {
-        if (!pos) return '';
-        const p = pos.toUpperCase();
-        if (p === 'GK' || p.startsWith('G')) return 'GK';
-        if (p === 'DEF' || p.startsWith('D')) return 'DEF';
-        if (p === 'MID' || p.startsWith('M')) return 'MID';
-        if (p === 'FWD' || p.startsWith('F')) return 'FWD';
-        return p;
-      };
+        const benchRaw =
+          (Array.isArray(data?.bench) && data.bench) ||
+          (Array.isArray(squad?.bench) && squad.bench) ||
+          (Array.isArray(squad?.subs) && squad.subs) ||
+          (Array.isArray(data?.players) && data.players.filter((x: any) => x.is_benched)) ||
+          [];
 
-      const normalize = (players?: any[]): PlayerView[] =>
-        (players ?? []).map((p: any) => ({
-          id: p.id,
-          full_name: p.full_name ?? p.name ?? '',
-          position: normPos(p.position ?? p.pos),
-          team: { name: p.team?.name ?? p.team_name ?? '' },
-          points: Number(p.points ?? p.gw_points ?? 0),
-          is_captain: Boolean(p.is_captain ?? p.captain),
-          is_vice_captain: Boolean(p.is_vice_captain ?? p.vice_captain),
-          is_benched: Boolean(p.is_benched ?? p.bench),
-        }));
+        setTeamData({
+          team_name: data.team_name ?? data.teamName ?? 'Team of the Week',
+          manager_name: data.manager_name ?? data.managerName ?? '',
+          stats: data.stats ?? undefined,
+          overallRank: data.overallRank ?? undefined,
+          gameweek_points: data.gameweek_points ?? data.stats?.gameweek_points ?? 0,
+          average_points: data.average_points ?? 0,
+          highest_points: data.highest_points ?? 0,
+          gw_rank: data.gw_rank ?? '',
+          transfers: data.transfers ?? '',
+          starting: normalize(startingRaw),
+          bench: normalize(benchRaw),
+          active_chip: data.active_chip // <--- CAPTURE THE CHIP
+        });
+      } catch (err: any) {
+        if (err.name !== 'AbortError') setError(err.message || 'Team not found or fetch failed');
+      } finally {
+        setLoading(false);
+      }
+    })();
 
-      // Accept multiple server shapes:
-      // A) { starting, bench }
-      // B) { players: [...] with is_benched flags }
-      // C) { squad: { starting11/subs } }
-      const squad = data?.squad || {};
-      const startingRaw =
-        (Array.isArray(data?.starting) && data.starting) ||
-        (Array.isArray(squad?.starting) && squad.starting) ||
-        (Array.isArray(squad?.starting11) && squad.starting11) ||
-        (Array.isArray(data?.players) && data.players.filter((x: any) => !x.is_benched)) ||
-        [];
-
-      const benchRaw =
-        (Array.isArray(data?.bench) && data.bench) ||
-        (Array.isArray(squad?.bench) && squad.bench) ||
-        (Array.isArray(squad?.subs) && squad.subs) ||
-        (Array.isArray(data?.players) && data.players.filter((x: any) => x.is_benched)) ||
-        [];
-
-      setTeamData({
-        team_name: data.team_name ?? data.teamName ?? 'Team of the Week',
-        manager_name: data.manager_name ?? data.managerName ?? '',
-        stats: data.stats ?? undefined,
-        overallRank: data.overallRank ?? undefined,
-        gameweek_points: data.gameweek_points ?? data.stats?.gameweek_points ?? 0,
-        average_points: data.average_points ?? 0,
-        highest_points: data.highest_points ?? 0,
-        gw_rank: data.gw_rank ?? '',
-        transfers: data.transfers ?? '',
-        starting: normalize(startingRaw),
-        bench: normalize(benchRaw),
-      });
-    } catch (err: any) {
-      if (err.name !== 'AbortError') setError(err.message || 'Team not found or fetch failed');
-    } finally {
-      setLoading(false);
-    }
-  })();
-
-  return () => controller.abort();
-}, [gw, userId]);
+    return () => controller.abort();
+  }, [gw, userId]);
 
   const handleNavigation = (direction: 'next' | 'prev') => {
     const currentGw = parseInt(gw || '1', 10);
@@ -149,9 +151,10 @@ useEffect(() => {
       navigate(`/team-view/${userId || 'top'}/${newGw}`);
     }
   };
-  if (loading) return <div className="p-4">Loading…</div>;
-if (error) return <div className="p-4 text-red-600">{error}</div>;
-if (!teamData) return null;
+
+  if (loading) return <div className="p-4 text-center">Loading team...</div>;
+  if (error) return <div className="p-4 text-red-600 text-center">{error}</div>;
+  if (!teamData) return null;
 
   const playersByPos = {
     GK: teamData.starting.filter(p => p.position === 'GK'),
@@ -164,39 +167,36 @@ if (!teamData) return null;
 
   return (
     <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
-      {/* --- Left Column (Manager Info on Desktop) --- */}
       <div className="hidden lg:block lg:w-2/5 p-4">
         <div className="lg:sticky lg:top-4">
-            {/* --- 2. USE THE NEW CARD COMPONENT --- */}
             <TeamViewInfoCard
-  teamName={teamData.team_name}
-  managerName={teamData.manager_name ?? ''}
-  stats={{
-    overall_points: teamData.stats?.overall_points ?? 0,
-    total_players: teamData.stats?.total_players ?? allPlayers.length,
-    gameweek_points: teamData.stats?.gameweek_points ?? 0,
-  }}
-  overallRank={teamData.overallRank ?? undefined}
-/>
+              teamName={teamData.team_name}
+              managerName={teamData.manager_name ?? ''}
+              stats={{
+                overall_points: teamData.stats?.overall_points ?? 0,
+                total_players: teamData.stats?.total_players ?? allPlayers.length,
+                gameweek_points: teamData.stats?.gameweek_points ?? 0,
+              }}
+              overallRank={teamData.overallRank ?? undefined}
+            />
         </div>
       </div>
 
-      {/* --- Right Column / Main Content --- */}
       <div className="flex flex-col flex-1 lg:w-3/5">
         <div className="lg:m-4 lg:border-2 lg:border-gray-300 lg:rounded-lg flex flex-col flex-grow">
           <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] p-4 lg:rounded-t-lg">
             <GameweekHeader
-  gw={gw}
-  view={view}
-  setView={setView}
-  teamName={teamData.team_name}
-  totalPoints={teamData.gameweek_points ?? teamData.stats?.gameweek_points ?? 0}
-  averagePoints={teamData.average_points ?? 0}
-  highestPoints={teamData.highest_points ?? 0}
-  gwRank={teamData.gw_rank ?? ''}
-  freeTransfers={teamData.transfers ?? ''}
-  onNavigate={handleNavigation}
-/>
+              gw={gw}
+              view={view}
+              setView={setView}
+              teamName={teamData.team_name}
+              totalPoints={teamData.gameweek_points ?? teamData.stats?.gameweek_points ?? 0}
+              averagePoints={teamData.average_points ?? 0}
+              highestPoints={teamData.highest_points ?? 0}
+              gwRank={teamData.gw_rank ?? ''}
+              freeTransfers={teamData.transfers ?? ''}
+              onNavigate={handleNavigation}
+            />
           </div>
 
           {view === 'pitch' ? (
@@ -204,35 +204,39 @@ if (!teamData) return null;
               playersByPos={playersByPos}
               bench={teamData.bench}
               onPlayerClick={setDetailedPlayer}
+              activeChip={teamData.active_chip as any} // <--- PASS CHIP TO PITCH
             />
           ) : (
-            <ListView players={allPlayers} />
+            <ListView 
+                players={allPlayers} 
+                activeChip={teamData.active_chip as any} // <--- PASS CHIP TO LIST
+            />
           )}
         </div>
       </div>
 
-       {/* --- Manager Info Card (Mobile Only) --- */}
        <div className="block lg:hidden p-4">
         <TeamViewInfoCard
-  teamName={teamData.team_name}
-  managerName={teamData.manager_name ?? ''}
-  stats={{
-    overall_points: teamData.stats?.overall_points ?? 0,
-    total_players: teamData.stats?.total_players ?? allPlayers.length,
-    gameweek_points: teamData.stats?.gameweek_points ?? 0,
-  }}
-  overallRank={teamData.overallRank ?? undefined}
-/>
+          teamName={teamData.team_name}
+          managerName={teamData.manager_name ?? ''}
+          stats={{
+            overall_points: teamData.stats?.overall_points ?? 0,
+            total_players: teamData.stats?.total_players ?? allPlayers.length,
+            gameweek_points: teamData.stats?.gameweek_points ?? 0,
+          }}
+          overallRank={teamData.overallRank ?? undefined}
+        />
       </div>
 
       <AnimatePresence>
-  {detailedPlayer && (
-    <PlayerDetailCard
-      player={detailedPlayer}
-      onClose={() => setDetailedPlayer(null)}
-    />
-  )}
-</AnimatePresence>
+        {detailedPlayer && (
+          <PlayerDetailCard
+            player={detailedPlayer}
+            onClose={() => setDetailedPlayer(null)}
+            activeChip={teamData.active_chip as any} // <--- PASS CHIP TO MODAL
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

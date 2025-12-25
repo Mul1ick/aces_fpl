@@ -129,6 +129,7 @@ class GetTeamResponse(BaseModel):
     team_name: str
     starting: List[PlayerDisplay]
     bench: List[PlayerDisplay]
+    active_chip: Optional[str]
 
 class LeaderboardEntry(BaseModel):
     rank: int

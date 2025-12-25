@@ -18,6 +18,10 @@ export const API = {
     leaderboard: `${API_BASE_URL}/leaderboard/`,
     transfer: `${API_BASE_URL}/teams/transfer`,
     userStats: `${API_BASE_URL}/users/stats`,
+    playerCard: (gwId: number, playerId: number, userId?: string) => 
+      userId 
+        ? `${API_BASE_URL}/teams/${gwId}/players/${playerId}/card?user_id=${userId}`
+        : `${API_BASE_URL}/teams/${gwId}/players/${playerId}/card`,
     // frontend/src/lib/api.ts
     playerDetails: (playerId: number) => `${API.BASE_URL}/players/${playerId}/details`,
     playerStats: `${API_BASE_URL}/players/stats`,

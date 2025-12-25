@@ -101,18 +101,6 @@ export function PlayerFormModal({
                 <Input id="full_name" value={formData.full_name} onChange={(e) => handleChange('full_name', e.target.value)} placeholder="e.g., John Doe" />
             </div>
              <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor="position">Position</Label>
-                    <Select value={formData.position} onValueChange={(value: 'GK' | 'DEF' | 'MID' | 'FWD') => handleChange('position', value)}>
-                        <SelectTrigger><SelectValue/></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="GK">Goalkeeper</SelectItem>
-                            <SelectItem value="DEF">Defender</SelectItem>
-                            <SelectItem value="MID">Midfielder</SelectItem>
-                            <SelectItem value="FWD">Forward</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
                  <div>
                     <Label htmlFor="price">Price (£m)</Label>
                     <Input 

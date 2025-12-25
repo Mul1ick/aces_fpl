@@ -9,6 +9,8 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
+# --- REMOVED THE CIRCULAR IMPORT HERE ---
+
 async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: str, players: list[dict]):
     logger.info(f"Saving team for user {user_id}, GW {gameweek_id}")
     try:
@@ -127,11 +129,7 @@ async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
 
     except Exception as e:
         logger.error(f"Error carrying forward team for user {user_id}", exc_info=True)
-        # We usually don't raise here to avoid blocking other flows, 
-        # but you can raise if strict consistency is required.
         raise e
-
-
 
 async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     logger.info(f"Fetching team for user_id={user_id}, gameweek_id={gameweek_id}")
@@ -140,7 +138,6 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     await carry_forward_team(db, user_id, gameweek_id)
     fantasy_team = await db.fantasyteam.find_unique(where={'user_id': user_id})
     if not fantasy_team:
-        
         logger.warning(f"No fantasy team found for user {user_id}")
         return {"team_name": "", "starting": [], "bench": []}
 
@@ -193,10 +190,9 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
             fixture_map_current[f.away_team_id] = fmt_fixture(f.home.short_name, 'A')
 
     # 5) Recent fixtures (last two + current) with points per player
-    #    a) find GW rows
     gw_rows = await db.gameweek.find_many(
-    where={"gw_number": {"gte": max(1, cur_gw.gw_number - 2), "lte": cur_gw.gw_number}},
-    order={"gw_number": "asc"}
+        where={"gw_number": {"gte": max(1, cur_gw.gw_number - 2), "lte": cur_gw.gw_number}},
+        order={"gw_number": "asc"}
     )
     gw_id_to_num: Dict[int, int] = {g.id: g.gw_number for g in gw_rows}
     recent_gw_ids: List[int] = [g.id for g in gw_rows]
@@ -213,13 +209,11 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
         order={"kickoff": "asc"}
     )
 
-
     fixtures_by_team: Dict[int, List[Any]] = {}
     for f in fixtures_recent:
         fixtures_by_team.setdefault(f.home_team_id, []).append(f)
         fixtures_by_team.setdefault(f.away_team_id, []).append(f)
 
-    # points by player across those recent GWs
     recent_stats = await db.gameweekplayerstats.find_many(
         where={"player_id": {"in": player_ids}, "gameweek_id": {"in": recent_gw_ids}}
     )
@@ -247,7 +241,6 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
             {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
         ]
         return raw, breakdown
-
 
     # 6) Shape response objects
     def to_display(entry):
@@ -291,13 +284,19 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     starting = [p for p in all_players if not p["is_benched"]]
     bench = [p for p in all_players if p["is_benched"]]
 
-    
+    # --- NEW: Fetch Active Chip ---
+    active_chip_row = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id}
+    )
+    # Convert to string to ensure Pydantic validation passes (avoids 500 error)
+    active_chip = str(active_chip_row.chip) if active_chip_row else None
+
     return {
         "team_name": fantasy_team.name,
         "starting": starting,
-        "bench": bench
+        "bench": bench,
+        "active_chip": active_chip
     }
-
 
 async def get_player_card(
     db: Prisma,
@@ -305,13 +304,6 @@ async def get_player_card(
     gameweek_id: int,
     player_id: int,
 ) -> Dict[str, Any]:
-    """
-    For the given user + GW + player:
-      - verify the player is in user's team for this GW
-      - return price, team info, captain/vice/bench flags
-      - return current-GW total points + per-stat breakdown
-      - return recent_fixtures: last two GWs + current with points
-    """
     # 0) verify membership in team and load player + club
     ut = await db.userteam.find_first(
         where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': player_id},
@@ -378,7 +370,6 @@ async def get_player_card(
         order={"kickoff": "asc"}
     )
 
-    # points for this player across those GWs
     recent_stats = await db.gameweekplayerstats.find_many(
         where={"player_id": player_id, "gameweek_id": {"in": recent_gw_ids}}
     )
@@ -398,12 +389,11 @@ async def get_player_card(
             "points": pts_by_gw.get(f.gameweek_id, 0),
         })
 
-    # 3) assemble card payload
     return {
         "id": player.id,
         "full_name": player.full_name,
         "position": player.position,
-        "price": player.price,                       # use as-is; format in UI
+        "price": player.price,
         "team": {"id": club.id, "name": club.name, "short_name": club.short_name} if club else None,
         "is_captain": bool(ut.is_captain),
         "is_vice_captain": bool(ut.is_vice_captain),
@@ -414,26 +404,17 @@ async def get_player_card(
         "recent_fixtures": recent_fixtures,
     }
 
-
-
 async def save_existing_team(
     db: Prisma,
     user_id: str,
     gameweek_id: int,
     new_players: List[Dict],
 ):
-    """
-    Updates the user's team configuration (starters/bench/captain).
-    Now includes STRICT formation validation to prevent illegal formations.
-    """
-
-    # --- Fetch existing to compute diff BEFORE we delete anything ---
     existing = await db.userteam.find_many(
         where={'user_id': user_id, 'gameweek_id': gameweek_id}
     )
     existing_ids = {e.player_id for e in existing}
 
-    # --- Normalize / basic guards ---
     if not isinstance(new_players, list) or len(new_players) == 0:
         raise HTTPException(400, "Players payload is empty.")
 
@@ -447,11 +428,9 @@ async def save_existing_team(
     if len(set(incoming_ids)) != 11:
         raise HTTPException(400, "Duplicate players detected in payload.")
 
-    # Map quick lookup for flags
     def b(v): return bool(v)
     attrs_map: Dict[int, Dict] = {int(p['id']): p for p in new_players if p and 'id' in p}
 
-    # Build new snapshot rows
     to_create = []
     for pid in incoming_ids:
         p = attrs_map[pid]
@@ -464,7 +443,6 @@ async def save_existing_team(
             'is_benched': b(p.get('is_benched', False)),
         })
 
-    # --- 1. Basic Counts Validation ---
     captains = [t for t in to_create if t['is_captain']]
     vices    = [t for t in to_create if t['is_vice_captain']]
     benched  = [t for t in to_create if t['is_benched']]
@@ -472,7 +450,7 @@ async def save_existing_team(
 
     if len(benched) != 3:
         raise HTTPException(400, f"Exactly 3 players must be benched (got {len(benched)}).")
-    if len(starters) != 8: # Should be implied by 11-3, but explicit check helps
+    if len(starters) != 8:
         raise HTTPException(400, "Exactly 8 players must be in the starting XI.")
     if len(captains) != 1:
         raise HTTPException(400, "Exactly 1 captain is required.")
@@ -484,15 +462,12 @@ async def save_existing_team(
        any(t['player_id'] == vices[0]['player_id'] for t in benched):
         raise HTTPException(400, "Captain and vice-captain cannot be benched.")
 
-    # --- 2. Fetch Metadata for Position Validation ---
     players_meta = await db.player.find_many(where={'id': {'in': incoming_ids}})
     if len(players_meta) != 11:
         raise HTTPException(400, "Some player IDs do not exist.")
     
     meta_map = {p.id: p for p in players_meta}
 
-    # --- 3. STRICT FORMATION VALIDATION (The Fix) ---
-    # We analyze the POSITIONS of the *starting 8* players
     start_pos = []
     for s in starters:
         player_obj = meta_map.get(s['player_id'])
@@ -500,33 +475,24 @@ async def save_existing_team(
     
     pos_counts = Counter(start_pos)
     
-    # Valid Formation Rules (Standard Fantasy Football):
-    # 1. Exactly 1 GK
-    # 2. At least 3 DEF (Sometimes 2 depending on your specific app rules, standard is 3)
-    # 3. At least 1 FWD (Sometimes 0 is allowed in rare rules, standard is 1)
-    
     if pos_counts['GK'] != 1:
         raise HTTPException(400, "Invalid Formation: Starting XI must have exactly 1 Goalkeeper.")
     
     if pos_counts['DEF'] < 2: 
-        # Note: If your app allows 2 defenders, change this to 2. Standard FPL is 3.
         raise HTTPException(400, "Invalid Formation: Starting XI must have at least 2 Defenders.")
 
     if pos_counts['FWD'] < 1:
         raise HTTPException(400, "Invalid Formation: Starting XI must have at least 1 Forward.")
 
-    # --- 4. GK Logic (Redundant safety check) ---
     gks = [p.id for p in players_meta if p.position == 'GK']
     if len(gks) != 2:
         raise HTTPException(400, f"Exactly 2 goalkeepers are required in the squad.")
 
-    # Exactly 1 GK benched (=> 1 GK starter)
     benched_ids = {t['player_id'] for t in benched}
     benched_gks = [pid for pid in gks if pid in benched_ids]
     if len(benched_gks) != 1:
         raise HTTPException(400, f"Exactly 1 goalkeeper must be benched.")
 
-    # --- 5. Commit to DB ---
     incoming_set = set(incoming_ids)
     removed_ids = existing_ids - incoming_set
     added_ids   = incoming_set - existing_ids
@@ -559,9 +525,7 @@ async def save_existing_team(
 
     return await get_user_team_full(db, user_id, gameweek_id)
 
-
 async def set_captain(db: Prisma, user_id: str, gameweek_id: int, player_id: int):
-    # make sure the player belongs to this user's team for this GW and isn't benched
     ut = await db.userteam.find_first(
         where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': player_id}
     )
@@ -570,7 +534,6 @@ async def set_captain(db: Prisma, user_id: str, gameweek_id: int, player_id: int
     if ut.is_benched:
         raise HTTPException(status_code=400, detail="Captain must be a starter (cannot be benched).")
 
-    # transaction: clear old captain, set new one
     async with db.tx() as tx:
         await tx.userteam.update_many(
             where={'user_id': user_id, 'gameweek_id': gameweek_id, 'is_captain': True},
@@ -603,21 +566,12 @@ async def set_vice_captain(db: Prisma, user_id: str, gameweek_id: int, player_id
     return {"ok": True}
 
 async def auto_correct_squad_formation(db: Prisma, players: list[schemas.PlayerSelection]) -> list[schemas.PlayerSelection]:
-    """
-    STRICTLY ENFORCES the default starting formation for new teams:
-    - 1 GK
-    - 2 DEF
-    - 3 MID
-    - 2 FWD
-    (Total 8 starters). Everyone else goes to bench.
-    """
     if len(players) != 11:
         raise HTTPException(status_code=400, detail="Squad must contain exactly 11 players.")
 
     player_ids = [p.id for p in players]
     db_players = await db.player.find_many(where={'id': {'in': player_ids}})
     
-    # Map input flags (captaincy) but IGNORE input 'is_benched' because we are forcing formation
     input_map = {p.id: p for p in players}
     
     rich_players = []
@@ -628,49 +582,38 @@ async def auto_correct_squad_formation(db: Prisma, players: list[schemas.PlayerS
             'position': p_db.position,
             'is_captain': p_in.is_captain if p_in else False,
             'is_vice_captain': p_in.is_vice_captain if p_in else False,
-            'is_benched': True # Default everyone to bench, we will pick starters below
+            'is_benched': True
         })
 
-    # Sort players by position buckets
     gks = [p for p in rich_players if p['position'] == 'GK']
     defs = [p for p in rich_players if p['position'] == 'DEF']
     mids = [p for p in rich_players if p['position'] == 'MID']
     fwds = [p for p in rich_players if p['position'] == 'FWD']
 
-    # --- ENFORCE FORMATION: 1-2-3-2 ---
     starters = []
     
-    # Pick 1 GK
     if gks: starters.extend(gks[:1])
     
-    # Pick 2 DEF
     if len(defs) >= 2: starters.extend(defs[:2])
-    else: starters.extend(defs) # Fallback if squad is weird
+    else: starters.extend(defs)
     
-    # Pick 3 MID
     if len(mids) >= 3: starters.extend(mids[:3])
     else: starters.extend(mids)
 
-    # Pick 2 FWD
     if len(fwds) >= 2: starters.extend(fwds[:2])
     else: starters.extend(fwds)
 
-    # Check if we have filled 8 spots (handle edge cases where user bought weird squad)
     if len(starters) < 8:
-        # Fill remaining spots with whoever is left (Bench players)
-        # We prefer filling outfield spots first
         current_ids = {p['id'] for p in starters}
         remaining = [p for p in rich_players if p['id'] not in current_ids]
         
         needed = 8 - len(starters)
-        # Filter out GK from filling outfield spot if possible
         fillers = [p for p in remaining if p['position'] != 'GK']
         if len(fillers) < needed:
-            fillers = remaining # Take GKs if absolutely necessary
+            fillers = remaining
             
         starters.extend(fillers[:needed])
 
-    # Apply 'is_benched = False' to the chosen starters
     starter_ids = {p['id'] for p in starters}
     for p in rich_players:
         if p['id'] in starter_ids:
@@ -678,25 +621,19 @@ async def auto_correct_squad_formation(db: Prisma, players: list[schemas.PlayerS
         else:
             p['is_benched'] = True
 
-        # Validations: Captain cannot be on bench
         if p['is_benched']:
             p['is_captain'] = False
             p['is_vice_captain'] = False
 
-    # Ensure we have a captain
     active_starters = [p for p in rich_players if not p['is_benched']]
     if not any(p['is_captain'] for p in active_starters):
-        # Default Captain: First FWD, else First MID
         cap_choice = next((p for p in active_starters if p['position'] == 'FWD'), 
                      next((p for p in active_starters if p['position'] == 'MID'), active_starters[0]))
         cap_choice['is_captain'] = True
 
     return [schemas.PlayerSelection(**p) for p in rich_players]
 
-
-# --- 2. The Complex View Logic ---
 async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
-    # 1. Resolve User
     user = None
     try:
         uuid.UUID(user_key)
@@ -707,20 +644,14 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # 2. Resolve Gameweek
     gw = await db.gameweek.find_unique(where={"gw_number": gameweek_number})
     if not gw:
         raise HTTPException(status_code=404, detail="Gameweek not found")
 
-    # 3. Get Team
     data = await get_user_team_full(db, str(user.id), gw.id)
     if not data:
         raise HTTPException(status_code=404, detail="No fantasy team found for this user/gameweek")
     
-    # 4. Get Leaderboard Stats (Optimized: we could move get_leaderboard logic here to avoid circular imports, 
-    # or just keep it simple. For now, we import it inside function or assume it's available via stats_service)
-    # NOTE: Since stats_service imports team_service, we CANNOT import stats_service at top level.
-    # We will do a local import.
     from app.services.stats_service import get_leaderboard
 
     try:
@@ -731,7 +662,6 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
     except Exception:
         overall_points, overall_rank = 0, None
 
-    # 5. Get GW Points
     try:
         ugws = await db.usergameweekscore.find_first(
             where={"user_id": str(user.id), "gameweek_id": gw.id}
