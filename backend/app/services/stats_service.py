@@ -137,6 +137,8 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
     # Build points map for the GW
     stats = await db.gameweekplayerstats.find_many(where={'gameweek_id': gameweek_id})
     pts = {s.player_id: s.points for s in stats}  # missing => 0
+    played_map = {s.player_id: getattr(s, 'played', False) for s in stats}
+
 
     starters = [e for e in entries if not e.is_benched]
     cap = next((e for e in starters if e.is_captain), None)
@@ -148,12 +150,14 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
 
     # Choose multiplier target: captain if played else vice if played
     bonus_target = None
-    if cap and (cap.player_id in pts):
+    if cap and played_map.get(cap.player_id, False):
         bonus_target = cap.player_id
-    elif vice and (vice.player_id in pts):
+    # 2. Else try Vice: Takes armband if Cap didn't play (even if Vice didn't play either)
+    elif vice:
         bonus_target = vice.player_id
 
     if bonus_target is not None:
+        bonus_points = pts.get(bonus_target, 0)
         if triple:
             # base already counts 1x; add +2x to make triple
             gross = base + 2 * pts[bonus_target]
