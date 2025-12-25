@@ -24,42 +24,50 @@ async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: 
             where={'user_id': user_id, 'gameweek_id': gameweek_id}
         )
 
-        player_ids = [p["id"] for p in players]
+        # 1. Create the map to look up flags (is_captain, is_benched)
+        input_map = {p["id"]: p for p in players}
+        
+        # 2. Extract just the IDs as a list for Prisma
+        player_ids = list(input_map.keys()) 
+
         if len(player_ids) != 11:
             raise HTTPException(status_code=400, detail="A full squad of 11 players is required.")
 
+        # 3. FIX: Pass the LIST of IDs, not the dictionary
         player_objects = await db.player.find_many(where={'id': {'in': player_ids}})
 
-        goalkeepers = [p for p in player_objects if p.position == 'GK']
-        if len(goalkeepers) != 2:
-            raise HTTPException(status_code=400, detail="You must select exactly two goalkeepers.")
-        
-        outfielders = [p for p in player_objects if p.position != 'GK']
-        benched_gk = random.choice(goalkeepers)
-        benched_outfielders = random.sample(outfielders, 2)
-        benched_ids = [p.id for p in benched_outfielders] + [benched_gk.id]
-        
-        starters = [p for p in player_objects if p.id not in benched_ids]
-        starter_ids = [p.id for p in starters]
+        if len(player_objects) != 11:
+             raise HTTPException(status_code=400, detail="Invalid player IDs provided.")
 
-        captain_id = random.choice(starter_ids)
-        remaining_starters = [pid for pid in starter_ids if pid != captain_id]
-        vice_captain_id = random.choice(remaining_starters)
-
-        team_to_create = [
-            {
+        team_to_create = []
+        for p_obj in player_objects:
+            p_input = input_map[p_obj.id]
+            
+            team_to_create.append({
                 'user_id': user_id,
                 'gameweek_id': gameweek_id,
-                'player_id': pid,
-                'is_captain': (pid == captain_id),
-                'is_vice_captain': (pid == vice_captain_id),
-                'is_benched': (pid in benched_ids)
-            }
-            for pid in player_ids
-        ]
+                'player_id': p_obj.id,
+                'is_captain': p_input.get('is_captain', False),
+                'is_vice_captain': p_input.get('is_vice_captain', False),
+                
+                # ✅ TRUST THE INPUT (which comes from auto_correct)
+                'is_benched': p_input.get('is_benched', False) 
+            })
         
+        # 4. Final safety check: ensure captain/vice exist (in case input was weird)
+        captains = [t for t in team_to_create if t['is_captain']]
+        if not captains:
+            starters = [t for t in team_to_create if not t['is_benched']]
+            if starters: starters[0]['is_captain'] = True
+                
+        vices = [t for t in team_to_create if t['is_vice_captain']]
+        if not vices:
+            starters = [t for t in team_to_create if not t['is_benched'] and not t['is_captain']]
+            if starters: starters[0]['is_vice_captain'] = True
+
         await db.userteam.create_many(data=team_to_create)
         logger.info("Team saved successfully")
+
     except HTTPException:
             raise
     except Exception as e:
@@ -596,107 +604,94 @@ async def set_vice_captain(db: Prisma, user_id: str, gameweek_id: int, player_id
 
 async def auto_correct_squad_formation(db: Prisma, players: list[schemas.PlayerSelection]) -> list[schemas.PlayerSelection]:
     """
-    Analyzes an 11-player squad, fetches their positions from the DB,
-    and performs automated substitutions to ensure a valid 8-player starting formation.
+    STRICTLY ENFORCES the default starting formation for new teams:
+    - 1 GK
+    - 2 DEF
+    - 3 MID
+    - 2 FWD
+    (Total 8 starters). Everyone else goes to bench.
     """
     if len(players) != 11:
         raise HTTPException(status_code=400, detail="Squad must contain exactly 11 players.")
 
     player_ids = [p.id for p in players]
     db_players = await db.player.find_many(where={'id': {'in': player_ids}})
-    player_map = {p.id: p for p in db_players}
-
-    # Combine input data (is_benched) with DB data (position)
+    
+    # Map input flags (captaincy) but IGNORE input 'is_benched' because we are forcing formation
+    input_map = {p.id: p for p in players}
+    
     rich_players = []
-    for p_select in players:
-        db_player = player_map.get(p_select.id)
-        if db_player:
-            rich_players.append({
-                'id': db_player.id,
-                'position': db_player.position,
-                'is_benched': p_select.is_benched,
-                'is_captain': p_select.is_captain,
-                'is_vice_captain': p_select.is_vice_captain
-            })
+    for p_db in db_players:
+        p_in = input_map.get(p_db.id)
+        rich_players.append({
+            'id': p_db.id,
+            'position': p_db.position,
+            'is_captain': p_in.is_captain if p_in else False,
+            'is_vice_captain': p_in.is_vice_captain if p_in else False,
+            'is_benched': True # Default everyone to bench, we will pick starters below
+        })
 
-    # Separate into starters and bench
-    starters = [p for p in rich_players if not p['is_benched']]
-    bench = [p for p in rich_players if p['is_benched']]
+    # Sort players by position buckets
+    gks = [p for p in rich_players if p['position'] == 'GK']
+    defs = [p for p in rich_players if p['position'] == 'DEF']
+    mids = [p for p in rich_players if p['position'] == 'MID']
+    fwds = [p for p in rich_players if p['position'] == 'FWD']
 
-    # --- Auto-Correction Loop ---
-    while True:
-        counts = Counter(p['position'] for p in starters)
-        is_valid = (
-            len(starters) == 8 and
-            counts.get('GK', 0) == 1 and
-            counts.get('DEF', 0) >= 2 and
-            counts.get('MID', 0) >= 1 and
-            counts.get('FWD', 0) >= 1
-        )
-        if is_valid:
-            break
+    # --- ENFORCE FORMATION: 1-2-3-2 ---
+    starters = []
+    
+    # Pick 1 GK
+    if gks: starters.extend(gks[:1])
+    
+    # Pick 2 DEF
+    if len(defs) >= 2: starters.extend(defs[:2])
+    else: starters.extend(defs) # Fallback if squad is weird
+    
+    # Pick 3 MID
+    if len(mids) >= 3: starters.extend(mids[:3])
+    else: starters.extend(mids)
 
-        # Rule 1: Fix Goalkeepers
-        if counts.get('GK', 0) < 1:
-            gk_from_bench = next((p for p in bench if p['position'] == 'GK'), None)
-            starter_to_bench = next((p for p in starters if p['position'] != 'GK'), None)
-            if gk_from_bench and starter_to_bench:
-                starters.append(gk_from_bench)
-                bench.remove(gk_from_bench)
-                bench.append(starter_to_bench)
-                starters.remove(starter_to_bench)
-                continue 
+    # Pick 2 FWD
+    if len(fwds) >= 2: starters.extend(fwds[:2])
+    else: starters.extend(fwds)
 
-        if counts.get('GK', 0) > 1:
-            extra_gk = next(p for p in starters if p['position'] == 'GK')
-            player_from_bench = next((p for p in bench if p['position'] != 'GK'), None)
-            if player_from_bench:
-                bench.append(extra_gk)
-                starters.remove(extra_gk)
-                starters.append(player_from_bench)
-                bench.remove(player_from_bench)
-                continue
-
-        # Rule 2: Fix minimum player counts
-        for pos, min_count in [('DEF', 2), ('MID', 1), ('FWD', 1)]:
-            if counts.get(pos, 0) < min_count:
-                player_from_bench = next((p for p in bench if p['position'] == pos), None)
-                starter_to_bench = max(starters, key=lambda p: counts[p['position']] if p['position'] != 'GK' else -1)
-                if player_from_bench and starter_to_bench:
-                    starters.append(player_from_bench)
-                    bench.remove(player_from_bench)
-                    bench.append(starter_to_bench)
-                    starters.remove(starter_to_bench)
-                    continue
-
-        # Rule 3: Ensure exactly 8 starters
-        if len(starters) > 8:
-            starter_to_bench = max(starters, key=lambda p: counts[p['position']] if p['position'] != 'GK' else -1)
-            bench.append(starter_to_bench)
-            starters.remove(starter_to_bench)
-            continue
-        if len(starters) < 8:
-            player_from_bench = next((p for p in bench), None)
-            if player_from_bench:
-                starters.append(player_from_bench)
-                bench.remove(player_from_bench)
-                continue
+    # Check if we have filled 8 spots (handle edge cases where user bought weird squad)
+    if len(starters) < 8:
+        # Fill remaining spots with whoever is left (Bench players)
+        # We prefer filling outfield spots first
+        current_ids = {p['id'] for p in starters}
+        remaining = [p for p in rich_players if p['id'] not in current_ids]
         
-        break
+        needed = 8 - len(starters)
+        # Filter out GK from filling outfield spot if possible
+        fillers = [p for p in remaining if p['position'] != 'GK']
+        if len(fillers) < needed:
+            fillers = remaining # Take GKs if absolutely necessary
+            
+        starters.extend(fillers[:needed])
 
-    final_players = starters + bench
-    for i, p in enumerate(final_players):
-        p['is_benched'] = i >= 8
-        if p['is_benched'] and (p['is_captain'] or p['is_vice_captain']):
+    # Apply 'is_benched = False' to the chosen starters
+    starter_ids = {p['id'] for p in starters}
+    for p in rich_players:
+        if p['id'] in starter_ids:
+            p['is_benched'] = False
+        else:
+            p['is_benched'] = True
+
+        # Validations: Captain cannot be on bench
+        if p['is_benched']:
             p['is_captain'] = False
             p['is_vice_captain'] = False
 
-    if not any(p['is_captain'] for p in starters):
-        first_fwd = next((p for p in starters if p['position'] == 'FWD'), None)
-        if first_fwd: first_fwd['is_captain'] = True
-        else: starters[0]['is_captain'] = True
+    # Ensure we have a captain
+    active_starters = [p for p in rich_players if not p['is_benched']]
+    if not any(p['is_captain'] for p in active_starters):
+        # Default Captain: First FWD, else First MID
+        cap_choice = next((p for p in active_starters if p['position'] == 'FWD'), 
+                     next((p for p in active_starters if p['position'] == 'MID'), active_starters[0]))
+        cap_choice['is_captain'] = True
 
-    return [schemas.PlayerSelection(**p) for p in final_players]
+    return [schemas.PlayerSelection(**p) for p in rich_players]
 
 
 # --- 2. The Complex View Logic ---
