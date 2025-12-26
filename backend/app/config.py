@@ -18,6 +18,8 @@ DEFAULT_ORIGINS = [
     "https://admin-acesfpl.vercel.app"  # Default for new Admin Portal React App,
     "http://localhost:3000",  # Default for main FPL React App
     "http://localhost:8080",
+    "https://acesfpl-test-dep.vercel.app",
+    "https://http://acesfpl-testadmin.vercel.app"
 ]
 
 # --- UPDATED: Safer parsing of the CORS_ORIGINS environment variable ---
