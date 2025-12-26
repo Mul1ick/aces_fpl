@@ -29,6 +29,10 @@ else:
     allowed_origins = [
         "http://localhost:3000", # Frontend App
         "http://localhost:8080", # Admin Portal
+        "https://acesfpl-test-dep.vercel.app", 
+    "https://acesfpl-test-dep.vercel.app/",
+    "https://http://acesfpl-testadmin.vercel.app/",
+    "https://http://acesfpl-testadmin.vercel.app"
     ]
 
 app.add_middleware(
