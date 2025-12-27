@@ -10,16 +10,17 @@ import { API, ChipName } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// ... (keep types and LoadingSkeleton as they were) ...
 type PlayerView = {
   id: number;
   full_name: string;
   position: string;
-  team: { name: string };
+  team: { name: string; short_name: string };
   points: number;
   is_captain: boolean;
   is_vice_captain: boolean;
   is_benched: boolean;
+  raw_stats?: any;
+  breakdown?: any[];
 };
 
 type TeamOfTheWeekData = {
@@ -47,7 +48,8 @@ const TeamOfTheWeek: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [view, setView] = useState<'pitch' | 'list'>('pitch');
+  // --- FIXED: Removed explicit literal types to satisfy GameweekHeader props ---
+  const [view, setView] = useState('pitch'); 
   const [teamData, setTeamData] = useState<TeamOfTheWeekData | null>(null);
   const [detailedPlayer, setDetailedPlayer] = useState<PlayerView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,7 +75,17 @@ const TeamOfTheWeek: React.FC = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || `Team of the Week for GW${gw} not found.`);
 
-        setTeamData(data);
+        const mapPlayer = (p: any) => ({
+            ...p,
+            raw_stats: p.raw_stats || p.stats || {}, 
+            points: Number(p.points || 0)
+        });
+
+        setTeamData({
+            ...data,
+            starting: data.starting.map(mapPlayer),
+            bench: data.bench.map(mapPlayer)
+        });
       } catch (err: any) {
         if (err.name !== 'AbortError') {
           setError(err.message);
@@ -88,23 +100,31 @@ const TeamOfTheWeek: React.FC = () => {
     return () => controller.abort();
   }, [gw, toast]);
 
-  // --- NEW: DEDUCE ACTIVE CHIP ---
-  const derivedActiveChip = useMemo<ChipName | null>(() => {
-    if (!teamData || !teamData.starting) return null;
+  const effectiveCaptainId = useMemo(() => {
+    if (!teamData) return null;
+    const allPlayers = [...teamData.starting, ...teamData.bench];
+    const captain = allPlayers.find(p => p.is_captain);
+    const viceCaptain = allPlayers.find(p => p.is_vice_captain);
 
-    const captain = teamData.starting.find((p) => p.is_captain);
-    if (!captain || captain.points === 0) return null;
+    const captainPlayed = captain?.raw_stats?.played === true;
+    return captainPlayed ? captain?.id : viceCaptain?.id;
+  }, [teamData]);
+
+  const derivedActiveChip = useMemo<ChipName | null>(() => {
+    if (!teamData || !teamData.starting || !effectiveCaptainId) return null;
+
+    const bonusTarget = teamData.starting.find((p) => p.id === effectiveCaptainId);
+    if (!bonusTarget || bonusTarget.points === 0) return null;
 
     const rawTotal = teamData.starting.reduce((sum, p) => sum + p.points, 0);
-    const bonusPoints = teamData.points - rawTotal;
+    const totalWithBonus = teamData.points;
+    const bonusPointsGiven = totalWithBonus - rawTotal;
 
-    // If bonus points are roughly equal to 2x captain points, it's Triple Captain
-    if (Math.abs(bonusPoints - (captain.points * 2)) < 0.1) {
+    if (Math.abs(bonusPointsGiven - (bonusTarget.points * 2)) < 0.1) {
       return 'TRIPLE_CAPTAIN';
     }
     return null;
-  }, [teamData]);
-  // -------------------------------
+  }, [teamData, effectiveCaptainId]);
 
   const handleNavigation = (direction: 'next' | 'prev') => {
     const currentGw = parseInt(gw || '1', 10);
@@ -131,7 +151,7 @@ const TeamOfTheWeek: React.FC = () => {
     <>
       <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
         
-        <div className="hidden lg:block lg:w-2/5 p-4">
+        <div className="hidden lg:block lg:w-2/5 p-4 text-black">
           <div className="lg:sticky lg:top-4">
             <TeamViewInfoCard
               isLoading={loading}
@@ -148,7 +168,7 @@ const TeamOfTheWeek: React.FC = () => {
         </div>
 
         <div className="flex flex-col flex-1 lg:w-3/5">
-          <div className="lg:m-4 lg:border-2 lg:border-gray-300 lg:rounded-lg flex flex-col flex-grow">
+          <div className="lg:m-4 lg:border-2 lg:border-gray-300 lg:rounded-lg flex flex-col flex-grow text-black">
             <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] p-4 lg:rounded-t-lg">
               <GameweekHeader
                 gw={gw}
@@ -165,12 +185,12 @@ const TeamOfTheWeek: React.FC = () => {
                 playersByPos={playersByPos}
                 bench={teamData.bench}
                 onPlayerClick={setDetailedPlayer}
-                activeChip={derivedActiveChip} // Pass derived chip
+                activeChip={derivedActiveChip}
               />
             ) : (
               <ListView 
                 players={allPlayers} 
-                activeChip={derivedActiveChip} // Pass derived chip
+                activeChip={derivedActiveChip}
               />
             )}
           </div>
@@ -196,7 +216,8 @@ const TeamOfTheWeek: React.FC = () => {
           <PlayerDetailCard 
             player={detailedPlayer} 
             onClose={() => setDetailedPlayer(null)} 
-            activeChip={derivedActiveChip} // Pass derived chip
+            activeChip={derivedActiveChip}
+            isEffectiveCaptain={detailedPlayer.id === effectiveCaptainId}
           />
         )}
       </AnimatePresence>

@@ -29,14 +29,6 @@ export function PlayerActions({ player, onEdit, onDelete }: PlayerActionsProps) 
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => onEdit(player)} className="cursor-pointer">
-          <Edit className="mr-2 h-4 w-4" />
-          <span>Edit Player</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled className="cursor-not-allowed">
-          <Eye className="mr-2 h-4 w-4" />
-          <span>View Stats (Soon)</span>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => onDelete(player)} className="cursor-pointer text-destructive focus:text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />

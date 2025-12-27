@@ -20,27 +20,35 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
   const canViewTotw = currentGameweekNumber > 0;
   const totwGameweekToShow = currentGameweekNumber;
 
-  // --- DEDUCE MULTIPLIER LOGIC ---
-  const captainMultiplier = useMemo(() => {
-    if (!team || !team.starting) return 2;
+  // --- NEW LOGIC: Deduce Effective Captain and Multiplier ---
+  const { multiplier, effectiveCaptainId } = useMemo(() => {
+    if (!team || !team.starting) return { multiplier: 2, effectiveCaptainId: null };
 
     const captain = team.starting.find((p: any) => p.is_captain || p.isCaptain);
-    // If no captain or captain scored 0, we can't mathematically deduce, default to 2
-    if (!captain || captain.points === 0) return 2; 
+    const vice = team.starting.find((p: any) => p.is_vice_captain || p.isVice);
 
-    // Sum of raw points from all starters
+    // 1. Identify who actually played. 
+    // We check stats.played or raw_stats.played (handles both API formats)
+    const capPlayed = captain?.stats?.played || captain?.raw_stats?.played || false;
+    
+    // If Captain missed the game, the bonus target is the Vice-Captain
+    const bonusTarget = capPlayed ? captain : vice;
+
+    if (!bonusTarget || bonusTarget.points === 0) {
+        return { multiplier: 2, effectiveCaptainId: bonusTarget?.id };
+    }
+
+    // 2. Deduce if it was a Triple Captain or standard Captain
+    // Sum the raw points of all starters
     const rawTotal = team.starting.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
     
-    // The difference between the Official Total and the Raw Sum represents the captain bonus
+    // The difference between Official Total and Raw Sum is the bonus
     const bonusPoints = team.points - rawTotal;
     
-    // Standard Captain (2x): Bonus == CaptainPoints
-    // Triple Captain (3x): Bonus == CaptainPoints * 2
-    if (Math.abs(bonusPoints - (captain.points * 2)) < 0.1) {
-      return 3;
-    }
-    
-    return 2;
+    // If bonus is 2x the player's points, it's a Triple Captain (Total = 1x base + 2x bonus)
+    const deducedMultiplier = Math.abs(bonusPoints - (bonusTarget.points * 2)) < 0.1 ? 3 : 2;
+
+    return { multiplier: deducedMultiplier, effectiveCaptainId: bonusTarget.id };
   }, [team]);
 
   return (
@@ -64,8 +72,9 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
             const isCaptain = player.is_captain || player.isCaptain;
             const isVice = player.is_vice_captain || player.isVice;
             
-            // Apply the deduced multiplier
-            const displayPoints = (player.points || 0) * (isCaptain ? captainMultiplier : 1);
+            // --- UPDATED: Use the deduced effective captain logic ---
+            const isEffCap = player.id === effectiveCaptainId;
+            const displayPoints = (player.points || 0) * (isEffCap ? multiplier : 1);
 
             return (
               <div key={player.id} className="flex items-center space-x-3 text-sm">
@@ -73,8 +82,16 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
                 <div className="flex-1">
                   <p className="font-bold text-black">
                     {player.full_name}
-                    {isCaptain && <span className="text-xs ml-1 text-pl-purple font-extrabold">(C)</span>}
-                    {isVice && <span className="text-xs ml-1 text-gray-500 font-bold">(V)</span>}
+                    {isCaptain && (
+                        <span className={`text-[10px] ml-1 font-extrabold ${isEffCap ? 'text-pl-purple' : 'text-gray-400 opacity-50'}`}>
+                            (C){isEffCap && multiplier === 3 && ' TC'}
+                        </span>
+                    )}
+                    {isVice && (
+                        <span className={`text-[10px] ml-1 font-bold ${isEffCap ? 'text-pl-purple' : 'text-gray-400'}`}>
+                            (V){isEffCap && multiplier === 3 && ' TC'}
+                        </span>
+                    )}
                   </p>
                   <p className="text-xs text-gray-500">{player.team.short_name} · {player.position}</p>
                 </div>
@@ -82,6 +99,7 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
               </div>
             );
           })}
+          
           <h4 className="font-bold text-gray-500 text-sm pt-2 border-t">Bench</h4>
           {team.bench.map(player => (
             <div key={player.id} className="flex items-center space-x-3 text-sm opacity-75">
