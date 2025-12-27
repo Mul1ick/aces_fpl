@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { cn } from '../../lib/utils';
 import { ChipName } from '../../lib/api';
 
@@ -8,6 +8,20 @@ interface ListViewProps {
 }
 
 export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
+  // --- NEW LOGIC: Calculate the Effective Captain ---
+  // Identify who is actually receiving the bonus points (C or VC)
+  const effectiveCaptainId = useMemo(() => {
+    const captain = players.find(p => p.is_captain || p.isCaptain);
+    const viceCaptain = players.find(p => p.is_vice_captain || p.isVice);
+
+    // Check if the Captain actually entered the field (matches backend logic)
+    const captainPlayed = captain?.raw_stats?.played === true;
+
+    // If Captain played, they get the bonus. 
+    // If Captain didn't play, the Vice-Captain gets the bonus.
+    return captainPlayed ? captain?.id : viceCaptain?.id;
+  }, [players]);
+
   const starters = players.filter(p => !p.is_benched);
   const bench = players.filter(p => p.is_benched);
 
@@ -16,10 +30,9 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
   const sortedStarters = starters.sort((a, b) => positionOrder[a.position] - positionOrder[b.position]);
   const sortedBench = bench.sort((a, b) => positionOrder[a.position] - positionOrder[b.position]);
 
-
   return (
     <div className="flex-1 p-4 min-h-0">
-      <div className="bg-white rounded-lg shadow-md h-full overflow-auto">
+      <div className="bg-white rounded-lg shadow-md h-full overflow-auto text-black">
         <table className="w-full text-left min-w-[300px]">
           <thead className="sticky top-0 bg-gray-100 z-10">
             <tr>
@@ -33,9 +46,14 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
               const isCaptain = player.is_captain || player.isCaptain;
               const isViceCaptain = player.is_vice_captain || player.isVice;
               
-              const multiplier = isCaptain
+              // --- UPDATED MULTIPLIER LOGIC ---
+              // Check if this specific player is the one currently receiving the bonus
+              const isEffCap = player.id === effectiveCaptainId;
+              
+              const multiplier = isEffCap
                 ? (activeChip === 'TRIPLE_CAPTAIN' ? 3 : 2)
                 : 1;
+              
               const finalPoints = (player.points || 0) * multiplier;
 
               return (
@@ -52,8 +70,19 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
                       </div>
                     </div>
                   </td>
-                  <td className="p-3 text-right font-bold text-lg text-black tabular-nums">
-                    {finalPoints}
+                  <td className="p-3 text-right">
+                    <div className="flex flex-col items-end">
+                      <span className="font-bold text-lg text-black tabular-nums">
+                        {finalPoints}
+                      </span>
+                      {/* Optional: Add a small badge if the Triple Captain chip is active on this player */}
+                      {isEffCap && activeChip === 'TRIPLE_CAPTAIN' && (
+                        <span className="text-[10px] font-bold text-white bg-pl-purple px-1 rounded">3x</span>
+                      )}
+                      {isEffCap && activeChip !== 'TRIPLE_CAPTAIN' && (
+                        <span className="text-[10px] font-bold text-gray-400">2x</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

@@ -17,7 +17,7 @@ const Gameweek: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [view, setView] = useState('pitch');
-  const [detailedPlayer, setDetailedPlayer] = useState(null);
+  const [detailedPlayer, setDetailedPlayer] = useState<any>(null);
   const [squad, setSquad] = useState<TeamResponse | null>(null);
   const [gameweekStats, setGameweekStats] = useState<any>(null);
   const [hubStats, setHubStats] = useState<any>({
@@ -83,6 +83,20 @@ const Gameweek: React.FC = () => {
     fetchAllData();
   }, [toast, gw, user]);
 
+  // --- NEW LOGIC: Determine Effective Captain for Modal Points ---
+  const effectiveCaptainId = useMemo(() => {
+    if (!squad) return null;
+    const allPlayers = [...squad.starting, ...squad.bench];
+    
+    // Using property names matching your types.ts
+    const captain = allPlayers.find(p => p.is_captain);
+    const viceCaptain = allPlayers.find(p => p.is_vice_captain);
+
+    // Using 'as any' to access raw_stats which isn't in the base Player type
+    const captainPlayed = (captain as any)?.raw_stats?.played === true;
+    
+    return captainPlayed ? captain?.id : viceCaptain?.id;
+  }, [squad]);
 
   const userRank = useMemo(() => {
     if (!leaderboard || !user) return undefined;
@@ -114,7 +128,7 @@ const Gameweek: React.FC = () => {
 
   return (
     <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
-      <div className="hidden lg:block lg:w-2/5 p-4">
+      <div className="hidden lg:block lg:w-2/5 p-4 text-black">
         <div className="lg:sticky lg:top-4">
             <ManagerInfoCard
               isLoading={isExtraDataLoading}
@@ -175,11 +189,17 @@ const Gameweek: React.FC = () => {
       </div>
 
       <AnimatePresence>
-        {detailedPlayer && <PlayerDetailCard player={detailedPlayer} onClose={() => setDetailedPlayer(null)} />}
+        {detailedPlayer && (
+          <PlayerDetailCard 
+            player={detailedPlayer} 
+            onClose={() => setDetailedPlayer(null)} 
+            activeChip={chipStatus?.active}
+            isEffectiveCaptain={detailedPlayer.id === effectiveCaptainId} // --- ADDED ---
+          />
+        )}
       </AnimatePresence>
     </div>
   );
 };
 
 export default Gameweek;
-

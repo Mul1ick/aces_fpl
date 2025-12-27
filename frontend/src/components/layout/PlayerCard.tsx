@@ -21,20 +21,32 @@ interface PlayerCardProps {
   isBench?: boolean;
   displayMode?: 'points' | 'fixture';
   showArmbands?: boolean;
-  activeChip?: ChipName | null; // Add the new prop here
+  activeChip?: ChipName | null;
+  isEffectiveCaptain?: boolean; // --- ADDED ---
 }
 
 // --- PLAYER CARD COMPONENT ---
-const PlayerCard: React.FC<PlayerCardProps> = ({ player, isBench = false, displayMode = 'points', showArmbands = true, activeChip }) => {
+const PlayerCard: React.FC<PlayerCardProps> = ({ 
+  player, 
+  isBench = false, 
+  displayMode = 'points', 
+  showArmbands = true, 
+  activeChip,
+  isEffectiveCaptain = false // --- ADDED (defaults to false) ---
+}) => {
   const jerseySrc = getTeamJersey(player.team);
 
-  // THIS IS THE KEY LOGIC CHANGE
+  // Maintain compatibility with both naming conventions from the API
   const isCaptain = player.isCaptain || (player as any).is_captain;
   const isViceCaptain = player.isVice || (player as any).is_vice_captain;
 
-  const multiplier = isCaptain
+  // --- UPDATED LOGIC ---
+  // If this player is the "Effective Captain" (The one receiving the bonus),
+  // check for Triple Captain chip (3x) or default to standard Captain (2x).
+  const multiplier = isEffectiveCaptain
     ? (activeChip === 'TRIPLE_CAPTAIN' ? 3 : 2)
     : 1;
+
   const displayPoints = (player.points ?? 0) * multiplier;
 
   return (

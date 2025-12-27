@@ -8,24 +8,26 @@ import { ChipName } from '@/lib/api';
 interface PlayerDetailCardProps {
   player: any;
   onClose: () => void;
-  activeChip?: ChipName | null; // Added activeChip prop
+  activeChip?: ChipName | null;
+  isEffectiveCaptain?: boolean; // --- ADDED ---
 }
 
-export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onClose, activeChip }) => {
+export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ 
+  player, 
+  onClose, 
+  activeChip,
+  isEffectiveCaptain = false // --- ADDED ---
+}) => {
   if (!player) return null;
 
   const jerseySrc = getTeamJersey(player.team?.name);
 
-  // --- Points Calculation Logic ---
-  // Check for captaincy flags (handles both naming conventions from API)
-  const isCaptain = player.isCaptain || player.is_captain;
-  
-  // Determine multiplier based on chip status
-  const multiplier = isCaptain
+  // --- UPDATED LOGIC ---
+  // Use the 'isEffectiveCaptain' prop to determine the multiplier
+  const multiplier = isEffectiveCaptain
     ? (activeChip === 'TRIPLE_CAPTAIN' ? 3 : 2)
     : 1;
 
-  // Calculate the final display points
   const displayPoints = (player.points ?? 0) * multiplier;
 
   return (
@@ -79,7 +81,6 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ player, onCl
                         <span className="text-gray-600">
                           {row.label}{typeof row.value === "number" ? ` (${row.value})` : ""}
                         </span>
-                        {/* Breakdown usually shows base points, total shows multiplied */}
                         <span className="font-medium text-black">{row.points}</span>
                       </div>
                     ))}

@@ -12,7 +12,25 @@ interface PitchViewProps {
 
 export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPlayerClick, activeChip }) => {
   
-  // --- ADDED: Logic to separate the goalkeeper from other subs ---
+  // --- NEW LOGIC: Calculate the Effective Captain ---
+  // We need to find who is actually receiving the bonus points (C or VC)
+  const effectiveCaptainId = useMemo(() => {
+    const starters = Object.values(playersByPos).flat();
+    const allPlayers = [...starters, ...bench];
+    
+    const captain = allPlayers.find(p => p.is_captain || p.isCaptain);
+    const viceCaptain = allPlayers.find(p => p.is_vice_captain || p.isVice);
+
+    // Check if the Captain actually played minutes
+    // We check raw_stats.played (matches backend logic)
+    const captainPlayed = captain?.raw_stats?.played === true;
+
+    // If Captain played, they are the target. 
+    // If Captain didn't play, the Vice-Captain becomes the target.
+    return captainPlayed ? captain?.id : viceCaptain?.id;
+  }, [playersByPos, bench]);
+
+  // --- PREVIOUS LOGIC: Separate the goalkeeper from other subs ---
   const benchLayout = useMemo(() => {
     if (!bench) return { goalkeeper: null, outfielders: [] };
     const goalkeeper = bench.find(p => p.position === 'GK') || null;
@@ -27,7 +45,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
         style={{ 
           backgroundImage: `url(${pitchBackground})`,
           backgroundSize: 'cover',
-           backgroundPosition: 'center top'
+          backgroundPosition: 'center top'
         }}
       >
         {/* Goalkeeper (Top of Pitch) */}
@@ -45,6 +63,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isVice: p.is_vice_captain
                 }} 
                 activeChip={activeChip}
+                isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
               />
             </div>
           ))}
@@ -65,6 +84,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isVice: p.is_vice_captain
                 }} 
                 activeChip={activeChip}
+                isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
               />
             </div>
            ))}
@@ -85,6 +105,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isVice: p.is_vice_captain
                 }} 
                 activeChip={activeChip}
+                isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
               />
             </div>
           ))}
@@ -105,13 +126,13 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isVice: p.is_vice_captain
                 }} 
                 activeChip={activeChip}
+                isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
               />
             </div>
           ))}
         </div>
       </main>
 
-      {/* --- MODIFIED: Updated footer to match the Pick Team page layout --- */}
       <footer className="flex-shrink-0 p-3 bg-gray-100 border-t">
         <div className="flex justify-center items-center gap-x-12">
           {benchLayout.goalkeeper && (
@@ -128,6 +149,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   isVice: benchLayout.goalkeeper.is_vice_captain
                 }} 
                 activeChip={activeChip}
+                isEffectiveCaptain={benchLayout.goalkeeper.id === effectiveCaptainId} // --- ADDED ---
               />
             </div>
           )}
@@ -147,6 +169,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                     isVice: p.is_vice_captain
                   }} 
                   activeChip={activeChip}
+                  isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
                 />
               </div>
             ))}
