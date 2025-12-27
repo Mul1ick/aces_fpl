@@ -14,6 +14,7 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
   
   // --- NEW LOGIC: Calculate the Effective Captain ---
   // We need to find who is actually receiving the bonus points (C or VC)
+
   const effectiveCaptainId = useMemo(() => {
     const starters = Object.values(playersByPos).flat();
     const allPlayers = [...starters, ...bench];
@@ -21,14 +22,12 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
     const captain = allPlayers.find(p => p.is_captain || p.isCaptain);
     const viceCaptain = allPlayers.find(p => p.is_vice_captain || p.isVice);
 
-    // Check if the Captain actually played minutes
-    // We check raw_stats.played (matches backend logic)
-    const captainPlayed = captain?.raw_stats?.played === true;
+    // ROBUST CHECK HERE TOO
+    const stats = captain?.raw_stats || (captain as any)?.stats;
+    const captainPlayed = stats?.played === true || stats?.played === 1 || stats?.played === "true";
 
-    // If Captain played, they are the target. 
-    // If Captain didn't play, the Vice-Captain becomes the target.
     return captainPlayed ? captain?.id : viceCaptain?.id;
-  }, [playersByPos, bench]);
+}, [playersByPos, bench]);
 
   // --- PREVIOUS LOGIC: Separate the goalkeeper from other subs ---
   const benchLayout = useMemo(() => {

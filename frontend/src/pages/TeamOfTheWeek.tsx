@@ -48,7 +48,6 @@ const TeamOfTheWeek: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // --- FIXED: Removed explicit literal types to satisfy GameweekHeader props ---
   const [view, setView] = useState('pitch'); 
   const [teamData, setTeamData] = useState<TeamOfTheWeekData | null>(null);
   const [detailedPlayer, setDetailedPlayer] = useState<PlayerView | null>(null);
@@ -75,11 +74,24 @@ const TeamOfTheWeek: React.FC = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || `Team of the Week for GW${gw} not found.`);
 
-        const mapPlayer = (p: any) => ({
-            ...p,
-            raw_stats: p.raw_stats || p.stats || {}, 
-            points: Number(p.points || 0)
-        });
+        // --- IMPROVED DATA MAPPING ---
+        const mapPlayer = (p: any) => {
+            // Find stats regardless of whether they are in 'stats', 'raw_stats', or 'p' itself
+            const statsObj = p.raw_stats || p.stats || p;
+            
+            return {
+                ...p,
+                // Standardize captain/vice naming
+                is_captain: p.is_captain || p.isCaptain || false,
+                is_vice_captain: p.is_vice_captain || p.isVice || false,
+                // Explicitly extract the 'played' flag
+                raw_stats: {
+                    ...statsObj,
+                    played: statsObj.played === true || statsObj.played === 1 || statsObj.played === "true" || (p.points > 0)
+                },
+                points: Number(p.points || 0)
+            };
+        };
 
         setTeamData({
             ...data,
@@ -100,16 +112,21 @@ const TeamOfTheWeek: React.FC = () => {
     return () => controller.abort();
   }, [gw, toast]);
 
+  // --- 1. Identify the Effective Captain ID ---
   const effectiveCaptainId = useMemo(() => {
     if (!teamData) return null;
     const allPlayers = [...teamData.starting, ...teamData.bench];
     const captain = allPlayers.find(p => p.is_captain);
     const viceCaptain = allPlayers.find(p => p.is_vice_captain);
 
+    // Check played status with the standardized raw_stats we mapped above
     const captainPlayed = captain?.raw_stats?.played === true;
+    
+    // If Captain played, they hold the bonus. Otherwise, it goes to the Vice.
     return captainPlayed ? captain?.id : viceCaptain?.id;
   }, [teamData]);
 
+  // --- 2. Deduce Active Chip (Triple Captain) ---
   const derivedActiveChip = useMemo<ChipName | null>(() => {
     if (!teamData || !teamData.starting || !effectiveCaptainId) return null;
 
@@ -117,10 +134,10 @@ const TeamOfTheWeek: React.FC = () => {
     if (!bonusTarget || bonusTarget.points === 0) return null;
 
     const rawTotal = teamData.starting.reduce((sum, p) => sum + p.points, 0);
-    const totalWithBonus = teamData.points;
-    const bonusPointsGiven = totalWithBonus - rawTotal;
+    const bonusPointsPart = teamData.points - rawTotal;
 
-    if (Math.abs(bonusPointsGiven - (bonusTarget.points * 2)) < 0.1) {
+    // Triple Captain bonus is 2x the base points.
+    if (Math.abs(bonusPointsPart - (bonusTarget.points * 2)) < 0.1) {
       return 'TRIPLE_CAPTAIN';
     }
     return null;
