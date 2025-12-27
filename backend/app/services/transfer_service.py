@@ -9,6 +9,49 @@ from app.utils.team_algo import _normalize_8p3
 from app.services.chip_service import is_wildcard_active
 
 
+def validate_squad_structure(players: list):
+    """
+    Enforces the specific squad composition:
+    Total: 11 Players
+    Breakdown: 2 GK, 3 DEF, 3 MID, 3 FWD
+    """
+    
+    # 1. Validate Total Size
+    if len(players) != 11:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Squad size invalid. Expected 11 players, received {len(players)}."
+        )
+
+    # 2. Define the Exact Requirements
+    required_counts = {
+        "GK": 2,
+        "DEF": 3,
+        "MID": 3,
+        "FWD": 3
+    }
+
+    # 3. Count Positions in the provided list
+    # NOTE: Adjust 'p.position' to 'p['position']' if passing raw dictionaries
+    current_counts = Counter(p.position for p in players)
+
+    # 4. Compare and Collect Errors
+    errors = []
+    for pos, limit in required_counts.items():
+        actual = current_counts.get(pos, 0)
+        if actual != limit:
+            errors.append(f"{pos}: expected {limit}, got {actual}")
+
+    # 5. Raise Error if Mismatch found
+    if errors:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid Squad Structure. {'; '.join(errors)}"
+        )
+
+    return True
+
+
 
 async def transfer_player(
     db: Prisma,
@@ -215,6 +258,19 @@ async def confirm_transfers(
                 "is_captain": False,
                 "is_vice_captain": False,
             }
+        
+        # 1. Get the list of IDs for the final squad
+        new_squad_ids = list(by_id.keys())
+
+        # 2. Fetch the full player objects (needed to check 'position')
+        new_squad_players = await tx.player.find_many(
+            where={"id": {"in": new_squad_ids}}
+        )
+
+        # 3. Run the validation (Enforces 2 GK, 3 DEF, 3 MID, 3 FWD)
+        validate_squad_structure(new_squad_players)
+        # --- VALIDATION BLOCK END ---
+        
         has_cap  = any(r["is_captain"] for r in by_id.values())
         has_vice = any(r["is_vice_captain"] for r in by_id.values())
 
