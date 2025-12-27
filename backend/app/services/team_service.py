@@ -6,6 +6,7 @@ from prisma import Prisma
 from app import schemas
 from collections import Counter
 import uuid
+from app.utils.stats_utils import calculate_breakdown
 
 logger = logging.getLogger(__name__)
 
@@ -221,26 +222,34 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
         (s.player_id, s.gameweek_id): int(s.points or 0) for s in recent_stats
     }
 
-    def _breakdown_for(position: str, st: Any) -> tuple[dict, list[dict]]:
-        raw = {
-            "played": bool(st.played or False),
-            "goals_scored": int(st.goals_scored or 0),
-            "assists": int(st.assists or 0),
-            "yellow_cards": int(st.yellow_cards or 0),
-            "red_cards": int(st.red_cards or 0),
-            "bonus_points": int(st.bonus_points or 0),
-        }
-        pos = (position or "").upper()
-        goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
-        breakdown = [
-            {"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
-            {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
-            {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
-            {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
-            {"label": "Red cards",    "value": raw["red_cards"],               "points": -3 * raw["red_cards"]},
-            {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
-        ]
-        return raw, breakdown
+    # def _breakdown_for(position: str, st: Any) -> tuple[dict, list[dict]]:
+    #     raw = {
+    #         "played": bool(st.played or False),
+    #         "goals_scored": int(st.goals_scored or 0),
+    #         "assists": int(st.assists or 0),
+    #         "yellow_cards": int(st.yellow_cards or 0),
+    #         "red_cards": int(st.red_cards or 0),
+    #         "bonus_points": int(st.bonus_points or 0),
+    #         "clean_sheets": int(st.clean_sheets or 0),
+    #     }
+    #     pos = (position or "").upper()
+    #     goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
+    #     if pos in ["GK", "DEF"]:
+    #         cs_pts = 4 
+    #     elif pos == "MID":
+    #         cs_pts = 1
+    #     else:
+    #         cs_pts = 0
+    #     breakdown = [
+    #         {"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
+    #         {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
+    #         {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
+    #         {"label": "Clean Sheet",  "value": raw["clean_sheets"],       "points": raw["clean_sheets"] * cs_pts},
+    #         {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
+    #         {"label": "Red cards",    "value": raw["red_cards"],               "points": -3 * raw["red_cards"]},
+    #         {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
+    #     ]
+    #     return raw, breakdown
 
     # 6) Shape response objects
     def to_display(entry):
@@ -260,7 +269,7 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
 
         st = stats_map.get(entry.player.id)
         if st:
-            raw, br = _breakdown_for(entry.player.position, st)
+            raw, br = calculate_breakdown(entry.player.position, st)
             out["raw_stats"] = raw
             out["breakdown"] = br
         else:

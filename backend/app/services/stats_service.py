@@ -7,6 +7,7 @@ from app import schemas
 from app.repositories.gameweek_repo import get_current_gameweek
 from app.services.team_service import carry_forward_team
 from app.services.chip_service import is_triple_captain_active
+from app.utils.stats_utils import calculate_breakdown
 
 import logging
 
@@ -293,10 +294,13 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
             'player_id': {'in': player_ids}
         }
     )
-    points_map = {stat.player_id: stat.points for stat in player_stats}
+    points_map = {stat.player_id: stat for stat in player_stats}
 
     def to_display(entry):
-        player_points = points_map.get(entry.player.id, 0)
+        player_points = points_map.get(entry.player.id)
+        final_points = player_points.points if player_points else 0
+
+        raw_stats, breakdown_list = calculate_breakdown(entry.player.position, player_points)
         
         return {
             "id": entry.player.id, "full_name": entry.player.full_name,
@@ -311,7 +315,9 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
             
             "is_captain": entry.is_captain, "is_vice_captain": entry.is_vice_captain,
             "is_benched": entry.is_benched, "team": entry.player.team,
-            "points": player_points
+            "points": final_points,
+            "stats": raw_stats,
+            "breakdown": breakdown_list
         }
 
     all_players = [to_display(p) for p in user_team_entries]
