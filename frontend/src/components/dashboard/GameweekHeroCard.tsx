@@ -19,6 +19,9 @@ interface GameweekHeroCardProps {
 export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamName, points, averagePoints, highestPoints,currentGameweekNumber  }) => {
   const navigate = useNavigate();
 
+  // Helper to determine if highest points link should be active
+  const canViewHighest = highestPoints > 0;
+
   return (
     <Card className="border-none p-6 text-white rounded-2xl shadow-lg bg-[linear-gradient(to_top_right,_#00c6ff,_#2196f3,_#6a11cb)]">
       <div className="flex flex-col space-y-5">
@@ -48,7 +51,7 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamNam
           
           <motion.div 
             whileHover={{ scale: 1.1 }}
-            onClick={() => navigate(`/gameweek/${currentGameweekNumber}`)} // Corrected Navigation
+            onClick={() => navigate(`/gameweek/${currentGameweekNumber}`)} 
             className="cursor-pointer"
           >
             <motion.p 
@@ -66,14 +69,18 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamNam
           </motion.div>
 
           <motion.div 
-            whileHover={{ scale: 1.1 }}
-            onClick={() => navigate(`/team-of-the-week/${currentGameweekNumber}`)} 
-            className="cursor-pointer flex flex-col items-center"
+            whileHover={canViewHighest ? { scale: 1.1 } : {}}
+            onClick={() => {
+              if (canViewHighest) {
+                navigate(`/team-of-the-week/${currentGameweekNumber}`);
+              }
+            }} 
+            className={`flex flex-col items-center ${canViewHighest ? "cursor-pointer" : "cursor-default"}`}
           >
             <p className="text-3xl font-bold tabular-nums">{highestPoints}</p>
             <div className="flex items-center justify-center">
                 <p className="text-sm text-white/80 font-medium">Highest</p>
-                <ChevronRight className="w-4 h-4 text-white/80 ml-1" />
+                {canViewHighest && <ChevronRight className="w-4 h-4 text-white/80 ml-1" />}
             </div>
           </motion.div>
 
