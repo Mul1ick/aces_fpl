@@ -6,15 +6,17 @@ import { cn } from '@/lib/utils';
 import { getChipStatus, playChip, cancelChip, type ChipStatus, type ChipName } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext'; // Added import
 
 const chips = [
-  { id: 'WILDCARD' as const, name: 'Wildcard', icon: RefreshCw, description: 'Unlimited free transfers for this Gameweek. Once played, the chip cannot be disabled.' },
-  { id: 'TRIPLE_CAPTAIN' as const, name: 'Triple Captain', icon: Zap, description: 'Captain scores are tripled this Gameweek. Once played, the chip cannot be disabled..' },
+  { id: 'WILDCARD' as const, name: 'Wildcard', icon: RefreshCw, description: 'Unlimited free transfers for this Gameweek. Once activated, a chip cannot be cancelled. Available once per season.' },
+  { id: 'TRIPLE_CAPTAIN' as const, name: 'Triple Captain', icon: Zap, description: 'Captain scores are tripled this Gameweek. Once activated, a chip cannot be cancelled. Available once per season.' },
 ];
 type ChipItem = typeof chips[number];
 
 export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token, gw }) => {
   const { toast } = useToast();
+  const { user } = useAuth(); // Get user context
   const [status, setStatus] = useState<ChipStatus>({ active: null, used: [] });
   const [selectedChip, setSelectedChip] = useState<ChipItem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,7 +65,19 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
             {chips.map(chip => {
               const isActive = status.active === chip.id;
               const isUsed = status.used.includes(chip.id as ChipName);
-              const isDisabled = loading || (!isActive && (status.active !== null || isUsed));
+              
+              // Logic to disable Wildcard if user hasn't played first GW (unlimited transfers active)
+              const isWildcard = chip.id === 'WILDCARD';
+              const hasUnlimitedTransfers = user?.played_first_gameweek === false;
+              
+              const isDisabled = loading || 
+                                 (!isActive && (status.active !== null || isUsed)) ||
+                                 (isWildcard && hasUnlimitedTransfers);
+
+              // Determine tooltip text
+              let tooltipText = "";
+              if (isUsed && !isActive) tooltipText = "Already used";
+              else if (isWildcard && hasUnlimitedTransfers) tooltipText = "Unlimited transfers active";
 
               return (
                 <div key={chip.id} className="flex flex-col items-center space-y-2 h-[110px] justify-start">
@@ -77,30 +91,25 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
                         : "bg-black/20 border-transparent text-white",
                       isDisabled 
                         ? "opacity-30 cursor-not-allowed" 
-                        : "hover:bg-white/5" // --- MODIFIED: Subtle hover effect ---
+                        : "hover:bg-white/5"
                     )}
-                    title={isUsed ? "Already used" : ""}
+                    title={tooltipText}
                   >
                     <chip.icon className="size-8" />
                   </button>
-                  {/* --- MODIFIED: Text is now always white --- */}
                   <p className="text-xs font-semibold text-white">
                     {chip.name}{isUsed && !isActive ? " (used)" : ""}
                   </p>
                   {isActive && (
                     <button
                       onClick={onCancelChip}
-                      // Disable cancellation if the active chip is a Wildcard
                       disabled={loading || status.active === 'WILDCARD'}
                       className={cn(
                         "mt-1 w-full px-3 py-1 rounded-full bg-gradient-to-r from-accent-teal to-accent-blue",
-                        // Visually indicate that the button is disabled
                         status.active === 'WILDCARD' && "opacity-60 cursor-not-allowed"
                       )}
-                      // Add a title to explain why it's disabled
                       title={status.active === 'WILDCARD' ? "Wildcard cannot be cancelled" : "Cancel Chip"}
                     >
-                      {/* --- MODIFIED: Text is now black for contrast --- */}
                       <p className="text-xs font-bold text-black">Active</p>
                     </button>
                   )}
