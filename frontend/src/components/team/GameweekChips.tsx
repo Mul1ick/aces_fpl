@@ -40,6 +40,19 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
   useEffect(() => { if (token) refresh(); }, [token, gw]);
 
   const handleChipClick = (chip: ChipItem) => {
+    // If a chip is already active, prevent clicking others
+    if (status.active) return;
+
+    // Custom check for Wildcard during first gameweek (unlimited transfers)
+    if (chip.id === 'WILDCARD' && user?.played_first_gameweek === false) {
+      toast({
+        title: "Wildcard Unavailable",
+        description: "Wildcard not available during free transfers.",
+        variant: "destructive", // Uses the red alert style to indicate restriction
+      });
+      return;
+    }
+
     setSelectedChip(chip);
   };
 
@@ -68,57 +81,42 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
               const isActive = status.active === chip.id;
               const isUsed = status.used.includes(chip.id as ChipName);
               
+              // Only block interaction if it's the Wildcard specifically disabled for new users
               const isWildcard = chip.id === 'WILDCARD';
               const hasUnlimitedTransfers = user?.played_first_gameweek === false;
               
-              // Calculate disabled state logically
+              // MODIFIED: Removed the check for (isWildcard && hasUnlimitedTransfers) so the button stays enabled
               const isDisabled = loading || 
-                                 (!isActive && (status.active !== null || isUsed)) ||
-                                 (isWildcard && hasUnlimitedTransfers);
+                                 (!isActive && (status.active !== null || isUsed));
 
               let tooltipText = "";
-              if (isUsed && !isActive) {
-                tooltipText = "Already used";
-              } else if (isWildcard && hasUnlimitedTransfers) {
-                tooltipText = "Wildcard unavailable: You already have unlimited free transfers this week";
-              } else if (status.active && !isActive) {
-                tooltipText = "Another chip is active";
-              }
+              if (isUsed && !isActive) tooltipText = "Already used";
+              else if (isWildcard && hasUnlimitedTransfers) tooltipText = "Unlimited transfers active";
+              else if (status.active && !isActive) tooltipText = "Another chip is active";
 
               return (
                 <div key={chip.id} className="flex flex-col items-center space-y-2 h-[110px] justify-start">
-                  <div
-                    // We use a div wrapper or remove 'disabled' attribute to ensure title tooltip works
-                    className="group relative"
-                    title={tooltipText} 
+                  <button
+                    onClick={() => handleChipClick(chip)}
+                    disabled={isDisabled || isActive} // Disable click if it's already active
+                    className={cn(
+                      "w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all",
+                      isActive 
+                        ? "bg-dashboard-gradient border-transparent text-white shadow-[0_0_15px_rgba(37,99,235,0.6)]" 
+                        : "bg-black/20 border-transparent text-white",
+                      isDisabled && !isActive
+                        ? "opacity-30 cursor-not-allowed" 
+                        : "hover:bg-white/5"
+                    )}
+                    title={tooltipText}
                   >
-                    <button
-                      onClick={() => {
-                        // Manually enforce disabled state
-                        if (!isDisabled && !isActive) {
-                          handleChipClick(chip);
-                        }
-                      }}
-                      // REMOVED: disabled={isDisabled || isActive} 
-                      // REASON: HTML 'disabled' suppresses tooltips in many browsers.
-                      className={cn(
-                        "w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all",
-                        isActive 
-                          ? "bg-dashboard-gradient border-transparent text-white shadow-[0_0_15px_rgba(37,99,235,0.6)]" 
-                          : "bg-black/20 border-transparent text-white",
-                        isDisabled && !isActive
-                          ? "opacity-30 cursor-not-allowed" // Visual disabled state
-                          : "hover:bg-white/5 cursor-pointer"
-                      )}
-                    >
-                      <chip.icon className="size-8" />
-                    </button>
-                  </div>
-
+                    <chip.icon className="size-8" />
+                  </button>
                   <p className="text-xs font-semibold text-white">
                     {chip.name}{isUsed && !isActive ? " (used)" : ""}
                   </p>
                   
+                  {/* Status Indicator Badge (Non-clickable) */}
                   {isActive && (
                     <div className="mt-1 w-full px-3 py-1 rounded-full bg-gradient-to-r from-accent-teal to-accent-blue opacity-90 cursor-default shadow-md">
                       <p className="text-xs font-bold text-black uppercase tracking-wide">Active</p>
