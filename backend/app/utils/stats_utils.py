@@ -23,6 +23,8 @@ def calculate_breakdown(position: str, st: Any) -> Tuple[Dict, List[Dict]]:
         "red_cards": int(get("red_cards")),
         "bonus_points": int(get("bonus_points")),
         "clean_sheets": int(get("clean_sheets")),
+        "penalties_missed": int(get("penalties_missed")),
+        "own_goals": int(get("own_goals")),
     }
 
     # 2. Determine Point Values based on Position
@@ -47,6 +49,8 @@ def calculate_breakdown(position: str, st: Any) -> Tuple[Dict, List[Dict]]:
         {"label": "Clean Sheet",  "value": raw["clean_sheets"],       "points": raw["clean_sheets"] * cs_pts},
         {"label": "Yellow cards", "value": raw["yellow_cards"],       "points": -1 * raw["yellow_cards"]},
         {"label": "Red cards",    "value": raw["red_cards"],          "points": -3 * raw["red_cards"]},
+        {"label": "Penalty Miss", "value": raw["penalties_missed"],   "points": -2 * raw["penalties_missed"]},
+        {"label": "Own Goal",     "value": raw["own_goals"],          "points": -2 * raw["own_goals"]},
         {"label": "Bonus",        "value": raw["bonus_points"],       "points": raw["bonus_points"]},
     ]
     

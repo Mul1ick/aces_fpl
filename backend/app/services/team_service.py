@@ -339,6 +339,8 @@ async def get_player_card(
             "yellow_cards": int(st_row.yellow_cards or 0),
             "red_cards": int(st_row.red_cards or 0),
             "bonus_points": int(st_row.bonus_points or 0),
+            "penalties_missed": int(st_row("penalties_missed")),
+            "own_goals": int(st_row("own_goals")),
         }
         pos = (position or "").upper()
         goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
@@ -346,8 +348,11 @@ async def get_player_card(
             {"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
             {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
             {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
+            {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
             {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
             {"label": "Red cards",    "value": raw["red_cards"],               "points": -3 * raw["red_cards"]},
+            {"label": "Penalty Miss", "value": raw["penalties_missed"],   "points": -2 * raw["penalties_missed"]},
+            {"label": "Own Goal",     "value": raw["own_goals"],          "points": -2 * raw["own_goals"]},
             {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
         ]
         return raw, breakdown
