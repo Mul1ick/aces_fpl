@@ -60,11 +60,12 @@ async def play_chip(db: Prisma, user_id: str, chip: str, gameweek_id: int | None
 
 
 async def cancel_chip(db: Prisma, user_id: str, gameweek_id: int | None):
+    """
+    Attempts to cancel a played chip. 
+    UPDATED: Now enforces that NO chips can be cancelled once played.
+    """
     gw = await _resolve_gw(db, gameweek_id)
-    now_utc = datetime.now(timezone.utc)
-    if gw.deadline < now_utc:
-        raise HTTPException(400, "Cannot cancel after deadline.")
-
+    
     # 1. Find the active chip for the gameweek
     active_chip = await db.userchip.find_first(
         where={'user_id': user_id, 'gameweek_id': gw.id}
@@ -74,10 +75,8 @@ async def cancel_chip(db: Prisma, user_id: str, gameweek_id: int | None):
     if not active_chip:
         return {"ok": True, "message": "No active chip to cancel."}
 
-    # 3. If the active chip is a Wildcard, raise an error
-    if active_chip.chip == "WILDCARD":
-        raise HTTPException(status_code=400, detail="A played Wildcard cannot be cancelled.")
-
-    # 4. If it's another type of chip, proceed with deletion
-    await db.userchip.delete_many(where={'user_id': user_id, 'gameweek_id': gw.id})
-    return {"ok": True}
+    # 3. STRICT RULE: Chips cannot be cancelled once played
+    raise HTTPException(
+        status_code=400, 
+        detail=f"The {active_chip.chip} chip cannot be cancelled once activated."
+    )
