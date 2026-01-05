@@ -26,6 +26,7 @@ interface ManagerHubCardProps {
     in_the_bank: number,
     gameweek_transfers: number; // Added
     total_transfers: number;    // Added
+    transfer_cost?: number; // <--- Optional (?) in case API misses it
 
   };
   // ✅ ADD THIS PROP
@@ -34,6 +35,17 @@ interface ManagerHubCardProps {
 
 
 export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats, overallRank }) => {
+
+  // ✅ THE CALCULATIONS (Imitating the Leaderboard)
+  
+  // 1. Get the hits (default to 0 if missing)
+  const hits = stats.transfer_cost || 0;
+
+  // 2. Calculate the "Net Score" (Raw Points - Hits)
+  // This ensures that if you have 0 points and 4 hits, it shows -4.
+  const netOverallPoints = stats.overall_points - hits;
+
+  
   return (
     <Card className="h-full border-black border-2">
         <CardContent className="p-4">
@@ -41,7 +53,8 @@ export const ManagerHubCard: React.FC<ManagerHubCardProps> = ({ stats, overallRa
             <div>
                 <h3 className="font-bold text-lg mb-2">Points & Rankings</h3>
                 <div className="space-y-1">
-                    <StatRow label="Overall points" value={stats.overall_points} />
+                    <StatRow label="Overall points" value={netOverallPoints} />
+                    
                     {/* ✅ MODIFIED THIS LINE */}
                     <StatRow label="Overall rank" value={overallRank?.toLocaleString() ?? '...'} />
                     <StatRow label="Total players" value={stats.total_players.toLocaleString()} />

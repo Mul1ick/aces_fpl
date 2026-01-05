@@ -69,6 +69,7 @@ const Dashboard: React.FC = () => {
     in_the_bank: 100.0,
     gameweek_transfers: 0,
     total_transfers: 0,
+    transfer_cost: 0, // <--- ✅ ADD THIS LINE (Initialize to 0)
 
   });
   
