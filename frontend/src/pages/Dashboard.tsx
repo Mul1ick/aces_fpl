@@ -8,10 +8,15 @@ import { ManagerHubCard } from "@/components/dashboard/ManagerHubCard";
 import { GameweekStatusCard } from "@/components/dashboard/GameweekStatusCard";
 import { TransfersCard } from "@/components/dashboard/TransfersCard";
 import { TeamOfTheWeekCard } from "@/components/dashboard/TeamOfTheWeekCard";
+import { DreamTeamCard } from "@/components/dashboard/DreamTeamCard";
+import { DeadlineCard } from "@/components/dashboard/DeadlineCard";
+import { TeamOfTheSeasonStrip } from "@/components/dashboard/TeamOfTheSeasonStrip"; // ✅ Imported
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API } from "@/lib/api";
-import { TeamResponse } from "@/types"; 
+import { TeamResponse } from "@/types";
 
+// ... [Keep existing types: TransferStatItem, GameweekStats, etc.] ...
 type TransferStatItem = {
   player_id: number;
   count: number;
@@ -20,17 +25,15 @@ type TransferStatItem = {
   team?: { short_name?: string; name?: string };
 };
 
-// 1. MODIFIED TYPE DEFINITION
 type GameweekStats = {
   gw_number: number;
-  status?: string; // <-- This was the missing piece
-  // These types are also corrected to match your components
+  status?: string;
   most_captained?: { name: string; team_name: string; };
   most_vice_captained?: { name: string; team_name: string; };
   most_selected?: { name: string; team_name: string; };
   chips_played?: number;
+  id: number;
 };
-
 
 type TransferStatsResponse =
   | {
@@ -45,12 +48,30 @@ type TransferStatsResponse =
       };
       [k: string]: any;
     };
-    
+
+interface SimpleGameweek {
+  id: number;
+  gw_number: number;
+  deadline: string;
+}
+
+interface SimpleFixture {
+  id: number;
+  gameweek_id: number;
+  kickoff: string;
+  home: { name: string; short_name: string };
+  away: { name: string; short_name: string };
+}
+
 const Dashboard: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [squad, setSquad] = useState<TeamResponse | null>(null);
   const [gameweek, setGameweek] = useState<GameweekStats | null>(null);
   const [teamOfTheWeek, setTeamOfTheWeek] = useState(null);
+  const [dreamTeam, setDreamTeam] = useState(null);
+
+  const [nextDeadlineGW, setNextDeadlineGW] = useState<SimpleGameweek | null>(null);
+  const [upcomingFixtures, setUpcomingFixtures] = useState<SimpleFixture[]>([]);
 
   const [gameweekStats, setGameweekStats] = useState({
     user_points: 0,
@@ -58,7 +79,6 @@ const Dashboard: React.FC = () => {
     highest_points: 0,
   });
 
-  // 2. ADDED NEW STATE VARIABLE
   const [displayGameweek, setDisplayGameweek] = useState<any | null>(null);
 
   const [hubStats, setHubStats] = useState({
@@ -69,10 +89,9 @@ const Dashboard: React.FC = () => {
     in_the_bank: 100.0,
     gameweek_transfers: 0,
     total_transfers: 0,
-
   });
   
-  const [leaderboard, setLeaderboard] = useState([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
 
   const [transfersIn, setTransfersIn] = useState<
@@ -83,6 +102,8 @@ const Dashboard: React.FC = () => {
   >([]);
   const [xferLoading, setXferLoading] = useState(true);
   const [xferError, setXferError] = useState<string | null>(null);
+
+  const [tots, setTots] = useState(null); // ✅ TOTS State
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -103,11 +124,43 @@ const Dashboard: React.FC = () => {
     transfers: (row.count ?? 0).toLocaleString(),
   }));
 
+  // --- DATA FETCHING (Same as before) ---
+  
+  useEffect(() => {
+    const fetchDeadlineData = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const [gwsRes, fixturesRes] = await Promise.all([
+          fetch(API.endpoints.gameweek, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(API.endpoints.fixtures, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        if (gwsRes.ok && fixturesRes.ok) {
+          const allGameweeks: SimpleGameweek[] = await gwsRes.json();
+          const allFixtures: SimpleFixture[] = await fixturesRes.json();
+          const now = new Date();
+          const nextGW = allGameweeks
+            .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+            .find(gw => new Date(gw.deadline) > now);
+          if (nextGW) {
+            setNextDeadlineGW(nextGW);
+            const gwFixtures = allFixtures
+              .filter(f => f.gameweek_id === nextGW.id)
+              .sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
+            setUpcomingFixtures(gwFixtures);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch deadline info", e);
+      }
+    };
+    fetchDeadlineData();
+  }, []);
+
   useEffect(() => {
     if (user?.has_team) {
       const token = localStorage.getItem("access_token");
       const URL = API.endpoints.transferStats;
-
       (async () => {
         try {
           setXferLoading(true);
@@ -147,10 +200,7 @@ const Dashboard: React.FC = () => {
         console.error("Failed to fetch current gameweek:", error);
       }
     };
-
-    if (user) {
-        fetchCurrentGameweek();
-    }
+    if (user) fetchCurrentGameweek();
   }, [user]);
   
   useEffect(() => {
@@ -169,10 +219,7 @@ const Dashboard: React.FC = () => {
         console.error("Failed to fetch leaderboard:", error);
       }
     };
-
-    if (user) {
-      fetchLeaderboard();
-    }
+    if (user) fetchLeaderboard();
   }, [user]);
 
   useEffect(() => {
@@ -180,64 +227,98 @@ const Dashboard: React.FC = () => {
       const userEntry = leaderboard.find(
         (entry: any) => entry.manager_email === user.email
       );
-      if (userEntry) {
-        setUserRank(userEntry.rank);
-      }
+      if (userEntry) setUserRank(userEntry.rank);
     }
   }, [user, leaderboard]);
 
-  if (isLoading) {
-    return <div className="min-h-screen bg-pl-purple flex items-center justify-center text-pl-white">Loading...</div>;
-  }
-  
-  if (user && user.has_team === false) {
-    return <NewUserDashboard />;
-  }
+  useEffect(() => {
+    const fetchBestTeams = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      const gwToFetch = displayGameweek?.gw_number;
+      if (gwToFetch && gwToFetch > 0) {
+        try {
+          const response = await fetch(API.endpoints.teamOfTheWeekByGameweek(gwToFetch), {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setTeamOfTheWeek(data);
+          } else if (response.status === 404 && gwToFetch > 1) {
+            const prevGwResponse = await fetch(API.endpoints.teamOfTheWeekByGameweek(gwToFetch - 1), {
+               headers: { Authorization: `Bearer ${token}` },
+            });
+            if (prevGwResponse.ok) {
+               const data = await prevGwResponse.json();
+               setTeamOfTheWeek(data);
+            } else {
+               setTeamOfTheWeek(null);
+            }
+          } else {
+            setTeamOfTheWeek(null);
+          }
+        } catch (error) {
+          console.error("Failed to fetch Team of the Week:", error);
+          setTeamOfTheWeek(null);
+        }
 
-  // 3. REPLACED THIS useEffect
+        try {
+            const res = await fetch(API.endpoints.dreamTeam(gwToFetch), {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setDreamTeam(await res.json());
+            } else if (res.status === 404 && gwToFetch > 1) {
+                const prevRes = await fetch(API.endpoints.dreamTeam(gwToFetch - 1), {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (prevRes.ok) {
+                    setDreamTeam(await prevRes.json());
+                } else {
+                    setDreamTeam(null);
+                }
+            } else {
+                setDreamTeam(null);
+            }
+        } catch (e) {
+            console.error("Failed to fetch Dream Team", e);
+            setDreamTeam(null);
+        }
+      } else {
+        setTeamOfTheWeek(null);
+        setDreamTeam(null);
+      }
+    };
+    if (user && (gameweek || displayGameweek)) fetchBestTeams();
+  }, [user, gameweek, displayGameweek]);
+
   useEffect(() => {
     const fetchDisplayGameweekStats = async () => {
       const token = localStorage.getItem("access_token");
-      if (!token || !gameweek) return; // Wait for the main gameweek object to be fetched first
-
+      if (!token || !gameweek) return;
       let gwNumberToFetch = gameweek.gw_number;
       let status = gameweek.status;
-
-      // This is the core logic fix:
-      // If the current gameweek is LIVE *or* UPCOMING, and it's not GW1...
       if ((status === 'LIVE' || status === 'UPCOMING') && gameweek.gw_number > 1) {
-        // ...then we want to fetch stats for the PREVIOUS gameweek.
         gwNumberToFetch = gameweek.gw_number - 1;
       }
-      
-      // If status is 'FINISHED', or if it's GW1 (in any state),
-      // it will correctly fetch stats for the current gw_number.
-
       try {
-        // Fetch stats for the *correct* gameweek number
         const statsEndpoint = `${API.BASE_URL}/gameweeks/${gwNumberToFetch}/stats`;
         const response = await fetch(statsEndpoint, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         if (response.ok) {
           const data = await response.json();
-          setGameweekStats(data); // Set the points (e.g., for GW1)
+          setGameweekStats(data);
         } else {
-          // Fallback if stats for GW1 aren't ready (e.g., 0 points)
           setGameweekStats({ user_points: 0, average_points: 0, highest_points: 0 });
         }
-        // *Always* set the display gameweek number
         setDisplayGameweek({ gw_number: gwNumberToFetch });
-
       } catch (error) {
         console.error("Failed to fetch display gameweek stats:", error);
         setGameweekStats({ user_points: 0, average_points: 0, highest_points: 0 });
         setDisplayGameweek({ gw_number: gwNumberToFetch });
       }
     };
-
-    // This effect runs when 'user' or the 'gameweek' object changes
     fetchDisplayGameweekStats();
   }, [user, gameweek]);
   
@@ -245,7 +326,6 @@ const Dashboard: React.FC = () => {
     const fetchTeam = async () => {
       const token = localStorage.getItem("access_token");
       if (!user || !token) return;
-
       try {
         const response = await fetch(API.endpoints.team(), {
           headers: { Authorization: `Bearer ${token}` },
@@ -258,7 +338,6 @@ const Dashboard: React.FC = () => {
         console.error("Failed to fetch team data on dashboard:", error);
       }
     };
-    
     fetchTeam();
   }, [user]);
 
@@ -278,111 +357,86 @@ const Dashboard: React.FC = () => {
         console.error("Failed to fetch manager hub stats:", error);
       }
     };
-
-    if (user) {
-      fetchHubStats();
-    }
+    if (user) fetchHubStats();
   }, [user]);
 
-   // 4. REPLACED THIS useEffect
-   useEffect(() => {
-    const fetchTeamOfTheWeek = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
-
-      // Use displayGameweek or gameweek to decide
-      const gwToFetch = displayGameweek?.gw_number;
-
-      // Only fetch if the gameweek is greater than 0
-      if (gwToFetch && gwToFetch > 0) {
+  // ✅ Fetch TOTS
+  useEffect(() => {
+    const fetchTots = async () => {
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
         try {
-          // 1. First, try to fetch the TOTW for the current display gameweek (e.g., GW4)
-          const response = await fetch(API.endpoints.teamOfTheWeekByGameweek(gwToFetch), {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            setTeamOfTheWeek(data);
-          } else if (response.status === 404 && gwToFetch > 1) {
-            // 2. If it's not found (404) and it's not GW1,
-            //    try to fetch the *previous* gameweek's TOTW (e.g., GW3)
-            const prevGwResponse = await fetch(API.endpoints.teamOfTheWeekByGameweek(gwToFetch - 1), {
-               headers: { Authorization: `Bearer ${token}` },
+            const res = await fetch(API.endpoints.teamOfTheSeason, {
+                headers: { Authorization: `Bearer ${token}` }
             });
-            if (prevGwResponse.ok) {
-               const data = await prevGwResponse.json();
-               setTeamOfTheWeek(data);
-            } else {
-               // If that also fails, set to null
-               setTeamOfTheWeek(null);
-            }
-          } else {
-            // For any other error, set to null
-            setTeamOfTheWeek(null);
-          }
-        } catch (error) {
-          console.error("Failed to fetch Team of the Week:", error);
-          setTeamOfTheWeek(null);
+            if (res.ok) setTots(await res.json());
+        } catch (e) {
+            console.error("TOTS fetch error", e);
         }
-      } else {
-        // If it's Gameweek 1 (or 0), ensure the state is null
-        setTeamOfTheWeek(null);
-      }
     };
-    
-    if (user && (gameweek || displayGameweek)) {
-        fetchTeamOfTheWeek();
-    }
-  }, [user, gameweek, displayGameweek]); // This dependency array is correct
+    if (user) fetchTots();
+  }, [user]);
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-pl-purple flex items-center justify-center text-pl-white">Loading...</div>;
+  }
+  
+  if (user && user.has_team === false) {
+    return <NewUserDashboard />;
+  }
 
   return (
     <div className="bg-white min-h-screen text-black">
-          <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
-            <motion.div
-               variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="grid grid-cols-1 lg:grid-cols-2 lg:gap-8 space-y-8 lg:space-y-0"
-            >
-              {/* Left Column */}
-              <div className="space-y-8">
-                <motion.div variants={itemVariants}>
-                  <GameweekHeroCard user={user}
-                  points={gameweekStats.user_points}
-                  averagePoints={gameweekStats.average_points}
-                  highestPoints={gameweekStats.highest_points}
-                  teamName={squad?.team_name}
-                  
-                  // 4. UPDATED PROP
-                  currentGameweekNumber={displayGameweek?.gw_number || gameweek?.gw_number || 1}
-                 />
-                </motion.div>
-                <motion.div variants={itemVariants}>
-                  <ManagerHubCard stats={hubStats} overallRank={userRank} />
-                </motion.div>
-              </div>
+      <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            // Use 12-column grid
+            className="grid grid-cols-1 lg:grid-cols-12 lg:gap-8 space-y-8 lg:space-y-0"
+        >
+          {/* Left Column (Approx 40%) */}
+          <div className="space-y-8 lg:col-span-5">
+            <motion.div variants={itemVariants}>
+              <GameweekHeroCard 
+                user={user}
+                points={gameweekStats.user_points}
+                averagePoints={gameweekStats.average_points}
+                highestPoints={gameweekStats.highest_points}
+                teamName={squad?.team_name}
+                currentGameweekNumber={displayGameweek?.gw_number || gameweek?.gw_number || 1}
+              />
+            </motion.div>
 
-              {/* Right Column */}
-              <motion.div variants={itemVariants}>
-                <Card className="h-full border-gray-200">
-                    <CardHeader>
-                      <CardTitle className="text-2xl">Gameweek Status</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-8">
-                        {/* This card *correctly* uses 'gameweek' (the upcoming GW) */}
-                        <GameweekStatusCard stats={gameweek} /> 
-                        <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
-                        
-                        {/* 5. REPLACED RENDER LOGIC */}
+            <motion.div variants={itemVariants}>
+              <DeadlineCard 
+                gameweek={nextDeadlineGW} 
+                fixtures={upcomingFixtures} 
+              />
+            </motion.div>
+
+            <motion.div variants={itemVariants}>
+              <ManagerHubCard stats={hubStats} overallRank={userRank} />
+            </motion.div>
+          </div>
+
+          {/* Right Column (Approx 60%) */}
+          <motion.div variants={itemVariants} className="lg:col-span-7">
+            <Card className="h-full border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-2xl">Gameweek Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                    <GameweekStatusCard stats={gameweek} /> 
+                    <TransfersCard transfersIn={transfersIn} transfersOut={transfersOut} />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {teamOfTheWeek ? (
-                          // IF teamOfTheWeek exists, show it
                           <TeamOfTheWeekCard 
                             team={teamOfTheWeek} 
                             currentGameweekNumber={displayGameweek?.gw_number || gameweek?.gw_number || 1} 
                           />
                         ) : (
-                          // ELSE, show the placeholder
                           <Card className="h-full border-black border-2">
                             <CardHeader>
                               <CardTitle className="text-xl">Team of the Week</CardTitle>
@@ -400,12 +454,38 @@ const Dashboard: React.FC = () => {
                             </CardContent>
                           </Card>
                         )}
-                    </CardContent>
-                </Card>
-              </motion.div>
-            </motion.div>
-          </div>
+
+                        {dreamTeam ? (
+                            <DreamTeamCard 
+                                team={dreamTeam} 
+                                gameweekNumber={displayGameweek?.gw_number || 1} 
+                            />
+                        ) : (
+                            <Card className="h-full border-black border-2 bg-white">
+                                <CardHeader>
+                                    <CardTitle className="text-xl text-black">Dream Team</CardTitle>
+                                    <p className="text-sm text-gray-500 font-semibold">Calculating...</p>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-center text-gray-400 py-8">
+                                        Stats processing...
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+
+        {/* ✅ MOVED HERE: TOTS Strip spans FULL WIDTH below the columns */}
+        <motion.div variants={itemVariants}>
+          <TeamOfTheSeasonStrip team={tots} />
+        </motion.div>
+
       </div>
+    </div>
   );
 };
 export default Dashboard;

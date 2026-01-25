@@ -2,6 +2,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from prisma import Prisma
 from prisma import models as PrismaModels
+from app.services.stats_service import calculate_dream_team
+from app.services.stats_service import calculate_team_of_the_season # Add import
+
 
 from app.database import get_db
 from app import schemas, auth
@@ -80,3 +83,25 @@ async def get_team_of_the_week_for_gameweek(gameweek_number: int, db: Prisma = D
             detail=f"Team of the Week for gameweek {gameweek_number} not found or not yet calculated."
         )
     return team_data
+
+@router.get("/dream-team/{gameweek_number}", response_model=Optional[schemas.TeamOfTheWeekOut])
+async def get_dream_team_endpoint(gameweek_number: int, db: Prisma = Depends(get_db)):
+    """
+    Calculates and returns the hypothetical best team for a specific gameweek.
+    """
+    gw = await get_gameweek_by_number(db, gameweek_number)
+    if not gw:
+        raise HTTPException(status_code=404, detail="Gameweek not found")
+    
+    dt = await calculate_dream_team(db, gw.id)
+    if not dt:
+        raise HTTPException(status_code=404, detail="Stats not available to generate Dream Team")
+        
+    return dt
+
+@router.get("/team-of-the-season", response_model=Optional[schemas.TeamOfTheWeekOut])
+async def get_tots_endpoint(db: Prisma = Depends(get_db)):
+    """
+    Calculates the best possible team based on total season points.
+    """
+    return await calculate_team_of_the_season(db)
