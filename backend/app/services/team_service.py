@@ -657,12 +657,14 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
     if not gw:
         raise HTTPException(status_code=404, detail="Gameweek not found")
 
+    # 1. Get Team Data
     data = await get_user_team_full(db, str(user.id), gw.id)
     if not data:
         raise HTTPException(status_code=404, detail="No fantasy team found for this user/gameweek")
     
     from app.services.stats_service import get_leaderboard
 
+    # 2. Get Overall Stats from Leaderboard
     try:
         lb = await get_leaderboard(db)
         me = next((r for r in lb if r.get("user_id") == str(user.id)), None)
@@ -671,6 +673,7 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
     except Exception:
         overall_points, overall_rank = 0, None
 
+    # 3. Get Specific Gameweek Score
     try:
         ugws = await db.usergameweekscore.find_first(
             where={"user_id": str(user.id), "gameweek_id": gw.id}
@@ -679,7 +682,50 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
     except Exception:
         gw_points = 0
 
-    manager_name = (user.email or "").split("@")[0]
+    # 4. --- NEW LOGIC: Calculate Gameweek Average, Highest, and Rank ---
+    all_gw_scores = await db.usergameweekscore.find_many(
+        where={"gameweek_id": gw.id}
+    )
+
+    avg_points = 0
+    max_points = 0
+    gw_rank_str = "-"
+
+    if all_gw_scores:
+        # Calculate scores as (total - hits) to be fair, or just total_points based on league rules
+        # Usually GW Rank is based on Total Points (before hits) or Net Points. 
+        # Standard FPL uses Net Points for Head-to-Head but Gross for GW Rank usually? 
+        # Actually, let's stick to Net Points (Total - Hits) as that's what 'gameweek_points' displays above.
+        
+        scores_list = []
+        for s in all_gw_scores:
+            net_score = (s.total_points or 0) - (s.transfer_hits or 0)
+            scores_list.append({"uid": s.user_id, "score": net_score})
+        
+        # Sort descending
+        scores_list.sort(key=lambda x: x["score"], reverse=True)
+
+        if scores_list:
+            max_points = scores_list[0]["score"]
+            total_sum = sum(item["score"] for item in scores_list)
+            avg_points = round(total_sum / len(scores_list))
+
+            # Find rank
+            # Handling ties: if scores are [50, 50, 40], ranks are 1, 1, 3
+            current_rank = 0
+            prev_score = None
+            true_rank = 0
+            
+            for idx, item in enumerate(scores_list):
+                if item["score"] != prev_score:
+                    true_rank = idx + 1
+                    prev_score = item["score"]
+                
+                if item["uid"] == str(user.id):
+                    gw_rank_str = str(true_rank)
+                    break
+
+    manager_name = user.full_name or (user.email or "").split("@")[0]
 
     return {
         **data,
@@ -690,4 +736,11 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
             "gameweek_points": gw_points,
         },
         "overallRank": data.get("overallRank") or overall_rank,
+        
+        # --- Added Fields ---
+        "average_points": avg_points,
+        "highest_points": max_points,
+        "gw_rank": gw_rank_str,
+        "transfers": str(user.free_transfers)
     }
+    

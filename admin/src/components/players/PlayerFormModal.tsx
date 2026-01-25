@@ -51,7 +51,6 @@ export function PlayerFormModal({
   useEffect(() => {
     if (isOpen) {
       if (isEditMode && editingPlayer) {
-        // Pre-fill form for editing an existing player
         setFormData({
           full_name: editingPlayer.full_name,
           position: editingPlayer.position,
@@ -60,7 +59,6 @@ export function PlayerFormModal({
           status: editingPlayer.status,
         });
       } else {
-        // Reset form for creating a new player, ensuring a valid default team_id
         setFormData({
             ...initialFormData,
             team_id: teams[0]?.id || 0,
@@ -100,7 +98,26 @@ export function PlayerFormModal({
                 <Label htmlFor="full_name">Full Name</Label>
                 <Input id="full_name" value={formData.full_name} onChange={(e) => handleChange('full_name', e.target.value)} placeholder="e.g., John Doe" />
             </div>
+             
              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                    <Label htmlFor="position">Position</Label>
+                    <Select 
+                      value={formData.position} 
+                      onValueChange={(value) => handleChange('position', value as any)}
+                    >
+                        <SelectTrigger id="position">
+                          <SelectValue placeholder="Select position" />
+                        </SelectTrigger>
+                        {/* Added bg-white to fix transparency issue */}
+                        <SelectContent className="bg-white">
+                            <SelectItem value="GK">Goalkeeper</SelectItem>
+                            <SelectItem value="DEF">Defender</SelectItem>
+                            <SelectItem value="MID">Midfielder</SelectItem>
+                            <SelectItem value="FWD">Forward</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
                  <div>
                     <Label htmlFor="price">Price (£m)</Label>
                     <Input 
@@ -109,17 +126,19 @@ export function PlayerFormModal({
                       step="0.1" 
                       value={formData.price} 
                       onChange={(e) => handleChange('price', parseFloat(e.target.value))} 
-                      disabled={isEditMode} // Price is not editable in edit mode
+                      disabled={isEditMode}
                       aria-describedby="price-description"
                     />
                     {isEditMode && <p id="price-description" className="text-xs text-muted-foreground mt-1">Price cannot be changed after creation.</p>}
                 </div>
             </div>
+
              <div>
                 <Label htmlFor="team">Team</Label>
                 <Select value={String(formData.team_id)} onValueChange={(value) => handleChange('team_id', parseInt(value, 10))}>
                     <SelectTrigger><SelectValue placeholder="Select a team"/></SelectTrigger>
-                    <SelectContent>
+                    {/* Added bg-white to fix transparency issue */}
+                    <SelectContent className="bg-white">
                         {teams.map(team => <SelectItem key={team.id} value={String(team.id)}>{team.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
@@ -128,7 +147,8 @@ export function PlayerFormModal({
                 <Label htmlFor="status">Status</Label>
                 <Select value={formData.status} onValueChange={(value: PlayerStatus) => handleChange('status', value)}>
                     <SelectTrigger><SelectValue/></SelectTrigger>
-                    <SelectContent>
+                    {/* Added bg-white to fix transparency issue */}
+                    <SelectContent className="bg-white">
                         <SelectItem value="ACTIVE">Active</SelectItem>
                         <SelectItem value="INJURED">Injured</SelectItem>
                         <SelectItem value="SUSPENDED">Suspended</SelectItem>

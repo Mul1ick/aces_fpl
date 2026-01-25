@@ -3,23 +3,34 @@ import { Card, CardContent } from "@/components/ui/card";
 import { RefreshCw, Zap, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { getChipStatus, playChip, cancelChip, type ChipStatus, type ChipName } from '@/lib/api';
+import { getChipStatus, playChip, type ChipStatus, type ChipName } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext'; // Added import
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const chips = [
-  { id: 'WILDCARD' as const, name: 'Wildcard', icon: RefreshCw, description: 'Unlimited free transfers for this Gameweek. Once activated, a chip cannot be cancelled. Available once per season.' },
-  { id: 'TRIPLE_CAPTAIN' as const, name: 'Triple Captain', icon: Zap, description: 'Captain scores are tripled this Gameweek. Once activated, a chip cannot be cancelled. Available once per season.' },
+  { id: 'WILDCARD' as const, name: 'Wildcard', icon: RefreshCw, description: 'Unlimited free transfers for this Gameweek. Once activated, this chip cannot be cancelled. Available once per season.' },
+  { id: 'TRIPLE_CAPTAIN' as const, name: 'Triple Captain', icon: Zap, description: 'Captain scores are tripled this Gameweek. Once activated, this chip cannot be cancelled. Available once per season.' },
 ];
 type ChipItem = typeof chips[number];
 
 export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token, gw }) => {
   const { toast } = useToast();
-  const { user } = useAuth(); // Get user context
+  const { user } = useAuth();
   const [status, setStatus] = useState<ChipStatus>({ active: null, used: [] });
   const [selectedChip, setSelectedChip] = useState<ChipItem | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   
   const refresh = async () => {
     try { setStatus(await getChipStatus(token, gw)); }
@@ -29,13 +40,26 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
   useEffect(() => { if (token) refresh(); }, [token, gw]);
 
   const handleChipClick = (chip: ChipItem) => {
-    if (status.active && status.active !== chip.id) return;
+    // If a chip is already active, prevent clicking others
+    if (status.active) return;
+
+    // Custom check for Wildcard during first gameweek (unlimited transfers)
+    if (chip.id === 'WILDCARD' && user?.played_first_gameweek === false) {
+      toast({
+        title: "Wildcard Unavailable",
+        description: "Wildcard not available during free transfers.",
+        variant: "destructive", // Uses the red alert style to indicate restriction
+      });
+      return;
+    }
+
     setSelectedChip(chip);
   };
 
-  const onPlayChip = async () => {
+  const executePlayChip = async () => {
     if (!selectedChip) return;
     setLoading(true);
+    setIsConfirmOpen(false);
     try {
       await playChip(token, selectedChip.id as ChipName, gw);
       await refresh();
@@ -43,20 +67,11 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
       toast({ title: `${selectedChip.name} activated` });
     } catch (e:any) {
       toast({ variant: 'destructive', title: `Could not play ${selectedChip.name}`, description: e.message });
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
   
-  const onCancelChip = async () => {
-    setLoading(true);
-    try {
-      await cancelChip(token, gw);
-      await refresh();
-      toast({ title: `Chip cancelled` });
-    } catch (e:any) {
-      toast({ variant: 'destructive', title: 'Cancel failed', description: e.message });
-    } finally { setLoading(false); }
-  };
-
   return (
     <>
       <Card className="bg-gradient-to-br from-[#37003C] to-[#23003F] border-purple-800/50">
@@ -66,30 +81,30 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
               const isActive = status.active === chip.id;
               const isUsed = status.used.includes(chip.id as ChipName);
               
-              // Logic to disable Wildcard if user hasn't played first GW (unlimited transfers active)
+              // Only block interaction if it's the Wildcard specifically disabled for new users
               const isWildcard = chip.id === 'WILDCARD';
               const hasUnlimitedTransfers = user?.played_first_gameweek === false;
               
+              // MODIFIED: Removed the check for (isWildcard && hasUnlimitedTransfers) so the button stays enabled
               const isDisabled = loading || 
-                                 (!isActive && (status.active !== null || isUsed)) ||
-                                 (isWildcard && hasUnlimitedTransfers);
+                                 (!isActive && (status.active !== null || isUsed));
 
-              // Determine tooltip text
               let tooltipText = "";
               if (isUsed && !isActive) tooltipText = "Already used";
               else if (isWildcard && hasUnlimitedTransfers) tooltipText = "Unlimited transfers active";
+              else if (status.active && !isActive) tooltipText = "Another chip is active";
 
               return (
                 <div key={chip.id} className="flex flex-col items-center space-y-2 h-[110px] justify-start">
                   <button
                     onClick={() => handleChipClick(chip)}
-                    disabled={isDisabled}
+                    disabled={isDisabled || isActive} // Disable click if it's already active
                     className={cn(
                       "w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all",
                       isActive 
-                        ? "bg-dashboard-gradient border-transparent text-white" 
+                        ? "bg-dashboard-gradient border-transparent text-white shadow-[0_0_15px_rgba(37,99,235,0.6)]" 
                         : "bg-black/20 border-transparent text-white",
-                      isDisabled 
+                      isDisabled && !isActive
                         ? "opacity-30 cursor-not-allowed" 
                         : "hover:bg-white/5"
                     )}
@@ -100,18 +115,12 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
                   <p className="text-xs font-semibold text-white">
                     {chip.name}{isUsed && !isActive ? " (used)" : ""}
                   </p>
+                  
+                  {/* Status Indicator Badge (Non-clickable) */}
                   {isActive && (
-                    <button
-                      onClick={onCancelChip}
-                      disabled={loading || status.active === 'WILDCARD'}
-                      className={cn(
-                        "mt-1 w-full px-3 py-1 rounded-full bg-gradient-to-r from-accent-teal to-accent-blue",
-                        status.active === 'WILDCARD' && "opacity-60 cursor-not-allowed"
-                      )}
-                      title={status.active === 'WILDCARD' ? "Wildcard cannot be cancelled" : "Cancel Chip"}
-                    >
-                      <p className="text-xs font-bold text-black">Active</p>
-                    </button>
+                    <div className="mt-1 w-full px-3 py-1 rounded-full bg-gradient-to-r from-accent-teal to-accent-blue opacity-90 cursor-default shadow-md">
+                      <p className="text-xs font-bold text-black uppercase tracking-wide">Active</p>
+                    </div>
                   )}
                 </div>
               );
@@ -120,6 +129,7 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
         </CardContent>
       </Card>
       
+      {/* Chip Detail Modal */}
       <AnimatePresence>
         {selectedChip && (
           <motion.div
@@ -144,7 +154,14 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
                     <h3 className="text-xl font-bold text-black">{selectedChip.name}</h3>
                 </div>
                 <p className="text-sm text-gray-600 my-4 text-center">{selectedChip.description}</p>
-                <Button className="w-full mt-6" onClick={onPlayChip} disabled={loading}>Play Chip</Button>
+                
+                <Button 
+                  className="w-full mt-6" 
+                  onClick={() => setIsConfirmOpen(true)} 
+                  disabled={loading}
+                >
+                  Play Chip
+                </Button>
               </div>
               <button onClick={() => setSelectedChip(null)} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">
                 <X className="w-5 h-5 text-gray-500" />
@@ -153,6 +170,27 @@ export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token,
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent className="max-w-[90%] sm:max-w-lg rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Activate {selectedChip?.name}?</AlertDialogTitle>
+            <AlertDialogDescription className="text-red-600 font-medium">
+              Warning: Once activated, this chip cannot be cancelled. 
+              {selectedChip?.id === 'WILDCARD' 
+                ? " You will have unlimited transfers for this gameweek." 
+                : " Your captain's points will be tripled for this gameweek."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={executePlayChip} disabled={loading} className="bg-pl-purple hover:bg-pl-purple/90">
+              Confirm Activation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
