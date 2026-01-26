@@ -8,6 +8,8 @@ from app.repositories.gameweek_repo import get_current_gameweek
 from app.services.team_service import carry_forward_team
 from app.services.chip_service import is_triple_captain_active
 from app.utils.stats_utils import calculate_breakdown
+from app.repositories.team_repo import get_team_by_id
+from app.repositories.player_repo import get_players_by_ids
 
 import logging
 
@@ -361,3 +363,221 @@ async def get_gameweek_stats_for_user(db: Prisma, user_id: str, gameweek_id: int
         "highest_points": highest_points,
     }
 
+async def calculate_dream_team(db: Prisma, gameweek_id: int):
+    """
+    Calculates the 'Dream Team' for a specific gameweek based on the
+    11-man squad limit: 2 GK, 3 DEF, 3 MID, 3 FWD.
+    From that 11, it picks the optimal starting 8.
+    """
+    
+    # 1. Fetch all stats for this GW with Player and Team info
+    stats = await db.gameweekplayerstats.find_many(
+        where={'gameweek_id': gameweek_id},
+        include={'player': {'include': {'team': True}}},
+        order={'points': 'desc'} # Primary sort by points
+    )
+
+    if not stats:
+        return None
+
+    # 2. Bucket by Position
+    # We sort by points DESC. Secondary sort usually price or ID, 
+    # but strictly points is fine for Dream Team.
+    gks = [s for s in stats if s.player.position == 'GK']
+    defs = [s for s in stats if s.player.position == 'DEF']
+    mids = [s for s in stats if s.player.position == 'MID']
+    fwds = [s for s in stats if s.player.position == 'FWD']
+
+    # 3. Select the "Squad of 11" (The Pool)
+    # 2 GK, 3 DEF, 3 MID, 3 FWD
+    pool_gk = gks[:2]
+    pool_def = defs[:3]
+    pool_mid = mids[:3]
+    pool_fwd = fwds[:3]
+
+    # If we don't have enough players in a position to fill a dream team, 
+    # we return what we have (early season edge case)
+    if len(pool_gk) < 1 or len(pool_def) < 2 or len(pool_mid) < 1 or len(pool_fwd) < 1:
+        # Fallback or simple error handling
+        return None
+
+    # 4. The "Starting 8" Optimization (Lock & Fill)
+    starters = []
+    
+    # A. Lock Essentials (5 Spots)
+    # We take the absolute best from each mandatory slot
+    starters.append(pool_gk[0])  # 1st Best GK
+    starters.append(pool_def[0]) # 1st Best DEF
+    starters.append(pool_def[1]) # 2nd Best DEF
+    starters.append(pool_mid[0]) # 1st Best MID
+    starters.append(pool_fwd[0]) # 1st Best FWD
+
+    # B. Define the Remaining Pool for Flex (6 Candidates)
+    # The 2nd GK is usually NOT eligible for Flex in football logic (only 1 GK on pitch).
+    # So the 2nd GK goes straight to bench.
+    bench_gk = pool_gk[1] if len(pool_gk) > 1 else None
+    
+    flex_candidates = []
+    if len(pool_def) > 2: flex_candidates.append(pool_def[2])
+    if len(pool_mid) > 1: flex_candidates.extend(pool_mid[1:])
+    if len(pool_fwd) > 1: flex_candidates.extend(pool_fwd[1:])
+
+    # C. Fill Flex Spots (Top 3 from candidates)
+    # Sort candidates by points descending
+    flex_candidates.sort(key=lambda x: x.points, reverse=True)
+    
+    # Take top 3
+    flex_picks = flex_candidates[:3]
+    starters.extend(flex_picks)
+
+    # D. Assign Bench
+    # The bench is the 2nd GK + the rejects from flex candidates
+    bench_outfield = flex_candidates[3:]
+    bench = []
+    if bench_gk: bench.append(bench_gk)
+    bench.extend(bench_outfield)
+
+    # 5. Format for Response (Reusing PlayerDisplay logic roughly)
+    def map_to_view(stat_entry, is_starter):
+        # We need to simulate Captaincy for visual flair (Highest scorer gets C)
+        return {
+            "id": stat_entry.player.id,
+            "full_name": stat_entry.player.full_name,
+            "position": stat_entry.player.position,
+            "team": stat_entry.player.team, # Full team object
+            "price": float(stat_entry.player.price),
+            "points": stat_entry.points,
+            "is_captain": False,      # Will calculate below
+            "is_vice_captain": False, # Will calculate below
+            "is_benched": not is_starter,
+            "raw_stats": {
+                "goals_scored": stat_entry.goals_scored,
+                "assists": stat_entry.assists,
+                "clean_sheets": stat_entry.clean_sheets,
+                "bonus_points": stat_entry.bonus_points,
+                "played": stat_entry.played
+            }
+        }
+
+    formatted_starters = [map_to_view(s, True) for s in starters]
+    formatted_bench = [map_to_view(b, False) for b in bench]
+
+    # Assign Captain (Top scorer in starters)
+    formatted_starters.sort(key=lambda x: x['points'], reverse=True)
+    if formatted_starters:
+        formatted_starters[0]['is_captain'] = True
+        if len(formatted_starters) > 1:
+            formatted_starters[1]['is_vice_captain'] = True
+
+    total_points = sum(p['points'] for p in formatted_starters)
+
+    return {
+        "manager_name": "Aces AI",
+        "team_name": "Dream Team",
+        "points": total_points,
+        "starting": formatted_starters,
+        "bench": formatted_bench
+    }
+
+async def calculate_team_of_the_season(db: Prisma):
+    """
+    Calculates the Team of the Season based on total points accumulated
+    from GW1 to present, using the Aces Squad (11) & Starting 8 rules.
+    """
+    # 1. Aggregate total points for all players
+    # UPDATED: Removed the 'having' clause that filtered out 0-point players
+    agg_stats = await db.gameweekplayerstats.group_by(
+        by=['player_id'],
+        sum={'points': True},
+        # having={'points': {'_sum': {'gt': 0}}}, <--- REMOVED THIS LINE
+        order={'_sum': {'points': 'desc'}}
+    )
+
+    if not agg_stats:
+        return None
+
+    # 2. Fetch Player Details
+    player_ids = [item['player_id'] for item in agg_stats]
+    players_data = await db.player.find_many(
+        where={'id': {'in': player_ids}},
+        include={'team': True}
+    )
+    
+    # Create a rich object with points attached
+    rich_players = []
+    player_map = {p.id: p for p in players_data}
+    
+    for item in agg_stats:
+        pid = item['player_id']
+        total_pts = item['_sum']['points'] or 0 # Ensure 0 if None
+        if pid in player_map:
+            p = player_map[pid]
+            rich_players.append({
+                "id": p.id,
+                "full_name": p.full_name,
+                "position": p.position,
+                "team": p.team,
+                "price": float(p.price),
+                "points": total_pts,
+                "raw_stats": {"played": True} 
+            })
+
+    # 3. Bucket by Position (Sorted by Total Points DESC)
+    gks = [p for p in rich_players if p['position'] == 'GK']
+    defs = [p for p in rich_players if p['position'] == 'DEF']
+    mids = [p for p in rich_players if p['position'] == 'MID']
+    fwds = [p for p in rich_players if p['position'] == 'FWD']
+
+    # 4. Select the "Squad of 11" (The Pool)
+    pool_gk = gks[:2]
+    pool_def = defs[:3]
+    pool_mid = mids[:3]
+    pool_fwd = fwds[:3]
+
+    # Check validity (Must have enough players in DB/Stats table to form a squad)
+    if len(pool_gk) < 1 or len(pool_def) < 2 or len(pool_mid) < 1 or len(pool_fwd) < 1:
+        return None 
+
+    # 5. The "Starting 8" Optimization (Lock & Fill)
+    starters = []
+    
+    # Lock Essentials
+    starters.append(pool_gk[0])
+    starters.append(pool_def[0])
+    starters.append(pool_def[1])
+    starters.append(pool_mid[0])
+    starters.append(pool_fwd[0])
+
+    # Flex Pool
+    bench_gk = pool_gk[1] if len(pool_gk) > 1 else None
+    flex_candidates = []
+    if len(pool_def) > 2: flex_candidates.append(pool_def[2])
+    if len(pool_mid) > 1: flex_candidates.extend(pool_mid[1:])
+    if len(pool_fwd) > 1: flex_candidates.extend(pool_fwd[1:])
+
+    # Sort Flex by points
+    flex_candidates.sort(key=lambda x: x['points'], reverse=True)
+    
+    # Pick Top 3 Flex
+    starters.extend(flex_candidates[:3])
+
+    # Bench (Remaining)
+    bench_outfield = flex_candidates[3:]
+    bench = []
+    if bench_gk: bench.append(bench_gk)
+    bench.extend(bench_outfield)
+
+    # 6. Assign Captaincy (Top scorer)
+    starters.sort(key=lambda x: x['points'], reverse=True)
+    starters = [{**p, "is_captain": i==0, "is_vice_captain": i==1, "is_benched": False} for i, p in enumerate(starters)]
+    bench = [{**p, "is_captain": False, "is_vice_captain": False, "is_benched": True} for p in bench]
+
+    total_season_points = sum(p['points'] for p in starters)
+
+    return {
+        "manager_name": "Aces AI",
+        "team_name": "Team of the Season",
+        "points": total_season_points,
+        "starting": starters,
+        "bench": bench
+    }

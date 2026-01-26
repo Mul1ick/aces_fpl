@@ -18,6 +18,8 @@ export const API = {
     leaderboard: `${API_BASE_URL}/leaderboard/`,
     transfer: `${API_BASE_URL}/teams/transfer`,
     userStats: `${API_BASE_URL}/users/stats`,
+    
+    dreamTeam: (gw: number) => `${API.BASE_URL}/gameweeks/dream-team/${gw}`,
     playerCard: (gwId: number, playerId: number, userId?: string) => 
       userId 
         ? `${API_BASE_URL}/teams/${gwId}/players/${playerId}/card?user_id=${userId}`
@@ -39,6 +41,7 @@ teamOfTheWeekByGameweek: (gw: number) => `${API.BASE_URL}/gameweeks/team-of-the-
           ? `${API_BASE_URL}/chips/cancel?gameweek_id=${gw}`
           : `${API_BASE_URL}/chips/cancel`,
     },
+    teamOfTheSeason: `${API_BASE_URL}/gameweeks/team-of-the-season`,
     fixtures: `${API_BASE_URL}/fixtures`,
     transferStats: `${API_BASE_URL}/transfers/stats`,
   },

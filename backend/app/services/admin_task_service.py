@@ -78,18 +78,14 @@ async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
             alog.info(f"Set 'played_first_gameweek' flag for {len(user_ids_in_gw1)} users after GW1.")
 
     # 5. Update free transfers for all active users who have started playing
-    # Rule: Give 1 free transfer, with a maximum of 2.
-    users_to_update = await db.user.find_many(
-        where={'is_active': True, 'played_first_gameweek': True, 'free_transfers': {'lt': 2}}
+    await db.user.update_many(
+        where={
+            'is_active': True, 
+            'played_first_gameweek': True
+        },
+        data={'free_transfers': 2}
     )
-    user_ids_to_increment = [u.id for u in users_to_update]
-
-    if user_ids_to_increment:
-        await db.user.update_many(
-            where={'id': {'in': user_ids_to_increment}},
-            data={'free_transfers': {'increment': 1}}
-        )
-        alog.info(f"Incremented free transfers for {len(user_ids_to_increment)} users.")
+    alog.info(f"Reset free transfers to 2 for all active players.")
 
     alog.info(f"--- Gameweek Rollover for GW ID: {live_gw_id} Completed ---")
 

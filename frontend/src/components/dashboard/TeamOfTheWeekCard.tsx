@@ -65,7 +65,7 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
           to={canViewTotw ? `/team-of-the-week/${totwGameweekToShow}` : '#'}
           className={`flex items-center justify-between group ${!canViewTotw && 'pointer-events-none'}`}
         >
-          <CardTitle className="text-xl group-hover:underline">Team of the Week</CardTitle>
+          <CardTitle className="text-xl group-hover:underline">Manager of the Week</CardTitle>
           {canViewTotw && <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />}
         </Link>
         <p className="text-sm text-gray-500 font-semibold">
@@ -74,7 +74,7 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          <h4 className="font-bold text-gray-500 text-sm">Starting XI</h4>
+          <h4 className="font-bold text-gray-500 text-sm">Starting VIII</h4>
           {team.starting.map(player => {
             const isCaptain = player.is_captain || player.isCaptain;
             const isVice = player.is_vice_captain || player.isVice;
