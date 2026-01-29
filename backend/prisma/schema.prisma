@@ -200,6 +200,7 @@ model transfer_log {
 enum ChipType {
   TRIPLE_CAPTAIN
   WILDCARD
+  FREE_HIT
 }
 
 model UserChip {

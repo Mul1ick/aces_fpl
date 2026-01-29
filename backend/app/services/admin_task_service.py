@@ -6,12 +6,6 @@ from fastapi import HTTPException
 alog = logging.getLogger("aces.admin_tasks")
 
 async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
-    """
-    Handles all tasks required when a gameweek is finalized and rolls over to the next.
-    - Copies every user's team from the live gameweek to the next one.
-    - Resets/adds free transfers for every user.
-    - Sets a flag for users who have completed Gameweek 1.
-    """
     alog.info(f"--- Starting Gameweek Rollover for GW ID: {live_gw_id} ---")
 
     live_gw = await db.gameweek.find_unique(where={'id': live_gw_id})
@@ -19,7 +13,6 @@ async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
         alog.error(f"Rollover failed: Could not find live_gw with id {live_gw_id}")
         return
 
-    # 1. Find the next gameweek
     next_gw = await db.gameweek.find_first(
         where={'gw_number': live_gw.gw_number + 1}
     )
@@ -27,26 +20,58 @@ async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
         alog.warning("End of season: No next gameweek found. Rollover tasks skipped.")
         return
 
-    alog.info(f"Transitioning from GW {live_gw.gw_number} to GW {next_gw.gw_number}")
-
-    # 2. Get all active users with a fantasy team
     active_users = await db.user.find_many(where={'is_active': True, 'fantasy_team': {'is_not': None}})
     if not active_users:
         alog.info("No active users with teams to roll over.")
         return
         
-    alog.info(f"Found {len(active_users)} active users with teams to process.")
-
-    # 3. For each user, copy their team from the live GW to the next GW
     for user in active_users:
-        user_team_for_live_gw = await db.userteam.find_many(
-            where={'user_id': user.id, 'gameweek_id': live_gw.id}
+        # 1. Determine if Free Hit was active in the GW that just finished
+        free_hit_active = await db.userchip.find_first(
+            where={
+                'user_id': user.id, 
+                'gameweek_id': live_gw_id, 
+                'chip': 'FREE_HIT'
+            }
+        )
+
+        source_gw_id = live_gw_id
+
+        if free_hit_active:
+            # 2. Revert logic: Find the team state BEFORE the Free Hit week
+            prev_entry = await db.userteam.find_first(
+                where={
+                    'user_id': user.id, 
+                    'gameweek_id': {'lt': live_gw_id}
+                },
+                order={'gameweek_id': 'desc'}
+            )
+            
+            if prev_entry:
+                source_gw_id = prev_entry.gameweek_id
+                alog.info(f"Free Hit detected for {user.email}. Reverting to team from GW ID {source_gw_id}.")
+            else:
+                alog.warning(f"User {user.email} used Free Hit but no previous team found. Defaulting to live GW.")
+
+        # 3. Fetch the team from our determined source
+        user_team_to_copy = await db.userteam.find_many(
+            where={'user_id': user.id, 'gameweek_id': source_gw_id}
         )
         
-        if not user_team_for_live_gw:
-            alog.warning(f"User {user.email} (ID: {user.id}) had no team in GW {live_gw.gw_number} to copy.")
+        if not user_team_to_copy:
             continue
 
+        # --- ADD THIS CLEANUP STEP ---
+        # Clear out any "temporary" or accidental data in the next GW 
+        # to ensure the revert is clean.
+        await db.userteam.delete_many(
+            where={
+                'user_id': user.id,
+                'gameweek_id': next_gw.id
+            }
+        )
+
+        # 4. Prepare data for the NEXT gameweek
         new_team_data = [
             {
                 "user_id": user.id,
@@ -55,14 +80,14 @@ async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
                 "is_captain": p.is_captain,
                 "is_vice_captain": p.is_vice_captain,
                 "is_benched": p.is_benched
-            } for p in user_team_for_live_gw
+            } for p in user_team_to_copy
         ]
 
-        # Use create_many for efficiency
+        # 5. Atomic copy (removed the redundant duplicate block)
         await db.userteam.create_many(data=new_team_data, skip_duplicates=True)
         alog.info(f"Copied team for user {user.email} to GW {next_gw.gw_number}.")
 
-    # 4. Set 'played_first_gameweek' flag for users after GW1 is finalized
+    # --- Keep existing steps 4 and 5 (flags and transfer resets) ---
     if live_gw.gw_number == 1:
         user_ids_in_gw1 = [
             ut.user_id for ut in await db.userteam.find_many(
@@ -75,18 +100,11 @@ async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
                 where={'id': {'in': user_ids_in_gw1}},
                 data={'played_first_gameweek': True}
             )
-            alog.info(f"Set 'played_first_gameweek' flag for {len(user_ids_in_gw1)} users after GW1.")
 
-    # 5. Update free transfers for all active users who have started playing
     await db.user.update_many(
-        where={
-            'is_active': True, 
-            'played_first_gameweek': True
-        },
+        where={'is_active': True, 'played_first_gameweek': True},
         data={'free_transfers': 2}
     )
-    alog.info(f"Reset free transfers to 2 for all active players.")
-
     alog.info(f"--- Gameweek Rollover for GW ID: {live_gw_id} Completed ---")
 
 

@@ -168,14 +168,14 @@ async def confirm_transfers(
 
         # --- WILDCARD LOGIC ---
         # 1. Check if a wildcard is active for this user and gameweek
-        active_wildcard = await tx.userchip.find_first(
+        active_chip = await tx.userchip.find_first(
             where={
                 "user_id": user_id,
                 "gameweek_id": gameweek_id,
-                "chip": "WILDCARD"
+                "chip": {"in": ["WILDCARD", "FREE_HIT"]}
             }
         )
-        is_wildcard_active = active_wildcard is not None
+        is_unlimited = active_chip is not None or (not user.played_first_gameweek)
         # ----------------------
 
         current_team = await tx.userteam.find_many(
@@ -212,7 +212,7 @@ async def confirm_transfers(
 
 
         # --- TRANSFER VALIDATION & COST CALCULATION ---
-        is_unlimited_transfers = (active_wildcard is not None) or (not user.played_first_gameweek)
+        is_unlimited_transfers = (active_chip is not None) or (not user.played_first_gameweek)
 
         transfer_hits = 0
         new_free_transfers = user.free_transfers

@@ -67,63 +67,105 @@ router = APIRouter(
 )
 
 # --- HELPER: PRE-ROLLOVER TEAMS ---
+# --- HELPER: PRE-ROLLOVER TEAMS (With Free Hit Logic) ---
 async def pre_rollover_teams(db: Prisma, current_gw_id: int):
     """
-    Copies the CURRENT (clean) teams to the NEXT gameweek ID 
-    before Autosubs modify them.
+    Copies teams to the NEXT gameweek with Free Hit logic.
+    - Normal Users: Copy from Current GW -> Next GW.
+    - Free Hit Users: Copy from PREVIOUS GW -> Next GW (Restoring their original team).
     """
-    # 1. Determine Next Gameweek ID
-    # Assuming GW IDs are sequential or we need to find the next one
-    # For safety, let's look up the current GW and find the next sequential number
+    logger.info("--- Starting Team Rollover with Chip Logic ---")
+
+    # 1. Setup Gameweek Context
     current_gw = await db.gameweek.find_unique(where={'id': current_gw_id})
-    if not current_gw:
+    if not current_gw: 
+        logger.error("Current Gameweek not found.")
         return None
-        
-    next_gw_number = current_gw.gw_number + 1
-    next_gw = await db.gameweek.find_first(where={'gw_number': next_gw_number})
     
-    # If next gameweek doesn't exist, we can't copy to it. 
-    # (The finalize logic usually creates it, but we need it NOW).
+    current_gw_num = current_gw.gw_number
+    next_gw_num = current_gw_num + 1
+    prev_gw_num = current_gw_num - 1
+
+    # 2. Find or Create Next Gameweek (Target)
+    next_gw = await db.gameweek.find_first(where={'gw_number': next_gw_num})
     if not next_gw:
-        # Create it simply so we have an ID target
+        # Create it if it doesn't exist (using 1 week later as placeholder deadline)
+        from datetime import timedelta
         next_gw = await db.gameweek.create(data={
-            'gw_number': next_gw_number,
+            'gw_number': next_gw_num,
             'status': 'UPCOMING',
-            'deadline': current_gw.deadline # Placeholder, admin can update later
+            'deadline': current_gw.deadline + timedelta(days=7) 
         })
-        logger.info(f"Created Next Gameweek {next_gw_number} for early rollover.")
+        logger.info(f"Created Next Gameweek {next_gw_num}")
 
-    # 2. Check if teams already exist for next GW (idempotency)
-    existing_count = await db.userteam.count(where={'gameweek_id': next_gw.id})
-    if existing_count > 0:
-        logger.info("Teams already exist for next gameweek. Skipping early rollover.")
+    # 3. Idempotency Check (Don't run twice)
+    if await db.userteam.count(where={'gameweek_id': next_gw.id}) > 0:
+        logger.warning(f"Teams already exist for GW {next_gw_num}. Skipping rollover.")
         return next_gw
 
-    # 3. Bulk Copy Logic
-    # We fetch all teams for current GW and insert for Next GW
-    current_teams = await db.userteam.find_many(where={'gameweek_id': current_gw_id})
-    
-    if not current_teams:
-        return next_gw
+    # 4. Identify 'FREE_HIT' Users
+    # We look for chips played in the CURRENT gameweek
+    active_chips = await db.userchip.find_many(
+        where={
+            'gameweek_id': current_gw_id,
+            'name': 'FREE_HIT'  # Ensure this matches your enum/string exactly
+        }
+    )
+    free_hit_user_ids = {chip.user_id for chip in active_chips}
+    logger.info(f"Found {len(free_hit_user_ids)} users with Free Hit active.")
 
-    # Prepare batch insert
-    # We copy everything EXCEPT the ID. 
-    # Importantly: We copy the CURRENT 'is_benched' state (The Clean State)
+    # 5. Locate Previous Gameweek (The 'Restore Point')
+    prev_gw = await db.gameweek.find_first(where={'gw_number': prev_gw_num})
+    prev_gw_id = prev_gw.id if prev_gw else None
+
+    # 6. Build the New Roster
     new_teams_data = []
-    for team in current_teams:
-        new_teams_data.append({
-            'user_id': team.user_id,
-            'player_id': team.player_id,
-            'gameweek_id': next_gw.id,
-            'is_captain': team.is_captain,
-            'is_vice_captain': team.is_vice_captain,
-            'is_benched': team.is_benched, # COPY THE ORIGINAL SELECTION
-            # Default transfer info resets usually happens here
-        })
     
+    # Get all active users
+    users = await db.user.find_many(where={'is_active': True})
+    
+    for user in users:
+        source_gw_id = None
+        
+        # --- LOGIC CORE ---
+        if user.id in free_hit_user_ids:
+            if prev_gw_id:
+                # User played Free Hit -> Revert to PREVIOUS week
+                source_gw_id = prev_gw_id
+                logger.info(f"User {user.email}: Free Hit detected. Reverting team from GW {prev_gw_num}.")
+            else:
+                # Edge Case: Played Free Hit in GW 1 (Impossible, but fallback safely)
+                source_gw_id = current_gw_id
+                logger.warning(f"User {user.email}: Free Hit in GW 1? Copying current team.")
+        else:
+            # Normal -> Copy CURRENT week
+            source_gw_id = current_gw_id
+
+        # Fetch the squad from the source week
+        source_team = await db.userteam.find_many(
+            where={'gameweek_id': source_gw_id, 'user_id': user.id}
+        )
+        
+        if not source_team:
+            continue
+
+        # Prepare rows for the Next Gameweek
+        for entry in source_team:
+            new_teams_data.append({
+                'user_id': user.id,
+                'player_id': entry.player_id,
+                'gameweek_id': next_gw.id,
+                # Crucial: Copy the 'is_benched' state from the source.
+                # If reverting, this puts their old players back on the bench correctly.
+                'is_benched': entry.is_benched,
+                'is_captain': entry.is_captain,
+                'is_vice_captain': entry.is_vice_captain,
+            })
+
+    # 7. Batch Insert
     if new_teams_data:
         await db.userteam.create_many(data=new_teams_data)
-        logger.info(f"Early Rollover: Copied {len(new_teams_data)} rows to GW {next_gw.id}")
+        logger.info(f"Rollover Complete. {len(new_teams_data)} rows created for GW {next_gw_num}.")
 
     return next_gw
 

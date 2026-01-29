@@ -153,7 +153,7 @@ class SetArmbandRequest(BaseModel):
     player_id: int
     kind: str = Field(pattern="^(C|VC)$")
 
-ChipName = Literal['TRIPLE_CAPTAIN', 'WILDCARD']
+ChipName = Literal['TRIPLE_CAPTAIN', 'WILDCARD','FREE_HIT']
 class PlayChipRequest(BaseModel):
     chip: ChipName
     gameweek_id: Optional[int] = None
