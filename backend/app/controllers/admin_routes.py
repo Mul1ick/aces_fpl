@@ -22,6 +22,7 @@ from app.services.fixture_service import (
     submit_fixture_stats_service, 
     get_fixture_stats_service
 )
+from app.services.autosub_service import process_autosubs_for_gameweek
 
 # Repositories
 from app.repositories.user_repo import (
@@ -65,6 +66,67 @@ router = APIRouter(
     dependencies=[Depends(auth.get_current_admin_user)]
 )
 
+# --- HELPER: PRE-ROLLOVER TEAMS ---
+async def pre_rollover_teams(db: Prisma, current_gw_id: int):
+    """
+    Copies the CURRENT (clean) teams to the NEXT gameweek ID 
+    before Autosubs modify them.
+    """
+    # 1. Determine Next Gameweek ID
+    # Assuming GW IDs are sequential or we need to find the next one
+    # For safety, let's look up the current GW and find the next sequential number
+    current_gw = await db.gameweek.find_unique(where={'id': current_gw_id})
+    if not current_gw:
+        return None
+        
+    next_gw_number = current_gw.gw_number + 1
+    next_gw = await db.gameweek.find_first(where={'gw_number': next_gw_number})
+    
+    # If next gameweek doesn't exist, we can't copy to it. 
+    # (The finalize logic usually creates it, but we need it NOW).
+    if not next_gw:
+        # Create it simply so we have an ID target
+        next_gw = await db.gameweek.create(data={
+            'gw_number': next_gw_number,
+            'status': 'UPCOMING',
+            'deadline': current_gw.deadline # Placeholder, admin can update later
+        })
+        logger.info(f"Created Next Gameweek {next_gw_number} for early rollover.")
+
+    # 2. Check if teams already exist for next GW (idempotency)
+    existing_count = await db.userteam.count(where={'gameweek_id': next_gw.id})
+    if existing_count > 0:
+        logger.info("Teams already exist for next gameweek. Skipping early rollover.")
+        return next_gw
+
+    # 3. Bulk Copy Logic
+    # We fetch all teams for current GW and insert for Next GW
+    current_teams = await db.userteam.find_many(where={'gameweek_id': current_gw_id})
+    
+    if not current_teams:
+        return next_gw
+
+    # Prepare batch insert
+    # We copy everything EXCEPT the ID. 
+    # Importantly: We copy the CURRENT 'is_benched' state (The Clean State)
+    new_teams_data = []
+    for team in current_teams:
+        new_teams_data.append({
+            'user_id': team.user_id,
+            'player_id': team.player_id,
+            'gameweek_id': next_gw.id,
+            'is_captain': team.is_captain,
+            'is_vice_captain': team.is_vice_captain,
+            'is_benched': team.is_benched, # COPY THE ORIGINAL SELECTION
+            # Default transfer info resets usually happens here
+        })
+    
+    if new_teams_data:
+        await db.userteam.create_many(data=new_teams_data)
+        logger.info(f"Early Rollover: Copied {len(new_teams_data)} rows to GW {next_gw.id}")
+
+    return next_gw
+
 # --- SEASON & GAMEWEEK LIFECYCLE ---
 
 @router.post("/gameweeks/start-season")
@@ -91,12 +153,35 @@ async def calculate_gameweek_points(gameweek_id: int, db: Prisma = Depends(get_d
 
 @router.post("/gameweeks/{gameweek_id}/finalize")
 async def finalize_gameweek(gameweek_id: int, db: Prisma = Depends(get_db)):
-    live_gw, upcoming_gw = await finalize_gameweek_logic(db, gameweek_id)
+    logger.info(f"--- Initiating Finalization for Gameweek ID {gameweek_id} ---")
     
-    message = f"Gameweek {live_gw.gw_number} finalized."
-    if upcoming_gw:
-        message += f" Gameweek {upcoming_gw.gw_number} is now live."
-    return {"message": message}
+    try:
+        # STEP 1: Run Autosubs (BEFORE points are final)
+        logger.info("Step 1: Running Automatic Substitutions...")
+        subs_count = await process_autosubs_for_gameweek(db, gameweek_id)
+        logger.info(f"Autosubs complete. {subs_count} squads updated.")
+
+        # STEP 2: Re-calculate points (To account for subs coming off the bench)
+        logger.info("Step 2: Re-calculating points for all users...")
+        users = await db.user.find_many(where={'is_active': True, 'fantasy_team': {'is_not': None}})
+        if users:
+            for user in users:
+                await compute_user_score_for_gw(db, str(user.id), gameweek_id)
+        logger.info("Points re-calculation complete.")
+
+        # STEP 3: Finalize (Status Change & Rollover)
+        logger.info("Step 3: Finalizing Gameweek Status and Rolling Over...")
+        live_gw, upcoming_gw = await finalize_gameweek_logic(db, gameweek_id)
+        
+        message = f"Gameweek {live_gw.gw_number} finalized (Autosubs run: {subs_count})."
+        if upcoming_gw:
+            message += f" Gameweek {upcoming_gw.gw_number} is now live."
+        
+        return {"message": message}
+    
+    except Exception as e:
+        logger.error(f"Error finalizing gameweek {gameweek_id}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Finalization failed: {str(e)}")
 
 
 # --- DATA VIEWING & ENTRY (DASHBOARD) ---
@@ -294,3 +379,20 @@ async def admin_fixture_players(fixture_id: int, db: Prisma = Depends(get_db)):
 @router.get("/fixtures/{fixture_id}/stats", response_model=schemas.FixtureStatsOut)
 async def admin_get_fixture_stats(fixture_id: int, db: Prisma = Depends(get_db)):
     return await get_fixture_stats_service(db, fixture_id)
+
+
+@router.post("/gameweeks/{gameweek_id}/run-autosubs")
+async def trigger_autosubs(gameweek_id: int, db: Prisma = Depends(get_db)):
+    """
+    Manually triggers the automatic substitution process.
+    Should be run after all fixtures are finished and stats are entered,
+    but BEFORE final rank calculation.
+    """
+    try:
+        count = await process_autosubs_for_gameweek(db, gameweek_id)
+        # Re-calculate points immediately after subs to reflect changes
+        await calculate_gameweek_points(gameweek_id, db) 
+        return {"message": f"Autosubs processed for {count} teams. Points recalculated."}
+    except Exception as e:
+        logger.error(f"Autosub error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
