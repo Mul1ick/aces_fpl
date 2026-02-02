@@ -140,7 +140,18 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
     # Build points map for the GW
     stats = await db.gameweekplayerstats.find_many(where={'gameweek_id': gameweek_id})
     pts = {s.player_id: s.points for s in stats}  # missing => 0
-    played_map = {s.player_id: getattr(s, 'played', False) for s in stats}
+
+    def has_participation(player_id: int) -> bool:
+        s = next((item for item in stats if item.player_id == player_id), None)
+        if not s: return False
+        # If they have points, they played. 
+        if s.points != 0: return True
+        # If points are 0, check for any non-zero stat (Yellow cards, etc.)
+        return any([
+            s.goals_scored > 0, s.assists > 0, s.yellow_cards > 0, 
+            s.red_cards > 0, s.bonus_points > 0, s.clean_sheets,
+            s.goals_conceded > 0, s.own_goals > 0, s.penalties_missed > 0
+        ])
 
 
     starters = [e for e in entries if not e.is_benched]
@@ -153,10 +164,9 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
 
     # Choose multiplier target: captain if played else vice if played
     bonus_target = None
-    if cap and played_map.get(cap.player_id, False):
+    if cap and has_participation(cap.player_id):
         bonus_target = cap.player_id
-    # 2. Else try Vice: Takes armband if Cap didn't play (even if Vice didn't play either)
-    elif vice:
+    elif vice and has_participation(vice.player_id):
         bonus_target = vice.player_id
 
     if bonus_target is not None:
