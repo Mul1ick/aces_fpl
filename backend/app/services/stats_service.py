@@ -581,3 +581,71 @@ async def calculate_team_of_the_season(db: Prisma):
         "starting": starters,
         "bench": bench
     }
+
+
+async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsRequest):
+    # Import the calculator utility
+    from app.utils.points_calculator import calculate_player_points
+    
+    # 1. Map input fields to actual Prisma database fields
+    # This ensures your 'goals' from Postman becomes 'goals_scored' for the DB
+    raw_data = data.model_dump(exclude_unset=True)
+    player_id = raw_data.pop("player_id")
+    gameweek_id = raw_data.pop("gameweek_id")
+    
+    # Map common aliases to schema names
+    mapping = {
+        "goals": "goals_scored",
+        "assists": "assists",
+        "clean_sheets": "clean_sheets",
+        "yellow_cards": "yellow_cards",
+        "red_cards": "red_cards",
+        "played": "played"
+    }
+    
+    db_update_data = {}
+    for key, value in raw_data.items():
+        db_field = mapping.get(key, key)
+        db_update_data[db_field] = value
+
+    # 2. Get the current player's position to recalculate points
+    player = await db.player.find_unique(where={"id": player_id})
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    # 3. Recalculate the 'points' field
+    # We fetch the current record, merge the updates, and calculate a new total
+    current_stats = await db.gameweekplayerstats.find_unique(
+        where={'gameweek_id_player_id': {'player_id': player_id, 'gameweek_id': gameweek_id}}
+    )
+    
+    # Merge existing data with the new updates to ensure calculate_player_points has a full object
+    full_stats_dict = current_stats.model_dump() if current_stats else {}
+    full_stats_dict.update(db_update_data)
+    
+    # Use your provided utility function
+    new_total_points = calculate_player_points(player.position, schemas.PlayerStatIn(**full_stats_dict))
+    db_update_data["points"] = new_total_points
+
+    # 4. Perform the Update
+    await db.gameweekplayerstats.update(
+        where={
+            'gameweek_id_player_id': {
+                'player_id': player_id,
+                'gameweek_id': gameweek_id
+            }
+        },
+        data=db_update_data
+    )
+
+    # 5. Trigger the ripple effect for affected users
+    affected_users = await db.userteam.find_many(
+        where={'player_id': player_id, 'gameweek_id': gameweek_id},
+        distinct=['user_id']
+    )
+
+    for record in affected_users:
+        # Call the local function to update UserGameweekScore and Leaderboards
+        await compute_user_score_for_gw(db, record.user_id, gameweek_id)
+    
+    return {"message": f"Successfully updated stats for {player.full_name}. New GW points: {new_total_points}"}

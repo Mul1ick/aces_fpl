@@ -302,3 +302,10 @@ class PlayerDetailResponse(BaseModel):
     history: List[PlayerHistoryItem]
     upcoming_fixtures: List[UpcomingFixtureItem]
 
+class UpdatePlayerStatsRequest(BaseModel):
+    player_id: int
+    gameweek_id: int
+    goals: Optional[int] = None
+    assists: Optional[int] = None
+    clean_sheets: Optional[bool] = None
+    yellow_cards: Optional[int] = None

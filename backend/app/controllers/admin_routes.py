@@ -8,6 +8,7 @@ from prisma import Prisma
 
 from app import schemas, auth
 from app.database import get_db
+from app.services import stats_service
 
 # --- IMPORT SERVICES & REPOS (The new modular files) ---
 from app.services.admin_task_service import (
@@ -438,3 +439,11 @@ async def trigger_autosubs(gameweek_id: int, db: Prisma = Depends(get_db)):
     except Exception as e:
         logger.error(f"Autosub error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.patch("/edit-stats")
+async def edit_historical_stats(
+    req: schemas.UpdatePlayerStatsRequest, 
+    db: Prisma = Depends(get_db),
+    admin=Depends(auth.get_current_admin_user) # Ensure only admin can access
+):
+    return await stats_service.update_historical_stats(db, req)
