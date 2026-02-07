@@ -95,7 +95,9 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
                 'position': entry.player.position,
                 'is_benched': entry.is_benched,
                 'is_captain': entry.is_captain,
-                'is_vice_captain': entry.is_vice_captain
+                'is_vice_captain': entry.is_vice_captain,
+                'bench_priority': entry.bench_priority,
+                
             })
 
         starters = [p for p in roster if not p['is_benched']]

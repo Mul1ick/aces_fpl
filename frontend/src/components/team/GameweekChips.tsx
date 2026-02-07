@@ -120,7 +120,7 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
   const getButtonText = (chipId: string, isActive: boolean, isUsed: boolean, isAnyActive: boolean, isRestricted: boolean) => {
     if (isActive) return "Active";
     if (isUsed) return "Used"; 
-    if (isRestricted) return "Not Needed"; // Or "Unavailable"
+    if (isRestricted) return "Unavailable for GW 1"; // Or "Unavailable"
     if (isAnyActive && !isActive) return "Unavailable";
     return "Play";
   };
@@ -144,9 +144,13 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
             
             // CONSTRAINT LOGIC: 
             // If it is the first gameweek, Wildcard and Free Hit are restricted.
-            const isRestricted = isFirstGameweek && (chip.id === 'WILDCARD' || chip.id === 'FREE_HIT');
+            
+            const isRestricted = 
+                (!user?.played_first_gameweek) && 
+                (chip.id === 'WILDCARD' || chip.id === 'FREE_HIT');
 
             const isDisabled = isUsed || (isAnyActive && !isActive) || isRestricted;
+
 
             return (
               <div

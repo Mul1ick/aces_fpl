@@ -102,6 +102,7 @@ model UserTeam {
   is_captain      Boolean  @default(false)
   is_vice_captain Boolean  @default(false)
   is_benched      Boolean  @default(false)
+  bench_priority  Int?
 
   user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)

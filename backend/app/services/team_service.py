@@ -150,7 +150,13 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     )
     logger.info(f"User team entries fetched: {len(entries)}")
     if not entries:
-        return {"team_name": fantasy_team.name, "starting": [], "bench": []}
+        # FIX 2: Add active_chip here (This is where your specific error triggered)
+        return {
+            "team_name": fantasy_team.name, 
+            "starting": [], 
+            "bench": [], 
+            "active_chip": None
+        }
 
     player_ids: List[int] = [e.player_id for e in entries]
     team_ids: List[int] = list({e.player.team_id for e in entries})
@@ -455,6 +461,7 @@ async def save_existing_team(
             'is_captain': b(p.get('is_captain', False)),
             'is_vice_captain': b(p.get('is_vice_captain', False)),
             'is_benched': b(p.get('is_benched', False)),
+            'bench_priority': p.get('bench_priority', None),
         })
 
     captains = [t for t in to_create if t['is_captain']]
