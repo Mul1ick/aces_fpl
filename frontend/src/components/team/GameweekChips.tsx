@@ -1,196 +1,301 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { RefreshCw, Zap, X } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { getChipStatus, playChip, type ChipStatus, type ChipName } from '@/lib/api';
+import { getChipStatus, playChip, type ChipStatus } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
+// --- 1. IMPORT BUTTON ICONS (Transparent) ---
+import wildcardIcon from '@/assets/images/chips/wildcard-transparent.png';
+import tripleCaptainIcon from '@/assets/images/chips/triplecaptain-transparent.png';
+import benchBoostIcon from '@/assets/images/chips/benchboost-transparent.png';
+import freeHitIcon from '@/assets/images/chips/free-hit-transparent.png';
+
+// --- 2. IMPORT SLIDER IMAGES (Big/Solid) ---
+import wildcardIll from '@/assets/images/chips/wild-card.png';
+import tripleCaptainIll from '@/assets/images/chips/triple-captain.png';
+import benchBoostIll from '@/assets/images/chips/bench-boost.png';
+import freeHitIll from '@/assets/images/chips/free-hit.png';
+
+type ExtendedChipName = 'WILDCARD' | 'TRIPLE_CAPTAIN' | 'BENCH_BOOST' | 'FREE_HIT';
+
+interface ExtendedChipStatus {
+  active: ExtendedChipName | null;
+  used: ExtendedChipName[];
+}
 
 const chips = [
-  { id: 'WILDCARD' as const, name: 'Wildcard', icon: RefreshCw, description: 'Unlimited free transfers for this Gameweek. Once activated, this chip cannot be cancelled. Available once per season.' },
-  { id: 'TRIPLE_CAPTAIN' as const, name: 'Triple Captain', icon: Zap, description: 'Captain scores are tripled this Gameweek. Once activated, this chip cannot be cancelled. Available once per season.' },
+  { 
+    id: 'WILDCARD' as ExtendedChipName, 
+    name: 'Wildcard', 
+    icon: wildcardIcon,           
+    illustration: wildcardIll,    
+    description: 'The Wildcard allows you to make unlimited permanent transfers to your squad without any point deductions.',
+  },
+  { 
+    id: 'TRIPLE_CAPTAIN' as ExtendedChipName, 
+    name: 'Triple Captain', 
+    icon: tripleCaptainIcon,
+    illustration: tripleCaptainIll,
+    description: 'Your Captain gets triple points instead of double points for this Gameweek only.',
+  },
+  { 
+    id: 'BENCH_BOOST' as ExtendedChipName, 
+    name: 'Bench Boost', 
+    icon: benchBoostIcon,
+    illustration: benchBoostIll,
+    description: 'The points scored by your 4 bench players are included in your total score for this Gameweek.',
+  },
+  { 
+    id: 'FREE_HIT' as ExtendedChipName, 
+    name: 'Free Hit', 
+    icon: freeHitIcon,
+    illustration: freeHitIll,
+    description: 'Make unlimited transfers for a single Gameweek. At the next deadline, your squad returns to its previous state.',
+  },
 ];
+
 type ChipItem = typeof chips[number];
 
-export const GameweekChips: React.FC<{ token: string; gw?: number }> = ({ token, gw }) => {
+// Added isFirstGameweek prop here
+export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGameweek?: boolean }> = ({ token, gw, isFirstGameweek = false }) => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [status, setStatus] = useState<ChipStatus>({ active: null, used: [] });
+  
+  const [status, setStatus] = useState<ExtendedChipStatus>({ active: null, used: [] });
   const [selectedChip, setSelectedChip] = useState<ChipItem | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  
-  const refresh = async () => {
-    try { setStatus(await getChipStatus(token, gw)); }
-    catch (e:any) { toast({ variant: 'destructive', title: 'Chip status failed', description: e.message }); }
-  };
-  
-  useEffect(() => { if (token) refresh(); }, [token, gw]);
+  const [isDesktop, setIsDesktop] = useState(false);
 
-  const handleChipClick = (chip: ChipItem) => {
-    // If a chip is already active, prevent clicking others
-    if (status.active) return;
+  // Track screen size for animation & layout logic
+  useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.innerWidth >= 768); 
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
 
-    // Custom check for Wildcard during first gameweek (unlimited transfers)
-    if (chip.id === 'WILDCARD' && user?.played_first_gameweek === false) {
-      toast({
-        title: "Wildcard Unavailable",
-        description: "Wildcard not available during free transfers.",
-        variant: "destructive", // Uses the red alert style to indicate restriction
-      });
-      return;
-    }
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const data = await getChipStatus(token);
+        setStatus(data as unknown as ExtendedChipStatus);
+      } catch (error) {
+        console.error('Failed to fetch chip status', error);
+      }
+    };
+    fetchStatus();
+  }, [token]);
 
+  const handleOpenSlider = (chip: ChipItem) => {
     setSelectedChip(chip);
   };
 
   const executePlayChip = async () => {
-    if (!selectedChip) return;
+    if (!selectedChip || !user) return;
     setLoading(true);
-    setIsConfirmOpen(false);
     try {
-      await playChip(token, selectedChip.id as ChipName, gw);
-      await refresh();
-      setSelectedChip(null);
-      toast({ title: `${selectedChip.name} activated` });
-    } catch (e:any) {
-      toast({ variant: 'destructive', title: `Could not play ${selectedChip.name}`, description: e.message });
-    } finally { 
-      setLoading(false); 
+      await playChip(token, selectedChip.id as any);
+      setStatus(prev => ({ ...prev, active: selectedChip.id }));
+      toast({
+        title: "Chip Activated",
+        description: `${selectedChip.name} is now active for this gameweek.`,
+        variant: "default", 
+      });
+      setSelectedChip(null); 
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.detail || "Failed to activate chip",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
-  
+
+  // Helper to determine the text for the button
+  const getButtonText = (chipId: string, isActive: boolean, isUsed: boolean, isAnyActive: boolean, isRestricted: boolean) => {
+    if (isActive) return "Active";
+    if (isUsed) return "Used"; 
+    if (isRestricted) return "Not Needed"; // Or "Unavailable"
+    if (isAnyActive && !isActive) return "Unavailable";
+    return "Play";
+  };
+
+  // Animation Variants: Right Slide for Desktop, Bottom Slide for Mobile
+  const sidebarVariants = {
+    hidden: isDesktop ? { x: "100%", y: 0 } : { y: "100%", x: 0 },
+    visible: { x: 0, y: 0 },
+    exit: isDesktop ? { x: "100%", y: 0 } : { y: "100%", x: 0 }
+  };
+
   return (
     <>
-      <Card className="bg-gradient-to-br from-[#37003C] to-[#23003F] border-purple-800/50">
-        <CardContent className="p-4">
-          <div className="flex justify-around items-center text-center">
-            {chips.map(chip => {
-              const isActive = status.active === chip.id;
-              const isUsed = status.used.includes(chip.id as ChipName);
-              
-              // Only block interaction if it's the Wildcard specifically disabled for new users
-              const isWildcard = chip.id === 'WILDCARD';
-              const hasUnlimitedTransfers = user?.played_first_gameweek === false;
-              
-              // MODIFIED: Removed the check for (isWildcard && hasUnlimitedTransfers) so the button stays enabled
-              const isDisabled = loading || 
-                                 (!isActive && (status.active !== null || isUsed));
+      {/* --- MAIN CHIP CONTROL PANEL --- */}
+      <div className="bg-[#38003c] rounded-xl p-4 mb-6 shadow-md text-white">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {chips.map((chip) => {
+            const isActive = status.active === chip.id;
+            const isUsed = status.used.includes(chip.id) && !isActive;
+            const isAnyActive = status.active !== null;
+            
+            // CONSTRAINT LOGIC: 
+            // If it is the first gameweek, Wildcard and Free Hit are restricted.
+            const isRestricted = isFirstGameweek && (chip.id === 'WILDCARD' || chip.id === 'FREE_HIT');
 
-              let tooltipText = "";
-              if (isUsed && !isActive) tooltipText = "Already used";
-              else if (isWildcard && hasUnlimitedTransfers) tooltipText = "Unlimited transfers active";
-              else if (status.active && !isActive) tooltipText = "Another chip is active";
+            const isDisabled = isUsed || (isAnyActive && !isActive) || isRestricted;
 
-              return (
-                <div key={chip.id} className="flex flex-col items-center space-y-2 h-[110px] justify-start">
-                  <button
-                    onClick={() => handleChipClick(chip)}
-                    disabled={isDisabled || isActive} // Disable click if it's already active
-                    className={cn(
-                      "w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all",
-                      isActive 
-                        ? "bg-dashboard-gradient border-transparent text-white shadow-[0_0_15px_rgba(37,99,235,0.6)]" 
-                        : "bg-black/20 border-transparent text-white",
-                      isDisabled && !isActive
-                        ? "opacity-30 cursor-not-allowed" 
-                        : "hover:bg-white/5"
-                    )}
-                    title={tooltipText}
-                  >
-                    <chip.icon className="size-8" />
-                  </button>
-                  <p className="text-xs font-semibold text-white">
-                    {chip.name}{isUsed && !isActive ? " (used)" : ""}
-                  </p>
-                  
-                  {/* Status Indicator Badge (Non-clickable) */}
-                  {isActive && (
-                    <div className="mt-1 w-full px-3 py-1 rounded-full bg-gradient-to-r from-accent-teal to-accent-blue opacity-90 cursor-default shadow-md">
-                      <p className="text-xs font-bold text-black uppercase tracking-wide">Active</p>
-                    </div>
+            return (
+              <div
+                key={chip.id}
+                className={cn(
+                  "group flex flex-col items-center justify-between p-3 rounded-lg transition-all duration-300 min-h-[140px]",
+                  isActive ? "bg-white/10 shadow-lg scale-105" : "bg-transparent",
+                  !isDisabled && !isActive ? "hover:bg-white/5 hover:-translate-y-1" : ""
+                )}
+              >
+                <div 
+                  className={cn(
+                    "flex flex-col items-center flex-grow justify-center w-full transition-opacity duration-300",
+                    isDisabled && !isUsed ? "opacity-50" : "", 
+                    isUsed ? "opacity-30 grayscale" : ""       
                   )}
+                  onClick={() => !isDisabled && !isActive && handleOpenSlider(chip)}
+                  style={{ cursor: isDisabled ? 'default' : 'pointer' }}
+                >
+                    <img 
+                      src={chip.icon} 
+                      alt={chip.name}
+                      className={cn(
+                          "w-12 h-12 object-contain mb-2 transition-transform duration-300",
+                          "brightness-0 invert",
+                          !isDisabled && !isActive && "group-hover:scale-110"
+                      )}
+                    />
+                    <h4 className="text-[10px] sm:text-xs font-bold tracking-wide text-center leading-tight">
+                      {chip.name}
+                    </h4>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Chip Detail Modal */}
+
+                <button
+                    type="button"
+                    disabled={isDisabled} 
+                    onClick={() => !isDisabled && !isActive && handleOpenSlider(chip)}
+                    className={cn(
+                        "w-full mt-3 py-1.5 px-2 rounded text-[10px] font-bold  tracking-wider transition-all duration-300",
+                        isActive 
+                            ? "bg-gradient-to-r from-cyan-300 via-blue-600 to-purple-700 text-white shadow-md border-none opacity-100 cursor-default"
+                            : "",
+                        // Unavailable States (Other active OR Restricted OR Used)
+                        (!isActive && isAnyActive) || isRestricted
+                            ? "bg-transparent text-gray-400 border border-gray-600 cursor-not-allowed"
+                            : "",
+                        isUsed
+                            ? "bg-transparent text-gray-500 border border-gray-700 cursor-not-allowed"
+                            : "",
+                        // Play State
+                        !isActive && !isAnyActive && !isUsed && !isRestricted
+                            ? "bg-transparent border border-white text-white hover:bg-white hover:text-[#38003c] shadow-sm"
+                            : ""
+                    )}
+                >
+                    {getButtonText(chip.id, isActive, isUsed, isAnyActive, isRestricted)}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* --- RESPONSIVE SLIDER --- */}
       <AnimatePresence>
         {selectedChip && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedChip(null)}
-          >
+          <>
+            {/* Backdrop */}
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm bg-white rounded-lg shadow-xl"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
+              onClick={() => setSelectedChip(null)}
+            />
+            
+            {/* Slider Content */}
+            <motion.div
+              variants={sidebarVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className={cn(
+                "fixed z-50 bg-white shadow-2xl overflow-y-auto",
+                // MOBILE
+                "bottom-0 left-0 right-0 w-full rounded-t-[2rem] max-h-[90vh]",
+                // DESKTOP (Right Drawer, 30%)
+                "md:top-0 md:right-0 md:left-auto md:bottom-auto", 
+                "md:h-full md:w-[30%] md:min-w-[400px] md:max-h-full", 
+                "md:rounded-none md:rounded-l-3xl"
+              )}
             >
-              <div className="p-6">
-                <div className="text-center">
-                   <div className="w-16 h-16 bg-gradient-to-br from-[#37003C] to-[#23003F] rounded-full flex items-center justify-center mx-auto mb-4">
-                        <selectedChip.icon className="size-8 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-black">{selectedChip.name}</h3>
-                </div>
-                <p className="text-sm text-gray-600 my-4 text-center">{selectedChip.description}</p>
+              <div className="p-8 h-full flex flex-col items-center text-center text-black relative">
                 
-                <Button 
-                  className="w-full mt-6" 
-                  onClick={() => setIsConfirmOpen(true)} 
-                  disabled={loading}
+                {/* Close Button */}
+                <button 
+                  onClick={() => setSelectedChip(null)}
+                  className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
                 >
-                  Play Chip
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+
+                {/* 1. Big Chip Logo */}
+                <div className="mt-4 md:mt-8 mb-4">
+                   <img 
+                    src={selectedChip.illustration} 
+                    alt={selectedChip.name}
+                    className="w-32 h-32 md:w-36 md:h-36 object-contain drop-shadow-xl"
+                   />
+                </div>
+
+                {/* 2. Chip Name */}
+                <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-2 text-[#38003c]">
+                  {selectedChip.name}
+                </h2>
+
+                {/* 3. Description */}
+                <div className="mb-6 max-w-sm mx-auto">
+                    <p className="text-gray-800 text-base md:text-lg font-medium leading-relaxed">
+                        {selectedChip.description}
+                    </p>
+                </div>
+
+                {/* 4. Warning */}
+                <div className="bg-gray-100 rounded-xl p-4 w-full mb-8">
+                    <h4 className="flex items-center justify-center gap-2 text-sm font-bold text-gray-700 mb-2 tracking-wider">
+                        <AlertTriangle className="w-4 h-4 text-black" /> Important
+                    </h4>
+                    <ul className="text-left text-sm space-y-1 text-gray-600 mx-auto max-w-[90%] list-disc pl-4">
+                        <li>Once activated, this chip <strong>cannot be cancelled</strong>.</li>
+                        <li>You only get <strong>one</strong> {selectedChip.name} per season.</li>
+                    </ul>
+                </div>
+
+                {/* 5. Play Button (Gradient) */}
+                <Button 
+                  onClick={executePlayChip}
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-cyan-300 via-blue-600 to-purple-700 hover:opacity-90 text-white font-black text-lg md:text-xl py-6 md:py-8 rounded-xl shadow-lg transition-all active:scale-95 tracking-widest mt-auto mb-4 border-none"
+                >
+                  {loading ? "Activating..." : `Play ${selectedChip.name}`}
                 </Button>
+                
               </div>
-              <button onClick={() => setSelectedChip(null)} className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
             </motion.div>
-          </motion.div>
+          </>
         )}
       </AnimatePresence>
-
-      {/* Confirmation Dialog */}
-      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <AlertDialogContent className="max-w-[90%] sm:max-w-lg rounded-xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Activate {selectedChip?.name}?</AlertDialogTitle>
-            <AlertDialogDescription className="text-red-600 font-medium">
-              Warning: Once activated, this chip cannot be cancelled. 
-              {selectedChip?.id === 'WILDCARD' 
-                ? " You will have unlimited transfers for this gameweek." 
-                : " Your captain's points will be tripled for this gameweek."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={executePlayChip} disabled={loading} className="bg-pl-purple hover:bg-pl-purple/90">
-              Confirm Activation
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };

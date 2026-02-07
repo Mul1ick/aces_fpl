@@ -464,11 +464,17 @@ const Dashboard: React.FC = () => {
                             <Card className="h-full border-black border-2 bg-white">
                                 <CardHeader>
                                     <CardTitle className="text-xl text-black">Dream Team</CardTitle>
-                                    <p className="text-sm text-gray-500 font-semibold">Calculating...</p>
+                                    <p className="text-sm text-gray-500 font-semibold">
+                                      { (displayGameweek?.gw_number || gameweek?.gw_number || 1) <= 1 
+                                        ? "Available after Gameweek 1"
+                                        : "Team of the Week is not yet available."
+                                      }
+                                    </p>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-center text-gray-400 py-8">
-                                        Stats processing...
+                                      Check back here after the gameweek is finalized.
+
                                     </div>
                                 </CardContent>
                             </Card>

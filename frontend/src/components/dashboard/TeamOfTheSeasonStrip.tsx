@@ -32,7 +32,7 @@ export const TeamOfTheSeasonStrip: React.FC<TeamOfTheSeasonStripProps> = ({ team
         </CardHeader>
         <CardContent className="p-8 text-center">
           <p className="text-gray-400 font-semibold text-sm">
-            Stats processing... Check back later.
+            The Team of the Season will be displayed here once the season begins and players start earning points. Stay tuned for the top performers!
           </p>
         </CardContent>
       </Card>
