@@ -144,10 +144,15 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
 
     # 1) Load current user team entries + player + club
     entries = await db.userteam.find_many(
-        where={'user_id': user_id, 'gameweek_id': gameweek_id},
-        include={'player': {'include': {'team': True}}},
-        order={'player_id': 'asc'}
-    )
+    where={'user_id': user_id, 'gameweek_id': gameweek_id},
+    include={'player': {'include': {'team': True}}},
+    # Sort by is_benched (starters first) then by priority
+    order=[
+        {'is_benched': 'asc'}, 
+        {'bench_priority': 'asc'}, 
+        {'player_id': 'asc'}
+    ] 
+)
     logger.info(f"User team entries fetched: {len(entries)}")
     if not entries:
         # FIX 2: Add active_chip here (This is where your specific error triggered)

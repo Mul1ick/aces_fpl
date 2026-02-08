@@ -16,6 +16,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isValid } from 'date-fns';
 import { transformApiPlayer } from '@/lib/player-utils';
+import { Reorder } from "framer-motion";
+import { Player } from "../types";
 
 import pitchBackground from '@/assets/images/pitch.png';
 import acesLogo from "@/assets/aces-logo.png";
@@ -280,10 +282,11 @@ const Team: React.FC = () => {
         const token = localStorage.getItem("access_token");
         if (!isDirty || !token) return;
 
-        const allPlayers = [...squad.starting, ...squad.bench];
+        // Combine for validation checks only
+        const allPlayersCheck = [...squad.starting, ...squad.bench];
 
-        const captain = allPlayers.find(p => p.isCaptain);
-        const viceCaptain = allPlayers.find(p => p.isVice);
+        const captain = allPlayersCheck.find(p => p.isCaptain);
+        const viceCaptain = allPlayersCheck.find(p => p.isVice);
 
         if (!captain) {
             toast({ variant: "destructive", title: "Validation Error", description: "Please select a Captain for your team." });
@@ -294,15 +297,31 @@ const Team: React.FC = () => {
             return;
         }
         
-       const payload = {
-            players: allPlayers.map((p) => ({
-                id: p.id,
-                position: p.pos,
-                is_captain: p.isCaptain,
-                is_vice_captain: p.isVice,
-                is_benched: p.isBenched, // This line is the change
-            }))
+        // --- LOGIC CHANGE START ---
+        // 1. Map Starters (Priority is null)
+        const formattedStarters = squad.starting.map((p) => ({
+            id: p.id,
+            position: p.pos,
+            is_captain: p.isCaptain,
+            is_vice_captain: p.isVice,
+            is_benched: false,
+            bench_priority: null, 
+        }));
+
+        // 2. Map Bench (Priority based on drag order: Index + 1)
+        const formattedBench = squad.bench.map((p, index) => ({
+            id: p.id,
+            position: p.pos,
+            is_captain: p.isCaptain,
+            is_vice_captain: p.isVice,
+            is_benched: true,
+            bench_priority: index + 1, 
+        }));
+
+        const payload = {
+            players: [...formattedStarters, ...formattedBench]
         };
+        // --- LOGIC CHANGE END ---
 
         try {
             const response = await fetch(API.endpoints.saveTeam, {
@@ -331,6 +350,16 @@ const Team: React.FC = () => {
 
         } catch (error: any) {
             toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    };
+
+    const handleOutfieldReorder = (newOutfieldOrder: Player[]) => {
+        const gk = squad.bench.find(p => p.pos === 'GK');
+        if (gk) {
+            setSquad(prev => ({
+                ...prev,
+                bench: [gk, ...newOutfieldOrder]
+            }));
         }
     };
     
@@ -363,6 +392,7 @@ const Team: React.FC = () => {
         hidden: { y: 20, opacity: 0 },
         visible: { y: 0, opacity: 1 }
     };
+
 
     return (
         <motion.div 
@@ -424,31 +454,62 @@ const Team: React.FC = () => {
               ))}
             </motion.main>
 
-            <motion.footer variants={itemVariants} className="flex-shrink-0 p-3 bg-gray-100 border-t">
+            <motion.footer variants={itemVariants} className="flex-shrink-0 p-3 bg-gray-100 border-t select-none">
                 <div className="flex justify-center items-center gap-x-12">
+                    
+                    {/* --- STATIC GOALKEEPER (Cannot be dragged) --- */}
                     {benchLayout.goalkeeper && (
-                        <motion.div
-                            key={benchLayout.goalkeeper.id}
-                            variants={itemVariants}
-                            onClick={() => handlePlayerClick(benchLayout.goalkeeper)}
-                            className={cn("cursor-pointer rounded-md transition-all", selectedPlayer?.id === benchLayout.goalkeeper.id && "ring-2 ring-accent-teal ring-offset-2 ring-offset-transparent")}
-                        >
-                            <PlayerCard player={benchLayout.goalkeeper} isBench={true} displayMode='fixture' />
-                        </motion.div>
-                    )}
-                    <div className="h-16 w-px bg-gray-300"></div>
-                    <div className="grid grid-cols-2 gap-12">
-                        {benchLayout.outfielders.map((player: any) => (
+                        <div className="relative">
+                            {/* Visual badge to show GK is always Priority 3 (Last resort) or 1 depending on logic, 
+                                usually GK sub logic is separate. We can hide priority or show a Lock icon. */}
+                            
                             <motion.div
-                                key={player.id}
-                                variants={itemVariants}
-                                onClick={() => handlePlayerClick(player)}
-                                className={cn("cursor-pointer rounded-md transition-all", selectedPlayer?.id === player.id && "ring-2 ring-accent-teal ring-offset-2 ring-offset-transparent")}
+                                key={benchLayout.goalkeeper.id}
+                                onClick={() => handlePlayerClick(benchLayout.goalkeeper)}
+                                className={cn(
+                                    "cursor-pointer rounded-md transition-all", 
+                                    selectedPlayer?.id === benchLayout.goalkeeper.id && "ring-2 ring-accent-teal ring-offset-2"
+                                )}
                             >
-                                <PlayerCard player={player} isBench={true} displayMode='fixture' />
+                                <PlayerCard player={benchLayout.goalkeeper} isBench={true} displayMode='fixture' />
                             </motion.div>
+                        </div>
+                    )}
+
+                    {/* Divider */}
+                    <div className="h-16 w-px bg-gray-300"></div>
+
+                    {/* --- DRAGGABLE OUTFIELDERS --- */}
+                    <Reorder.Group
+                        axis="x"
+                        values={benchLayout.outfielders}
+                        onReorder={handleOutfieldReorder}
+                        className="grid grid-cols-2 gap-12" // Maintain your Grid Layout
+                    >
+                        {benchLayout.outfielders.map((player: any, index: number) => (
+                            <Reorder.Item
+                                key={player.id}
+                                value={player}
+                                // 'layout' prop makes neighboring items slide smoothly
+                                layout 
+                                whileDrag={{ scale: 1.05, cursor: "grabbing", zIndex: 50 }}
+                                className="relative touch-none" // touch-none essential for mobile drag
+                            >
+                                
+
+                                <div
+                                    onClick={() => handlePlayerClick(player)}
+                                    className={cn(
+                                        "cursor-pointer rounded-md transition-all",
+                                        selectedPlayer?.id === player.id && "ring-2 ring-accent-teal ring-offset-2"
+                                    )}
+                                >
+                                    <PlayerCard player={player} isBench={true} displayMode='fixture' />
+                                </div>
+                            </Reorder.Item>
                         ))}
-                    </div>
+                    </Reorder.Group>
+
                 </div>
             </motion.footer>
 

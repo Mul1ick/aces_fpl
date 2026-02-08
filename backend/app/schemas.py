@@ -101,6 +101,7 @@ class PlayerSelection(BaseModel):
     is_captain: bool = False
     is_vice_captain: bool = False
     is_benched: bool = False
+    bench_priority: Optional[int] = None
 
 class SubmitTeamRequest(BaseModel):
     team_name:str
