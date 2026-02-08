@@ -16,7 +16,7 @@ def calculate_breakdown(position: str, st: Any) -> Tuple[Dict, List[Dict]]:
         return getattr(st, key, default) or default
 
     raw = {
-        "played": bool(get("played", False)),
+        #"played": bool(get("played", False)),
         "goals_scored": int(get("goals_scored")),
         "assists": int(get("assists")),
         "yellow_cards": int(get("yellow_cards")),
@@ -43,7 +43,7 @@ def calculate_breakdown(position: str, st: Any) -> Tuple[Dict, List[Dict]]:
 
     # 3. Build the Breakdown List (for the Popup)
     breakdown = [
-        {"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
+        #{"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
         {"label": "Goals",        "value": raw["goals_scored"],       "points": raw["goals_scored"] * goal_pts},
         {"label": "Assists",      "value": raw["assists"],            "points": raw["assists"] * 3},
         {"label": "Clean Sheet",  "value": raw["clean_sheets"],       "points": raw["clean_sheets"] * cs_pts},

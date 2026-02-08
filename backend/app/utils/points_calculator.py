@@ -2,7 +2,7 @@ from app import schemas
 
 def calculate_player_points(position: str, stats: schemas.PlayerStatIn) -> int:
     points = 0
-    if stats.played: points += 1
+    #if stats.played: points += 1
     if stats.goals_scored > 0:
         if position == "GK": points += stats.goals_scored * 10
         elif position == "DEF": points += stats.goals_scored * 6

@@ -118,7 +118,7 @@ model GameweekPlayerStats {
   player_id     Int
 
   // granular stats
-  played          Boolean @default(false)     // NEW
+  // played          Boolean @default(false)     // NEW
   goals_scored  Int     @default(0)
   assists       Int     @default(0)
   clean_sheets    Boolean @default(false)     // NEW
