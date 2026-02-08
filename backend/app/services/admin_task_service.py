@@ -124,19 +124,15 @@ async def start_season_logic(db: Prisma):
     return first_gw
 
 async def finalize_gameweek_logic(db: Prisma, gameweek_id: int):
-    # Note: alog was used in routes, we use logger here
-    # Reuse the rollover logic we already moved
-    from app.services.admin_task_service import perform_gameweek_rollover_tasks
-
+    # REMOVED: perform_gameweek_rollover_tasks(db, live_gw.id)
+    # The Controller now handles the specific order of rollover -> autosub -> finalize status
+    
     try:
         live_gw = await db.gameweek.find_first(where={'status': 'LIVE'})
         if not live_gw or live_gw.id != gameweek_id:
             raise HTTPException(status_code=400, detail="Incorrect or no live gameweek to finalize.")
         
         upcoming_gw = await db.gameweek.find_first(where={'status': 'UPCOMING'}, order={'gw_number': 'asc'})
-        
-        # Call the rollover
-        await perform_gameweek_rollover_tasks(db, live_gw.id)
         
         async with db.tx() as transaction:
             await transaction.gameweek.update(where={'id': live_gw.id}, data={'status': 'FINISHED'})
@@ -147,5 +143,4 @@ async def finalize_gameweek_logic(db: Prisma, gameweek_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        # alog.error logic replaced by throwing up
         raise HTTPException(status_code=500, detail=str(e))

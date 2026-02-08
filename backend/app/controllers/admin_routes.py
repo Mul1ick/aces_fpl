@@ -13,7 +13,8 @@ from app.services import stats_service
 # --- IMPORT SERVICES & REPOS (The new modular files) ---
 from app.services.admin_task_service import (
     start_season_logic, 
-    finalize_gameweek_logic
+    finalize_gameweek_logic,
+    perform_gameweek_rollover_tasks
 )
 from app.services.stats_service import (
     get_dashboard_stats, 
@@ -195,28 +196,60 @@ async def calculate_gameweek_points(gameweek_id: int, db: Prisma = Depends(get_d
         raise HTTPException(status_code=500, detail="Point calculation failed.")
 
 @router.post("/gameweeks/{gameweek_id}/finalize")
+# FILE: backend/app/controllers/admin_routes.py
+
+# ... (Previous imports remain the same)
+
+# ... (Keep pre_rollover_teams function as is) ...
+
+@router.post("/gameweeks/{gameweek_id}/finalize")
 async def finalize_gameweek(gameweek_id: int, db: Prisma = Depends(get_db)):
     logger.info(f"--- Initiating Finalization for Gameweek ID {gameweek_id} ---")
     
     try:
-        # STEP 1: Run Autosubs (BEFORE points are final)
-        logger.info("Step 1: Running Automatic Substitutions...")
+        # STEP 1: ROLLOVER (CRITICAL FIX: Do this FIRST)
+        # We copy the 'clean' teams (before autosubs) to the next gameweek.
+        # This ensures players return to the bench next week.
+        logger.info("Step 1: Rolling over teams to next Gameweek...")
+        
+        # We need to find the live gameweek to ensure we are rolling over the right one
+        live_gw = await db.gameweek.find_unique(where={'id': gameweek_id})
+        if not live_gw:
+             raise HTTPException(status_code=404, detail="Gameweek not found.")
+
+        # Execute the rollover logic immediately
+        # Note: We reuse the logic from admin_task_service but call it here explicitly
+        await perform_gameweek_rollover_tasks(db, gameweek_id)
+        logger.info("Rollover complete. Original lineups preserved for next week.")
+
+        # STEP 2: RUN AUTOSUBS
+        # Now we can safely modify the CURRENT gameweek's teams without affecting next week.
+        logger.info("Step 2: Running Automatic Substitutions for CURRENT Gameweek...")
         subs_count = await process_autosubs_for_gameweek(db, gameweek_id)
         logger.info(f"Autosubs complete. {subs_count} squads updated.")
 
-        # STEP 2: Re-calculate points (To account for subs coming off the bench)
-        logger.info("Step 2: Re-calculating points for all users...")
+        # STEP 3: RE-CALCULATE POINTS
+        # Calculate points based on the new lineup (with subs in)
+        logger.info("Step 3: Re-calculating points for all users...")
         users = await db.user.find_many(where={'is_active': True, 'fantasy_team': {'is_not': None}})
         if users:
             for user in users:
                 await compute_user_score_for_gw(db, str(user.id), gameweek_id)
         logger.info("Points re-calculation complete.")
 
-        # STEP 3: Finalize (Status Change & Rollover)
-        logger.info("Step 3: Finalizing Gameweek Status and Rolling Over...")
-        live_gw, upcoming_gw = await finalize_gameweek_logic(db, gameweek_id)
+        # STEP 4: UPDATE STATUS
+        # Finally, mark the gameweek as FINISHED and the next as LIVE
+        logger.info("Step 4: Updating Gameweek Status...")
         
-        message = f"Gameweek {live_gw.gw_number} finalized (Autosubs run: {subs_count})."
+        # Logic extracted from finalize_gameweek_logic since we split the tasks
+        upcoming_gw = await db.gameweek.find_first(where={'status': 'UPCOMING'}, order={'gw_number': 'asc'})
+        
+        async with db.tx() as transaction:
+            await transaction.gameweek.update(where={'id': gameweek_id}, data={'status': 'FINISHED'})
+            if upcoming_gw:
+                await transaction.gameweek.update(where={'id': upcoming_gw.id}, data={'status': 'LIVE'})
+        
+        message = f"Gameweek {live_gw.gw_number} finalized. Teams rolled over. Autosubs run: {subs_count}."
         if upcoming_gw:
             message += f" Gameweek {upcoming_gw.gw_number} is now live."
         
