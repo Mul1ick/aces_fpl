@@ -255,11 +255,18 @@ async def get_manager_hub_stats(db: Prisma, user_id: str, gameweek_id: int):
     in_the_bank = 100.0 - float(squad_value)
 
     gameweek_transfers_count = await db.transfer_log.count(
-        where={"user_id": user_id, "gameweek_id": gameweek_id}
+        where={
+            "user_id": user_id, 
+            "gameweek_id": gameweek_id,
+            "in_player": {"not": None} # <--- ADD THIS FILTER
+        }
     )
     
     total_transfers_count = await db.transfer_log.count(
-        where={"user_id": user_id}
+        where={
+            "user_id": user_id,
+            "in_player": {"not": None} # Only count rows where a player came IN
+        }
     )
 
     return {

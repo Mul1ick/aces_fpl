@@ -29,7 +29,10 @@ async def submit_fixture_stats_service(db: Prisma, gameweek_id: int, payload: sc
             
             total_points = calculate_player_points(player.position, s)
             stat_data = s.model_dump()
-            del stat_data['player_id']
+            keys_to_remove = ['player_id', 'played', 'minutes']
+            for key in keys_to_remove:
+                if key in stat_data:
+                    del stat_data[key]
             
             await tx.gameweekplayerstats.upsert(
                 where={"gameweek_id_player_id": {"gameweek_id": gameweek_id, "player_id": s.player_id}},
