@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ChipType" ADD VALUE 'BENCH_BOOST';

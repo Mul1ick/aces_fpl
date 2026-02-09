@@ -51,6 +51,7 @@ enum PlayerStatus {
   ACTIVE
   INJURED
   SUSPENDED
+  UNAVAILABLE
 }
 
 model Player {
@@ -202,6 +203,7 @@ enum ChipType {
   TRIPLE_CAPTAIN
   WILDCARD
   FREE_HIT
+  BENCH_BOOST
 }
 
 model UserChip {

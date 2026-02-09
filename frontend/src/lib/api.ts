@@ -47,7 +47,7 @@ teamOfTheWeekByGameweek: (gw: number) => `${API.BASE_URL}/gameweeks/team-of-the-
   },
 };
 
-export type ChipName = "TRIPLE_CAPTAIN" | "WILDCARD";
+export type ChipName = "TRIPLE_CAPTAIN" | "WILDCARD" | "FREE_HIT" | "BENCH_BOOST";
 export type ChipStatus = { active: ChipName | null; used: ChipName[] };
 async function apiFetch(url: string, init: RequestInit, token: string) {
   const res = await fetch(url, {

@@ -6,7 +6,7 @@ from prisma import Prisma
 from app import schemas
 from app.repositories.gameweek_repo import get_current_gameweek
 from app.services.team_service import carry_forward_team
-from app.services.chip_service import is_triple_captain_active
+from app.services.chip_service import is_triple_captain_active , is_bench_boost_active 
 from app.utils.stats_utils import calculate_breakdown
 from app.repositories.team_repo import get_team_by_id
 from app.repositories.player_repo import get_players_by_ids
@@ -114,6 +114,9 @@ async def get_transfer_stats(db: Prisma, gameweek_id: int):
     }
 
 
+# Ensure you have imported these in stats_service.py:
+# from app.services.chip_service import is_triple_captain_active, is_bench_boost_active
+
 async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) -> int:
     await carry_forward_team(db, user_id, gameweek_id)
     # Fetch team for the GW
@@ -153,14 +156,28 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
             s.goals_conceded > 0, s.own_goals > 0, s.penalties_missed > 0
         ])
 
-
-    starters = [e for e in entries if not e.is_benched]
-    cap = next((e for e in starters if e.is_captain), None)
-    vice = next((e for e in starters if e.is_vice_captain), None)
-
-    base = sum(pts.get(e.player_id, 0) for e in starters)
-
+    # --- 1. CHECK CHIPS FIRST ---
+    # We need to know this BEFORE calculating the base points
     triple = await is_triple_captain_active(db, user_id, gameweek_id)
+    bench_boost = await is_bench_boost_active(db, user_id, gameweek_id)
+
+    # --- 2. DEFINE SCORING PLAYERS ---
+    # If Bench Boost is active, ALL players count.
+    # Otherwise, only non-benched players count.
+    if bench_boost:
+        scoring_pool = entries
+    else:
+        scoring_pool = [e for e in entries if not e.is_benched]
+
+    # --- 3. CALCULATE BASE POINTS ---
+    # Sum points for everyone in the valid scoring pool (1x multiplier)
+    base = sum(pts.get(e.player_id, 0) for e in scoring_pool)
+
+    # --- 4. HANDLE CAPTAINCY ---
+    # Get starters specifically to find C/VC (Captain is always a starter in valid teams)
+    # However, searching 'entries' is safe because C/VC are flags on the row.
+    cap = next((e for e in entries if e.is_captain), None)
+    vice = next((e for e in entries if e.is_vice_captain), None)
 
     # Choose multiplier target: captain if played else vice if played
     bonus_target = None
@@ -169,14 +186,16 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
     elif vice and has_participation(vice.player_id):
         bonus_target = vice.player_id
 
+    # Add the Bonus Points
+    # Base already includes 1x points for the captain.
+    # Standard Captain = 2x total (Add 1x)
+    # Triple Captain = 3x total (Add 2x)
     if bonus_target is not None:
         bonus_points = pts.get(bonus_target, 0)
         if triple:
-            # base already counts 1x; add +2x to make triple
-            gross = base + 2 * pts[bonus_target]
+            gross = base + (2 * bonus_points)
         else:
-            # base already counts 1x; add +1x to make double
-            gross = base + pts[bonus_target]
+            gross = base + bonus_points
     else:
         gross = base
 
