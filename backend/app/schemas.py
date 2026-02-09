@@ -4,7 +4,7 @@ from typing import List, Optional, TypeVar, Generic,Literal,Dict,Any
 from datetime import datetime
 
 # --- Generic Type for Paginated Response ---
-PlayerStatus = Literal['ACTIVE', 'INJURED', 'SUSPENDED']
+PlayerStatus = Literal['ACTIVE', 'INJURED', 'SUSPENDED', 'UNAVAILABLE']
 T = TypeVar('T')
 
 class PaginatedResponse(BaseModel, Generic[T]):
@@ -188,7 +188,7 @@ class GameweekOutWithFixtures(BaseModel):
 # --- Stats Schemas ---
 class PlayerStatIn(BaseModel):
     player_id: int
-    #played: bool = False
+    played: bool = False
     goals_scored: int = 0
     assists: int = 0
     clean_sheets: bool = False
