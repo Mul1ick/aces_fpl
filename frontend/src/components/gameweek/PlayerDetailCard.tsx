@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X , AlertTriangle} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getTeamJersey } from '@/lib/player-utils';
 import { ChipName } from '@/lib/api';
@@ -29,6 +29,7 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
     : 1;
 
   const displayPoints = (player.points ?? 0) * multiplier;
+  const isUnavailable = player.status && player.status !== 'ACTIVE';
 
   return (
     <motion.div
@@ -45,6 +46,17 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
         className="relative w-full max-w-sm"
         onClick={(e) => e.stopPropagation()}
       >
+         {/* --- ADDED: Unavailability Banner --- */}
+        {isUnavailable && (
+            <motion.div 
+                className="bg-red-600 text-white p-3 text-center text-sm font-semibold rounded-t-lg flex items-center justify-center gap-2"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+            >
+                <AlertTriangle className="w-4 h-4" />
+                <span>{player.news || player.status}</span>
+            </motion.div>
+        )}
         <Card className="border-2 border-gray-300 shadow-xl bg-white text-black">
           <CardHeader className="p-4 flex flex-row items-center justify-between">
             <div>

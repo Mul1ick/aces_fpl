@@ -8,16 +8,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react';
+// --- ADDED AlertTriangle icon ---
+import { MoreHorizontal, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import type { Player } from '@/types';
 
 interface PlayerActionsProps {
   player: Player;
   onEdit: (player: Player) => void;
   onDelete: (player: Player) => void;
+  // --- ADDED: Prop for the new action ---
+  onUpdateStatus: (player: Player) => void;
 }
 
-export function PlayerActions({ player, onEdit, onDelete }: PlayerActionsProps) {
+export function PlayerActions({ player, onEdit, onDelete, onUpdateStatus }: PlayerActionsProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -29,6 +32,17 @@ export function PlayerActions({ player, onEdit, onDelete }: PlayerActionsProps) 
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onEdit(player)} className="cursor-pointer">
+          <Edit className="mr-2 h-4 w-4" />
+          <span>Edit Details</span>
+        </DropdownMenuItem>
+        
+        {/* --- ADDED: New Menu Item for Status --- */}
+        <DropdownMenuItem onClick={() => onUpdateStatus(player)} className="cursor-pointer">
+          <AlertTriangle className="mr-2 h-4 w-4" />
+          <span>Update Availability</span>
+        </DropdownMenuItem>
+        
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => onDelete(player)} className="cursor-pointer text-destructive focus:text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />

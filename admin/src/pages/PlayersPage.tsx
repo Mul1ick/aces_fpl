@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import type { Player, Team, PlayerFormData } from '@/types';
 import { teamAPI, playerAPI } from '@/lib/api';
+import { PlayerStatusModal } from '@/components/players/PlayerStatusModal';
 import { useAuth } from '@/contexts/AuthContext';
 
 // --- DUMMY DATA ---
@@ -36,6 +37,10 @@ const [error, setError] = useState<string|null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [deletingPlayer, setDeletingPlayer] = useState<Player | null>(null);
+
+  // --- ADDED: State for Status Modal ---
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [statusEditingPlayer, setStatusEditingPlayer] = useState<Player | null>(null);
 
   // Filtering, Sorting, and Pagination State
   const [filters, setFilters] = useState({
@@ -67,6 +72,7 @@ const loadPlayers = useCallback(async () => {
     setError(null);
     const teamParam = filters.teamId !== 'all' ? String(filters.teamId) : '';
     const posParam  = filters.position !== 'all' ? filters.position : '';
+    const statusParam = filters.status !== 'all' ? filters.status : '';
     const res = await playerAPI.getPlayers(authToken, filters.search || '', teamParam, posParam);
     setPlayers(res);
   } catch (e:any) { setError(e.message || "Failed to load players"); }
@@ -138,8 +144,33 @@ useEffect(() => { loadPlayers(); }, [loadPlayers]);
   const handleOpenAddModal = () => { setEditingPlayer(null); setIsModalOpen(true); };
   const handleOpenEditModal = (player: Player) => { setEditingPlayer(player); setIsModalOpen(true); };
   const handleOpenDeleteDialog = (player: Player) => { setDeletingPlayer(player); };
+  // --- ADDED: Handler for opening the Status Modal ---
+  const handleOpenStatusModal = (player: Player) => {
+    setStatusEditingPlayer(player);
+    setIsStatusModalOpen(true);
+  };
   const handleCloseModal = () => { setIsModalOpen(false); setEditingPlayer(null); };
   const handleCloseDeleteDialog = () => { setDeletingPlayer(null); };
+  const handleCloseStatusModal = () => {
+    setIsStatusModalOpen(false);
+    setStatusEditingPlayer(null);
+  };
+
+  const handleSubmitStatusForm = async (playerId: number, data: any) => {
+    if (!authToken) return;
+    try {
+      setIsLoading(true);
+      await playerAPI.updatePlayer(String(playerId), data, authToken);
+      toast({ title: 'Availability updated successfully' });
+      await loadPlayers();
+      handleCloseStatusModal();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update failed', description: e.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
 
   // Simulate form submission
   const POSITION_MAP: Record<string, string> = {
@@ -208,6 +239,7 @@ const handleConfirmDelete = async () => {
 };
 
 
+
   return (
     <div className="space-y-6">
       <div>
@@ -231,6 +263,7 @@ const handleConfirmDelete = async () => {
           <>
             <PlayerTable 
               players={paginatedPlayers} 
+              onUpdateStatus={handleOpenStatusModal} 
               onEdit={handleOpenEditModal} 
               onDelete={handleOpenDeleteDialog}
               sortConfig={sortConfig}
@@ -257,6 +290,13 @@ const handleConfirmDelete = async () => {
         onSubmit={handleSubmitForm}
         teams={teams}
         editingPlayer={editingPlayer}
+      />
+
+      <PlayerStatusModal
+        isOpen={isStatusModalOpen}
+        onClose={handleCloseStatusModal}
+        onSubmit={handleSubmitStatusForm}
+        player={statusEditingPlayer}
       />
       
       <ConfirmDialog

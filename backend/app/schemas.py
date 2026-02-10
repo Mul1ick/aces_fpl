@@ -78,6 +78,9 @@ class PlayerBase(BaseModel):
     price: float
     team_id: int
     status: PlayerStatus
+    news: Optional[str] = None
+    chance_of_playing: Optional[int] = None
+    return_date: Optional[datetime] = None
 
 class PlayerCreate(PlayerBase):
     pass
@@ -94,6 +97,10 @@ class PlayerUpdate(BaseModel):
     price: Optional[float] = None
     status: Optional[PlayerStatus] = None
     team_id: Optional[int] = None
+    news: Optional[str] = None
+    chance_of_playing: Optional[int] = None
+    return_date: Optional[datetime] = None
+    
 
 # --- FPL Specific Schemas ---
 class PlayerSelection(BaseModel):
@@ -120,6 +127,10 @@ class PlayerDisplay(BaseModel):
     team: TeamOut
     is_benched:bool
     points: int
+    status: Optional[str] = None 
+    news: Optional[str] = None
+    chance_of_playing: Optional[int] = None
+    return_date: Optional[datetime] = None
     fixture_str: Optional[str] = None
     recent_fixtures: Optional[List[Dict[str, Any]]] = None
     raw_stats: Optional[Dict[str, int]] = None
@@ -198,6 +209,7 @@ class PlayerStatIn(BaseModel):
     yellow_cards: int = 0
     red_cards: int = 0
     bonus_points: int = 0
+    suspension_duration: Optional[int] = None
 
 class SubmitFixtureStats(BaseModel):
     fixture_id: int

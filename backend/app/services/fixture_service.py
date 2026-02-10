@@ -6,6 +6,8 @@ from app.utils.points_calculator import calculate_player_points
 from app.repositories.player_repo import get_players_by_ids
 from app.repositories.gameweek_repo import get_current_gameweek
 from app.repositories.fixture_repo import get_fixtures_in_gameweek
+from app.repositories.gameweek_repo import get_gameweek_by_number 
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +15,10 @@ async def submit_fixture_stats_service(db: Prisma, gameweek_id: int, payload: sc
     fx = await db.fixture.find_unique(where={"id": payload.fixture_id})
     if not fx or fx.gameweek_id != gameweek_id: 
         raise HTTPException(400, "Fixture does not belong to this gameweek")
+    
+    current_gw = await db.gameweek.find_unique(where={'id': gameweek_id})
+    if not current_gw:
+        raise HTTPException(404, "Current Gameweek not found")
 
     player_ids = [s.player_id for s in payload.player_stats]
     players = await get_players_by_ids(db, player_ids)
@@ -29,7 +35,13 @@ async def submit_fixture_stats_service(db: Prisma, gameweek_id: int, payload: sc
             
             total_points = calculate_player_points(player.position, s)
             stat_data = s.model_dump()
+
+            # --- CORRECTION IS HERE ---
+            # Remove fields that are not in the GameweekPlayerStats table
             del stat_data['player_id']
+            if 'suspension_duration' in stat_data:
+                del stat_data['suspension_duration']
+            # --------------------------
             
             await tx.gameweekplayerstats.upsert(
                 where={"gameweek_id_player_id": {"gameweek_id": gameweek_id, "player_id": s.player_id}},
@@ -38,8 +50,36 @@ async def submit_fixture_stats_service(db: Prisma, gameweek_id: int, payload: sc
                     "update": {**stat_data, "points": total_points}
                 }
             )
+
+            if s.red_cards > 0:
+                duration = s.suspension_duration or 1 # Default to 1 match ban
+                
+                return_gw_num = current_gw.gw_number + duration
+                
+                target_gw = await tx.gameweek.find_unique(where={'gw_number': return_gw_num})
+                
+                update_data = {
+                    'status': 'SUSPENDED',
+                    'chance_of_playing': 0
+                }
+
+                if target_gw:
+                    update_data['return_date'] = target_gw.deadline
+                    date_str = target_gw.deadline.strftime('%d %b')
+                    update_data['news'] = f"Suspended until {date_str}"
+                else:
+                    update_data['return_date'] = None
+                    update_data['news'] = "Suspended (Season End)"
+
+                await tx.player.update(
+                    where={'id': s.player_id},
+                    data=update_data
+                )
+                logger.info(f"Player {player.full_name} suspended. Duration: {duration}. Return GW: {return_gw_num}")
+
     return {"ok": True}
 
+         
 async def get_fixture_stats_service(db: Prisma, fixture_id: int):
     fx = await db.fixture.find_unique(where={"id": fixture_id})
     if not fx: raise HTTPException(404, "Fixture not found")

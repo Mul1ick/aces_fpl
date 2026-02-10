@@ -144,3 +144,47 @@ async def finalize_gameweek_logic(db: Prisma, gameweek_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+async def process_player_reinstatements(db: Prisma, next_gameweek_id: int):
+    """
+    Scans for players whose injury/suspension period has ended and makes them available.
+    This is a self-contained task run during gameweek finalization.
+    """
+    alog.info(f"--- Processing Player Reinstatements for upcoming GW ID: {next_gameweek_id} ---")
+
+    # 1. Get the deadline of the upcoming gameweek to use as a reference point.
+    next_gw = await db.gameweek.find_unique(where={'id': next_gameweek_id})
+    if not next_gw:
+        alog.error(f"Reinstatement failed: Could not find next_gw with id {next_gameweek_id}")
+        return
+
+    # 2. Find all players who are currently unavailable but should now be active.
+    players_to_reinstate = await db.player.find_many(
+        where={
+            'status': {'not': 'ACTIVE'},
+            'return_date': {
+                'not': None,  # Must have a return date set
+                'lt': next_gw.deadline  # The return date must be strictly BEFORE the next deadline
+            }
+        }
+    )
+
+    if not players_to_reinstate:
+        alog.info("No players needed reinstatement for the upcoming gameweek.")
+        return
+
+    player_ids = [p.id for p in players_to_reinstate]
+    
+    # 3. Perform a bulk update to reset their status.
+    await db.player.update_many(
+        where={'id': {'in': player_ids}},
+        data={
+            'status': 'ACTIVE',
+            'news': None,
+            'chance_of_playing': None, # Null implies 100%
+            'return_date': None
+        }
+    )
+    
+    alog.info(f"Successfully reinstated {len(player_ids)} players for GW {next_gw.gw_number}.")    

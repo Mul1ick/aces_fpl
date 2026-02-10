@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Shirt, Star, User, ChevronsRight } from 'lucide-react';
+import { X, Shirt, Star, User, ChevronsRight, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -45,6 +45,7 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
   const jerseySrc = TEAM_JERSEYS[player.team] || tshirtRed;
   const isCaptain = !!player.isCaptain || !!player.is_captain;
   const isVice    = !!player.isVice || !!player.is_vice_captain;
+  const isUnavailable = player.status && player.status !== 'ACTIVE';
 
   return (
     <motion.div
@@ -61,6 +62,12 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
         className="relative w-full max-w-sm bg-white rounded-lg shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {isUnavailable && (
+            <div className="bg-red-600 text-white p-3 text-center text-sm font-semibold rounded-t-lg flex items-center justify-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                <span>{player.news || player.status}</span>
+            </div>
+        )}
         <Card className="border-2 border-gray-300">
           <CardHeader className="bg-gray-100 p-4">
             <div className="flex items-center space-x-4">

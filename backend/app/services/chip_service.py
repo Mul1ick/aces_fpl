@@ -19,7 +19,6 @@ async def is_wildcard_active(db: Prisma, user_id: str, gameweek_id: int) -> bool
     )
     return row is not None
 
-# Add this function
 async def is_bench_boost_active(db: Prisma, user_id: str, gameweek_id: int) -> bool:
     row = await db.userchip.find_first(
         where={'user_id': user_id, 'gameweek_id': gameweek_id, 'chip': 'BENCH_BOOST'}

@@ -25,8 +25,7 @@ export interface Team {
   player_count?: number;
 }
 
-export type PlayerStatus = 'ACTIVE' | 'INJURED' | 'SUSPENDED' ;
-
+export type PlayerStatus = 'ACTIVE' | 'INJURED' | 'SUSPENDED' | 'UNAVAILABLE';
 export interface Player {
   id: number;
   full_name: string;
@@ -35,6 +34,9 @@ export interface Player {
   team: Team;
   price: number;
   status: PlayerStatus;
+  news?: string | null;
+  chance_of_playing?: number | null;
+  return_date?: string | null;
   total_points: number;
   games_played: number;
   minutes_played: number;

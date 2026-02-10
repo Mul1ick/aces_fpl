@@ -60,6 +60,11 @@ model Player {
   position    String
   price       Decimal  @db.Decimal(5, 2)
   status    PlayerStatus @default(ACTIVE)
+
+  news              String?    // The reason (e.g., "Hamstring Injury", "Suspended")
+  chance_of_playing Int?       // 0, 25, 50, 75. (Used for flag color)
+  return_date       DateTime?  @db.Timestamptz(6) // Specific date eligible to return. Null = Unknown.
+  
   team_id     Int
   team        Team     @relation(fields: [team_id], references: [id], onDelete: Cascade)
   user_teams  UserTeam[]

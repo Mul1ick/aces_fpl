@@ -14,6 +14,7 @@ interface Player {
   points?: number;
   isCaptain?: boolean;
   isVice?: boolean;
+  status?: 'ACTIVE' | 'INJURED' | 'SUSPENDED' | 'UNAVAILABLE'; // --- ADDED ---
 }
 
 interface PlayerCardProps {
@@ -48,6 +49,8 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     : 1;
 
   const displayPoints = (player.points ?? 0) * multiplier;
+  const isUnavailable = player.status && player.status !== 'ACTIVE';
+
 
   return (
     <motion.div
@@ -79,7 +82,11 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         {/* Info Section */}
         <div className="h-[35%] flex flex-col">
           {/* Player Name */}
-           <div className="flex-1 bg-white text-black flex items-center justify-center px-1">
+           <div className={cn(
+             "flex-1 flex items-center justify-center px-1",
+             // --- MODIFIED: Conditional background color ---
+             isUnavailable ? 'bg-red-600 text-white' : 'bg-white text-black'
+           )}>
              <p className="font-bold truncate" style={{ fontSize: isBench ? '9px' : '11px' }}>{player.name}</p>
           </div>
           {/* Fixture or Points */}

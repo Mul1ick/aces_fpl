@@ -14,7 +14,8 @@ from app.services import stats_service
 from app.services.admin_task_service import (
     start_season_logic, 
     finalize_gameweek_logic,
-    perform_gameweek_rollover_tasks
+    perform_gameweek_rollover_tasks,
+    process_player_reinstatements
 )
 from app.services.stats_service import (
     get_dashboard_stats, 
@@ -236,6 +237,19 @@ async def finalize_gameweek(gameweek_id: int, db: Prisma = Depends(get_db)):
             for user in users:
                 await compute_user_score_for_gw(db, str(user.id), gameweek_id)
         logger.info("Points re-calculation complete.")
+
+        logger.info("Step 4: Updating Gameweek Status...")
+        upcoming_gw = await db.gameweek.find_first(where={'status': 'UPCOMING'}, order={'gw_number': 'asc'})
+        
+        async with db.tx() as transaction:
+            await transaction.gameweek.update(where={'id': gameweek_id}, data={'status': 'FINISHED'})
+            if upcoming_gw:
+                await transaction.gameweek.update(where={'id': upcoming_gw.id}, data={'status': 'LIVE'})
+
+        # --- STEP 5 (NEW): PROCESS PLAYER REINSTATEMENTS ---
+        if upcoming_gw:
+            logger.info("Step 5: Processing player reinstatements for the new gameweek...")
+            await process_player_reinstatements(db, upcoming_gw.id)
 
         # STEP 4: UPDATE STATUS
         # Finally, mark the gameweek as FINISHED and the next as LIVE

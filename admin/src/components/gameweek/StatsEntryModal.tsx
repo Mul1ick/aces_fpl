@@ -12,21 +12,34 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { Team, Player, PlayerGameweekStats } from '@/types';
 import { CompactInput } from '@/components/shared/CompactInput';
-import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, Footprints, ShieldAlert, Ban, Star } from 'lucide-react';
+import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, Footprints, ShieldAlert, Ban, Star, Timer } from 'lucide-react';
 
-type PlayerStatInputs = {
-  [playerId: number]: PlayerGameweekStats;
+// --- MODIFIED: Extend type locally to include suspension duration ---
+type ExtendedPlayerGameweekStats = PlayerGameweekStats & {
+  suspension_duration?: number;
 };
 
-const DEFAULT_ROW_STATS: PlayerGameweekStats = {
+type PlayerStatInputs = {
+  [playerId: number]: ExtendedPlayerGameweekStats;
+};
+
+const DEFAULT_ROW_STATS: ExtendedPlayerGameweekStats = {
   played: false, goals_scored: 0, assists: 0, clean_sheets: false,
   goals_conceded: 0, own_goals: 0, penalties_missed: 0, yellow_cards: 0,
   red_cards: 0, bonus_points: 0,
+  suspension_duration: 1, // Default duration
 };
 
-type StatKey = keyof PlayerGameweekStats;
+type StatKey = keyof ExtendedPlayerGameweekStats;
 
 interface Fixture {
   id: number;
@@ -81,7 +94,7 @@ const PlayerStatRow = ({
   isReadOnly,
 }: {
   player: Player;
-  stats: PlayerGameweekStats;
+  stats: ExtendedPlayerGameweekStats;
   onStatChange: (playerId: number, field: StatKey, value: number | boolean) => void;
   isReadOnly?: boolean;
 }) => {
@@ -99,7 +112,32 @@ const PlayerStatRow = ({
       <CompactInput value={stats.own_goals} onValueChange={(val) => onStatChange(player.id, 'own_goals', val)} disabled={isReadOnly} />
       <CompactInput value={stats.penalties_missed} onValueChange={(val) => onStatChange(player.id, 'penalties_missed', val)} disabled={isReadOnly} />
       <CompactInput value={stats.yellow_cards} onValueChange={(val) => onStatChange(player.id, 'yellow_cards', val)} max={1} disabled={isReadOnly} />
-      <CompactInput value={stats.red_cards} onValueChange={(val) => onStatChange(player.id, 'red_cards', val)} max={1} disabled={isReadOnly} />
+      
+      {/* --- MODIFIED: Red Card Column with Duration Popup --- */}
+      <div className="flex flex-col items-center gap-1">
+        <CompactInput value={stats.red_cards} onValueChange={(val) => onStatChange(player.id, 'red_cards', val)} max={1} disabled={isReadOnly} />
+        {stats.red_cards > 0 && !isReadOnly && (
+           <div className="flex items-center gap-1 scale-75 origin-top">
+             <Timer className="w-3 h-3 text-red-500" />
+             <Select 
+                value={String(stats.suspension_duration || 1)} 
+                onValueChange={(val) => onStatChange(player.id, 'suspension_duration', parseInt(val))}
+             >
+                <SelectTrigger className="h-6 w-14 text-[10px] px-1">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="1">1 GM</SelectItem>
+                    <SelectItem value="2">2 GM</SelectItem>
+                    <SelectItem value="3">3 GM</SelectItem>
+                    <SelectItem value="4">4 GM</SelectItem>
+                </SelectContent>
+             </Select>
+           </div>
+        )}
+      </div>
+      {/* --------------------------------------------------- */}
+
       <CompactInput value={stats.bonus_points} onValueChange={(val) => onStatChange(player.id, 'bonus_points', val)} max={3} disabled={isReadOnly} />
     </div>
   );
@@ -116,13 +154,13 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
   };
 
   const { homePlayers, awayPlayers } = useMemo(() => {
-    if (!fixture) return; // Returns undefined, handled by fallback
+    if (!fixture) return { homePlayers: [], awayPlayers: [] };
     const getTid = (p: Player) => (p as any).team_id ?? (p as any).team?.id;
     return {
       homePlayers: players.filter(p => getTid(p) === fixture.home_team.id),
       awayPlayers: players.filter(p => getTid(p) === fixture.away_team.id),
     };
-  }, [fixture, players]) || { homePlayers: [], awayPlayers: [] }; // Corrected: Fallback added
+  }, [fixture, players]);
 
   useEffect(() => {
     if (fixture) {
@@ -146,6 +184,8 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
             yellow_cards: savedStat.yellow_cards ?? 0,
             red_cards: savedStat.red_cards ?? 0,
             bonus_points: savedStat.bonus_points ?? 0,
+            // Only strictly needed for new input, saved stats won't have it (that's fine)
+            suspension_duration: 1, 
           };
         } else {
           populatedStats[player.id] = { ...DEFAULT_ROW_STATS };
@@ -156,7 +196,7 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
     }
   }, [fixture, homePlayers, awayPlayers, initialStats]);
 
-  const handleStatChange = (playerId: number, field: keyof PlayerGameweekStats, value: number | boolean) => {
+  const handleStatChange = (playerId: number, field: keyof ExtendedPlayerGameweekStats, value: number | boolean) => {
     setStats(prev => ({ ...prev, [playerId]: { ...prev[playerId], [field]: value } }));
   };
 
@@ -186,6 +226,7 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
     </div>
   );
 
+  // ... (Rest of component render logic, dialog content, etc. remains exactly the same) ...
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl p-0">

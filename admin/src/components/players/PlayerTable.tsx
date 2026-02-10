@@ -23,38 +23,34 @@ interface PlayerTableProps {
   players: Player[];
   onEdit: (player: Player) => void;
   onDelete: (player: Player) => void;
+  onUpdateStatus: (player: Player) => void; 
   sortConfig: SortConfig;
   onSortRequest: (key: keyof Player) => void;
 }
 
-export function PlayerTable({ players, onEdit, onDelete, sortConfig, onSortRequest }: PlayerTableProps) {
+// --- MODIFICATION: Destructured onUpdateStatus from props ---
+export function PlayerTable({ players, onEdit, onDelete, onUpdateStatus, sortConfig, onSortRequest }: PlayerTableProps) {
   const STATUS_LABEL: Record<PlayerStatus, string> = {
-  ACTIVE: 'Available',
-  INJURED: 'Injured',
-  SUSPENDED: 'Suspended',
-};
-const STATUS_CLASS: Record<PlayerStatus, string> = {
-  ACTIVE: 'bg-green-100 text-green-700',
-  INJURED: 'bg-yellow-100 text-yellow-700',
-  SUSPENDED: 'bg-red-100 text-red-700',
-};
-function getStatusClass(s?: PlayerStatus) {
-  return s ? STATUS_CLASS[s] : 'bg-muted text-muted-foreground border-0';
-}
-  
-  const getStatusVariant = (status: PlayerStatus) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'bg-success/10 text-success border-success/20';
-      case 'INJURED':
-        return 'bg-destructive/10 text-destructive border-destructive/20';
-      case 'SUSPENDED':
-        return 'bg-warning/10 text-warning border-warning/20';
-      default:
-        return 'bg-muted text-muted-foreground border-border';
-    }
+    ACTIVE: 'Available',
+    INJURED: 'Injured',
+    SUSPENDED: 'Suspended',
+    // --- ADDED: Handle the new status ---
+    UNAVAILABLE: 'Unavailable'
+  };
+  const STATUS_CLASS: Record<PlayerStatus, string> = {
+    ACTIVE: 'bg-green-100 text-green-700',
+    INJURED: 'bg-yellow-100 text-yellow-700',
+    SUSPENDED: 'bg-red-100 text-red-700',
+    // --- ADDED: Style for the new status ---
+    UNAVAILABLE: 'bg-gray-100 text-gray-700'
   };
 
+  function getStatusClass(s?: PlayerStatus) {
+    // Fallback for null or undefined status
+    if (!s) return 'bg-muted text-muted-foreground border-0';
+    return STATUS_CLASS[s] || 'bg-muted text-muted-foreground border-0';
+  }
+  
   const renderSortArrow = (key: keyof Player) => {
     if (!sortConfig || sortConfig.key !== key) {
       return null;
@@ -92,16 +88,22 @@ function getStatusClass(s?: PlayerStatus) {
               <TableCell>{player.position}</TableCell>
               <TableCell>£{player.price.toFixed(1)}m</TableCell>
               <TableCell>
-  {player.status ? (
-    <Badge variant="outline" className={cn(getStatusClass(player.status))}>
-      {STATUS_LABEL[player.status]}
-    </Badge>
-  ) : (
-    <span className="text-muted-foreground">—</span>
-  )}
-</TableCell>
+                {player.status ? (
+                  <Badge variant="outline" className={cn(getStatusClass(player.status))}>
+                    {STATUS_LABEL[player.status]}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
               <TableCell className="text-right">
-                <PlayerActions player={player} onEdit={onEdit} onDelete={onDelete} />
+                {/* --- MODIFICATION: Passed the onUpdateStatus prop --- */}
+                <PlayerActions 
+                  player={player} 
+                  onEdit={onEdit} 
+                  onDelete={onDelete} 
+                  onUpdateStatus={onUpdateStatus} 
+                />
               </TableCell>
             </TableRow>
           ))}
