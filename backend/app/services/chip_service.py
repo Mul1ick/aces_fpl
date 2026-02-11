@@ -57,11 +57,37 @@ async def play_chip(db: Prisma, user_id: str, chip: str, gameweek_id: int | None
     if already_used:
         raise HTTPException(400, f"{chip} already used this season.")
 
-    return await db.userchip.create(data={
-        'user_id': user_id,
-        'gameweek_id': gw.id,
-        'chip': chip
-    })
+    async with db.tx() as tx:
+        # 1. Create the chip record
+        new_chip = await tx.userchip.create(data={
+            'user_id': user_id,
+            'gameweek_id': gw.id,
+            'chip': chip
+        })
+
+        # 2. Reset transfer hits if it's a Wildcard or Free Hit
+        if chip in ["WILDCARD", "FREE_HIT"]:
+            await tx.usergameweekscore.upsert(
+                where={
+                    'user_id_gameweek_id': {
+                        'user_id': user_id, 
+                        'gameweek_id': gw.id
+                    }
+                },
+                data={
+                    'create': {
+                        'user_id': user_id, 
+                        'gameweek_id': gw.id, 
+                        'transfer_hits': 0
+                    },
+                    'update': {
+                        'transfer_hits': 0
+                    }
+                }
+            )
+            logger.info(f"User {user_id} activated {chip}. Transfer hits reset to 0.")
+
+        return new_chip
 
 
 async def cancel_chip(db: Prisma, user_id: str, gameweek_id: int | None):
@@ -85,3 +111,9 @@ async def cancel_chip(db: Prisma, user_id: str, gameweek_id: int | None):
         status_code=400, 
         detail=f"The {active_chip.chip} chip cannot be cancelled once activated."
     )
+
+async def is_bench_boost_active(db: Prisma, user_id: str, gameweek_id: int) -> bool:
+    row = await db.userchip.find_first(
+        where={'user_id': user_id, 'gameweek_id': gameweek_id, 'chip': 'BENCH_BOOST'}
+    )
+    return row is not None
