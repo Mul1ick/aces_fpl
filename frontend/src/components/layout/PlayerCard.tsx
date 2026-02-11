@@ -14,7 +14,9 @@ interface Player {
   points?: number;
   isCaptain?: boolean;
   isVice?: boolean;
-  status?: 'ACTIVE' | 'INJURED' | 'SUSPENDED' | 'UNAVAILABLE'; // --- ADDED ---
+  status?: 'ACTIVE' | 'INJURED' | 'SUSPENDED' | 'UNAVAILABLE';
+  chance_of_playing?: number | null; // --- ADDED ---
+  news?: string | null;
 }
 
 interface PlayerCardProps {
@@ -23,7 +25,7 @@ interface PlayerCardProps {
   displayMode?: 'points' | 'fixture';
   showArmbands?: boolean;
   activeChip?: ChipName | null;
-  isEffectiveCaptain?: boolean; // --- ADDED ---
+  isEffectiveCaptain?: boolean;
 }
 
 // --- PLAYER CARD COMPONENT ---
@@ -33,7 +35,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   displayMode = 'points', 
   showArmbands = true, 
   activeChip,
-  isEffectiveCaptain = false // --- ADDED (defaults to false) ---
+  isEffectiveCaptain = false 
 }) => {
   const jerseySrc = getTeamJersey(player.team);
 
@@ -41,7 +43,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const isCaptain = player.isCaptain || (player as any).is_captain;
   const isViceCaptain = player.isVice || (player as any).is_vice_captain;
 
-  // --- UPDATED LOGIC ---
   // If this player is the "Effective Captain" (The one receiving the bonus),
   // check for Triple Captain chip (3x) or default to standard Captain (2x).
   const multiplier = isEffectiveCaptain
@@ -49,8 +50,25 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     : 1;
 
   const displayPoints = (player.points ?? 0) * multiplier;
-  const isUnavailable = player.status && player.status !== 'ACTIVE';
+  
+  // --- NEW STATUS COLOR LOGIC ---
+  const getStatusColorClass = () => {
+    const chance = player.chance_of_playing;
+    const status = player.status;
 
+    // 1. Strictly check if they are perfectly healthy first
+    if (!status || status === 'ACTIVE') {
+      return 'bg-white text-black';
+    }
+    
+    // 2. Check if Doubtful (Yellow Warning)
+    if (chance !== undefined && chance !== null && chance > 0 && chance <= 75) {
+      return 'bg-yellow-400 text-black';
+    }
+
+    // 3. Otherwise, they are Ruled Out / Suspended / Unavailable (Red Warning)
+    return 'bg-[#B2002D] text-white';
+  };
 
   return (
     <motion.div
@@ -84,8 +102,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
           {/* Player Name */}
            <div className={cn(
              "flex-1 flex items-center justify-center px-1",
-             // --- MODIFIED: Conditional background color ---
-             isUnavailable ? 'bg-red-600 text-white' : 'bg-white text-black'
+             getStatusColorClass() // --- APPLIED NEW LOGIC ---
            )}>
              <p className="font-bold truncate" style={{ fontSize: isBench ? '9px' : '11px' }}>{player.name}</p>
           </div>

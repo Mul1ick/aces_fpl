@@ -276,6 +276,11 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
             "is_benched": entry.is_benched,
             "points": pts_map.get(entry.player.id, 0),
             "fixture_str": fixture_map_current.get(club.id, "—"),
+
+            "status": entry.player.status,
+            "news": entry.player.news,
+            "chance_of_playing": entry.player.chance_of_playing,
+            "return_date": entry.player.return_date,
         }
 
         st = stats_map.get(entry.player.id)
@@ -427,6 +432,11 @@ async def get_player_card(
         "raw_stats": raw_stats or None,
         "breakdown": breakdown or None,
         "recent_fixtures": recent_fixtures,
+
+        "status": player.status,
+        "news": player.news,
+        "chance_of_playing": player.chance_of_playing,
+        "return_date": player.return_date,
     }
 
 async def save_existing_team(

@@ -439,7 +439,7 @@ const Dashboard: React.FC = () => {
                         ) : (
                           <Card className="h-full border-black border-2">
                             <CardHeader>
-                              <CardTitle className="text-xl">Team of the Week</CardTitle>
+                              <CardTitle className="text-xl">Manager of the Week</CardTitle>
                               <p className="text-sm text-gray-500 font-semibold">
                                 { (displayGameweek?.gw_number || gameweek?.gw_number || 1) <= 1 
                                   ? "Available after Gameweek 1"
@@ -463,7 +463,7 @@ const Dashboard: React.FC = () => {
                         ) : (
                             <Card className="h-full border-black border-2 bg-white">
                                 <CardHeader>
-                                    <CardTitle className="text-xl text-black">Dream Team</CardTitle>
+                                    <CardTitle className="text-xl text-black">Team of the Week</CardTitle>
                                     <p className="text-sm text-gray-500 font-semibold">
                                       { (displayGameweek?.gw_number || gameweek?.gw_number || 1) <= 1 
                                         ? "Available after Gameweek 1"

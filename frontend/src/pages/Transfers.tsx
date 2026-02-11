@@ -202,7 +202,17 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
   
   const handlePlayerSelect = (playerData: any) => {
     setIsPlayerSelectionOpen(false);
+    
+    // Transform the base player data
     const newPlayer = transformApiPlayer(playerData);
+    
+    // --- THE FIX: EXPLICITLY CARRY FORWARD STATUS DATA ---
+    // This ensures that even if transformApiPlayer drops the injury data, 
+    // we force it directly into the new player object before they hit the pitch.
+    newPlayer.status = playerData.status || 'ACTIVE';
+    newPlayer.chance_of_playing = playerData.chance_of_playing ?? null;
+    newPlayer.news = playerData.news || null;
+
     const posKey = newPlayer.pos;
 
     let targetSlot = positionToFill;

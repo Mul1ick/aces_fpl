@@ -10,17 +10,25 @@ import { API, ChipName } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// --- TYPESCRIPT FIXES ---
 type PlayerView = {
   id: number;
   full_name: string;
+  name?: string; // Fallback for PlayerCard
   position: string;
-  team: { name: string; short_name: string };
+  pos?: string;  // Fallback for PlayerCard
+  team: any;     // Relaxed to handle both string (for jerseys) and objects
   points: number;
   is_captain: boolean;
   is_vice_captain: boolean;
   is_benched: boolean;
   raw_stats?: any;
   breakdown?: any[];
+  // --- ADDED FOR INJURIES & DRAWER ---
+  status?: string;
+  news?: string | null;
+  chance_of_playing?: number | null;
+  return_date?: string | null;
 };
 
 type TeamOfTheWeekData = {
@@ -48,7 +56,8 @@ const TeamOfTheWeek: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [view, setView] = useState('pitch'); 
+  // Explicitly type as string to match GameweekHeader
+  const [view, setView] = useState<string>('pitch'); 
   const [teamData, setTeamData] = useState<TeamOfTheWeekData | null>(null);
   const [detailedPlayer, setDetailedPlayer] = useState<PlayerView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,16 +83,31 @@ const TeamOfTheWeek: React.FC = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || `Team of the Week for GW${gw} not found.`);
 
-        // --- IMPROVED DATA MAPPING ---
-        const mapPlayer = (p: any) => {
+        // --- BULLETPROOF DATA MAPPING ---
+        const mapPlayer = (p: any): PlayerView => {
             // Find stats regardless of whether they are in 'stats', 'raw_stats', or 'p' itself
             const statsObj = p.raw_stats || p.stats || p;
             
             return {
                 ...p,
+                // Name and Position safety nets for PitchView and Drawer
+                full_name: p.full_name || p.name || '',
+                name: p.full_name || p.name || '',
+                position: p.position || p.pos || '',
+                pos: p.position || p.pos || '',
+                // Ensure team is a string so getTeamJersey() doesn't break
+                team: p.team?.name || p.team_name || p.team || '',
+                
                 // Standardize captain/vice naming
                 is_captain: p.is_captain || p.isCaptain || false,
                 is_vice_captain: p.is_vice_captain || p.isVice || false,
+                
+                // --- INJURY FLAGS CARRY-FORWARD ---
+                status: p.status ?? 'ACTIVE',
+                news: p.news ?? null,
+                chance_of_playing: p.chance_of_playing ?? null,
+                return_date: p.return_date ?? null,
+
                 // Explicitly extract the 'played' flag
                 raw_stats: {
                     ...statsObj,
@@ -95,8 +119,8 @@ const TeamOfTheWeek: React.FC = () => {
 
         setTeamData({
             ...data,
-            starting: data.starting.map(mapPlayer),
-            bench: data.bench.map(mapPlayer)
+            starting: (data.starting || []).map(mapPlayer),
+            bench: (data.bench || []).map(mapPlayer)
         });
       } catch (err: any) {
         if (err.name !== 'AbortError') {

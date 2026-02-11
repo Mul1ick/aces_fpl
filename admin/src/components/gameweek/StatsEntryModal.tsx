@@ -21,11 +21,13 @@ import {
 } from '@/components/ui/select';
 import type { Team, Player, PlayerGameweekStats } from '@/types';
 import { CompactInput } from '@/components/shared/CompactInput';
-import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, Footprints, ShieldAlert, Ban, Star, Timer } from 'lucide-react';
+import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, Footprints, ShieldAlert, Ban, Star, Timer, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils'; // Make sure you import cn for conditional row styling
 
-// --- MODIFIED: Extend type locally to include suspension duration ---
+// --- MODIFIED: Extend type locally to include suspension duration & penalties saved ---
 type ExtendedPlayerGameweekStats = PlayerGameweekStats & {
   suspension_duration?: number;
+  penalties_saved?: number;
 };
 
 type PlayerStatInputs = {
@@ -34,7 +36,7 @@ type PlayerStatInputs = {
 
 const DEFAULT_ROW_STATS: ExtendedPlayerGameweekStats = {
   played: false, goals_scored: 0, assists: 0, clean_sheets: false,
-  goals_conceded: 0, own_goals: 0, penalties_missed: 0, yellow_cards: 0,
+  goals_conceded: 0, own_goals: 0, penalties_missed: 0, penalties_saved: 0, yellow_cards: 0,
   red_cards: 0, bonus_points: 0,
   suspension_duration: 1, // Default duration
 };
@@ -69,13 +71,16 @@ const StatsTableHeader = () => {
         { icon: <ShieldX className="h-5 w-5 text-red-500" />, label: 'Goals Conceded' },
         { icon: <ShieldAlert className="h-5 w-5" />, label: 'Own Goals' },
         { icon: <Ban className="h-5 w-5" />, label: 'Pen Miss' },
+        // --- NEW: Pen Saved Header ---
+        { icon: <ShieldCheck className="h-5 w-5 text-blue-400" />, label: 'Pen Saved' },
         { icon: <Square className="h-5 w-5 text-yellow-500 fill-yellow-500" />, label: 'Yellow Card' },
         { icon: <Square className="h-5 w-5 text-red-600 fill-red-600" />, label: 'Red Card' },
         { icon: <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />, label: 'Bonus' },
     ];
 
     return (
-        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(10,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
+        // --- MODIFIED: grid-cols updated to repeat(11, ...) ---
+        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(11,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
             <div className="text-left font-bold">Player</div>
             {headers.map(h => (
                 <div key={h.label} className="flex flex-col items-center justify-center gap-1.5 h-12">
@@ -98,11 +103,27 @@ const PlayerStatRow = ({
   onStatChange: (playerId: number, field: StatKey, value: number | boolean) => void;
   isReadOnly?: boolean;
 }) => {
+  // --- NEW: Check availability status ---
+  const isUnavailable = player.status && player.status !== 'ACTIVE';
+
   return (
-    <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(10,_minmax(80px,_1fr))] items-center gap-3 py-2 border-b last:border-b-0">
-      <div>
-        <p className="font-medium text-sm truncate">{player.full_name}</p>
-        <p className="text-xs text-muted-foreground">{player.position}</p>
+    // --- MODIFIED: grid-cols updated to 11, and dynamic background applied ---
+    <div className={cn(
+      "grid grid-cols-[minmax(200px,_1.5fr)_repeat(11,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 border-b last:border-b-0",
+      isUnavailable && "bg-red-50/60 dark:bg-red-950/20"
+    )}>
+      <div className="flex items-center gap-2">
+        {/* --- NEW: Alert Icon for unavailable players --- */}
+        {isUnavailable && (
+          <AlertTriangle 
+            className="h-4 w-4 text-red-500 flex-shrink-0" 
+            title={player.news || player.status}
+          />
+        )}
+        <div className="min-w-0">
+          <p className="font-medium text-sm truncate">{player.full_name}</p>
+          <p className="text-xs text-muted-foreground">{player.position}</p>
+        </div>
       </div>
       <div className="flex justify-center"><Switch checked={stats.played} onCheckedChange={(val) => onStatChange(player.id, 'played', val)} disabled={isReadOnly} /></div>
       <CompactInput value={stats.goals_scored} onValueChange={(val) => onStatChange(player.id, 'goals_scored', val)} disabled={isReadOnly} />
@@ -111,9 +132,12 @@ const PlayerStatRow = ({
       <CompactInput value={stats.goals_conceded} onValueChange={(val) => onStatChange(player.id, 'goals_conceded', val)} disabled={isReadOnly} />
       <CompactInput value={stats.own_goals} onValueChange={(val) => onStatChange(player.id, 'own_goals', val)} disabled={isReadOnly} />
       <CompactInput value={stats.penalties_missed} onValueChange={(val) => onStatChange(player.id, 'penalties_missed', val)} disabled={isReadOnly} />
+      
+      {/* --- NEW: Penalties Saved Input --- */}
+      <CompactInput value={stats.penalties_saved || 0} onValueChange={(val) => onStatChange(player.id, 'penalties_saved', val)} disabled={isReadOnly} />
+      
       <CompactInput value={stats.yellow_cards} onValueChange={(val) => onStatChange(player.id, 'yellow_cards', val)} max={1} disabled={isReadOnly} />
       
-      {/* --- MODIFIED: Red Card Column with Duration Popup --- */}
       <div className="flex flex-col items-center gap-1">
         <CompactInput value={stats.red_cards} onValueChange={(val) => onStatChange(player.id, 'red_cards', val)} max={1} disabled={isReadOnly} />
         {stats.red_cards > 0 && !isReadOnly && (
@@ -136,8 +160,6 @@ const PlayerStatRow = ({
            </div>
         )}
       </div>
-      {/* --------------------------------------------------- */}
-
       <CompactInput value={stats.bonus_points} onValueChange={(val) => onStatChange(player.id, 'bonus_points', val)} max={3} disabled={isReadOnly} />
     </div>
   );
@@ -181,10 +203,10 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
             goals_conceded: savedStat.goals_conceded ?? 0,
             own_goals: savedStat.own_goals ?? 0,
             penalties_missed: savedStat.penalties_missed ?? 0,
+            penalties_saved: savedStat.penalties_saved ?? 0, // --- NEW ---
             yellow_cards: savedStat.yellow_cards ?? 0,
             red_cards: savedStat.red_cards ?? 0,
             bonus_points: savedStat.bonus_points ?? 0,
-            // Only strictly needed for new input, saved stats won't have it (that's fine)
             suspension_duration: 1, 
           };
         } else {
@@ -210,9 +232,9 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
   if (!fixture) return null;
 
   const renderPlayerTable = (teamPlayers: Player[]) => (
-    <div className="border rounded-lg">
+    <div className="border rounded-lg bg-card">
       <StatsTableHeader />
-      <div className="px-3">
+      <div className="flex flex-col">
         {teamPlayers.map(player => (
           <PlayerStatRow
             key={player.id}
@@ -226,10 +248,9 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
     </div>
   );
 
-  // ... (Rest of component render logic, dialog content, etc. remains exactly the same) ...
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl p-0">
+      <DialogContent className="max-w-[95vw] xl:max-w-7xl p-0">
         <DialogHeader className="bg-sidebar text-sidebar-foreground p-4 rounded-t-lg">
           <DialogTitle className="text-xl">{isReadOnly ? 'View Match Stats' : 'Enter Match Stats'}</DialogTitle>
           <DialogDescription className="text-sidebar-foreground/80">
@@ -252,13 +273,13 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
           </div>
         </DialogHeader>
         
-        <div className="p-6">
-          <ScrollArea className="h-[55vh] w-full pr-4">
+        <div className="p-6 overflow-x-auto">
+          <ScrollArea className="h-[55vh] w-full pr-4 min-w-[1000px]">
             {loading ? (
               <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading players…</div>
             ) : (
               <Tabs defaultValue="home">
-                <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsList className="grid w-[400px] grid-cols-2 mb-4">
                   <TabsTrigger value="home">
                     <img src={getLogoPath(fixture.home_team.logo_url)} alt="" className="h-5 w-5 mr-2" /> {fixture.home_team.name}
                   </TabsTrigger>

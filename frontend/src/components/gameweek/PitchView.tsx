@@ -19,8 +19,8 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
     const starters = Object.values(playersByPos).flat();
     const allPlayers = [...starters, ...bench];
     
-    const captain = allPlayers.find(p => p.is_captain || p.isCaptain);
-    const viceCaptain = allPlayers.find(p => p.is_vice_captain || p.isVice);
+    const captain = allPlayers.find((p: any) => p.is_captain || p.isCaptain);
+    const viceCaptain = allPlayers.find((p: any) => p.is_vice_captain || p.isVice);
 
     // ROBUST CHECK HERE TOO
     const stats = captain?.raw_stats || (captain as any)?.stats;
@@ -32,8 +32,8 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
   // --- PREVIOUS LOGIC: Separate the goalkeeper from other subs ---
   const benchLayout = useMemo(() => {
     if (!bench) return { goalkeeper: null, outfielders: [] };
-    const goalkeeper = bench.find(p => p.position === 'GK') || null;
-    const outfielders = bench.filter(p => p.position !== 'GK');
+    const goalkeeper = bench.find((p: any) => p.position === 'GK') || null;
+    const outfielders = bench.filter((p: any) => p.position !== 'GK');
     return { goalkeeper, outfielders };
   }, [bench]);
 
@@ -56,13 +56,17 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   id: p.id,
                   name: p.full_name,
                   pos: p.position,
-                  team: p.team.name,
+                  team: p.team?.name || p.team,
                   points: p.points,
                   isCaptain: p.is_captain,
-                  isVice: p.is_vice_captain
+                  isVice: p.is_vice_captain,
+                  // --- INJECTED STATUS FIELDS ---
+                  status: p.status,
+                  chance_of_playing: p.chance_of_playing,
+                  news: p.news
                 }} 
                 activeChip={activeChip}
-                isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
+                isEffectiveCaptain={p.id === effectiveCaptainId} 
               />
             </div>
           ))}
@@ -77,13 +81,17 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   id: p.id,
                   name: p.full_name,
                   pos: p.position,
-                  team: p.team.name,
+                  team: p.team?.name || p.team,
                   points: p.points,
                   isCaptain: p.is_captain,
-                  isVice: p.is_vice_captain
+                  isVice: p.is_vice_captain,
+                  // --- INJECTED STATUS FIELDS ---
+                  status: p.status,
+                  chance_of_playing: p.chance_of_playing,
+                  news: p.news
                 }} 
                 activeChip={activeChip}
-                isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
+                isEffectiveCaptain={p.id === effectiveCaptainId}
               />
             </div>
            ))}
@@ -98,13 +106,17 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   id: p.id,
                   name: p.full_name,
                   pos: p.position,
-                  team: p.team.name,
+                  team: p.team?.name || p.team,
                   points: p.points,
                   isCaptain: p.is_captain,
-                  isVice: p.is_vice_captain
+                  isVice: p.is_vice_captain,
+                  // --- INJECTED STATUS FIELDS ---
+                  status: p.status,
+                  chance_of_playing: p.chance_of_playing,
+                  news: p.news
                 }} 
                 activeChip={activeChip}
-                isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
+                isEffectiveCaptain={p.id === effectiveCaptainId}
               />
             </div>
           ))}
@@ -119,13 +131,17 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   id: p.id,
                   name: p.full_name,
                   pos: p.position,
-                  team: p.team.name,
+                  team: p.team?.name || p.team,
                   points: p.points ?? 0,
                   isCaptain: p.is_captain,
-                  isVice: p.is_vice_captain
+                  isVice: p.is_vice_captain,
+                  // --- INJECTED STATUS FIELDS ---
+                  status: p.status,
+                  chance_of_playing: p.chance_of_playing,
+                  news: p.news
                 }} 
                 activeChip={activeChip}
-                isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
+                isEffectiveCaptain={p.id === effectiveCaptainId}
               />
             </div>
           ))}
@@ -142,13 +158,17 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   id: benchLayout.goalkeeper.id,
                   name: benchLayout.goalkeeper.full_name,
                   pos: benchLayout.goalkeeper.position,
-                  team: benchLayout.goalkeeper.team.name,
+                  team: benchLayout.goalkeeper.team?.name || benchLayout.goalkeeper.team,
                   points: benchLayout.goalkeeper.points,
                   isCaptain: benchLayout.goalkeeper.is_captain,
-                  isVice: benchLayout.goalkeeper.is_vice_captain
+                  isVice: benchLayout.goalkeeper.is_vice_captain,
+                  // --- INJECTED STATUS FIELDS ---
+                  status: benchLayout.goalkeeper.status,
+                  chance_of_playing: benchLayout.goalkeeper.chance_of_playing,
+                  news: benchLayout.goalkeeper.news
                 }} 
                 activeChip={activeChip}
-                isEffectiveCaptain={benchLayout.goalkeeper.id === effectiveCaptainId} // --- ADDED ---
+                isEffectiveCaptain={benchLayout.goalkeeper.id === effectiveCaptainId}
               />
             </div>
           )}
@@ -162,13 +182,17 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                     id: p.id,
                     name: p.full_name,
                     pos: p.position,
-                    team: p.team.name,
+                    team: p.team?.name || p.team,
                     points: p.points,
                     isCaptain: p.is_captain,
-                    isVice: p.is_vice_captain
+                    isVice: p.is_vice_captain,
+                    // --- INJECTED STATUS FIELDS ---
+                    status: p.status,
+                    chance_of_playing: p.chance_of_playing,
+                    news: p.news
                   }} 
                   activeChip={activeChip}
-                  isEffectiveCaptain={p.id === effectiveCaptainId} // --- ADDED ---
+                  isEffectiveCaptain={p.id === effectiveCaptainId} 
                 />
               </div>
             ))}

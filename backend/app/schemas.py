@@ -312,6 +312,10 @@ class PlayerDetailResponse(BaseModel):
     team_name: str
     price: float
     total_points: int
+    status: Optional[str] = None           # ADD THIS
+    news: Optional[str] = None             # ADD THIS
+    chance_of_playing: Optional[int] = None # ADD THIS
+    return_date: Optional[datetime] = None
     history: List[PlayerHistoryItem]
     upcoming_fixtures: List[UpcomingFixtureItem]
 

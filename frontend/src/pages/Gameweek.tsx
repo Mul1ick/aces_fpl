@@ -10,6 +10,7 @@ import { API, getChipStatus, ChipStatus } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/use-toast';
 import { PlayerDetailCard } from '../components/gameweek/PlayerDetailCard';
+import { transformApiPlayer } from '../lib/player-utils';
 
 const Gameweek: React.FC = () => {
   const { gw } = useParams();

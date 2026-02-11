@@ -24,23 +24,37 @@ export const TransferListView: React.FC<TransferListViewProps> = ({ squad }) => 
   const sortedStarters = starters.sort((a, b) => positionOrder[a.pos] - positionOrder[b.pos]);
   const sortedBench = bench.sort((a, b) => positionOrder[a.pos] - positionOrder[b.pos]);
 
-  const PlayerRow = ({ player }: { player: any }) => (
-    <tr className={cn("border-b border-gray-200", player.is_benched && "bg-gray-50 opacity-80")}>
-      <td className="p-3">
-        <div className="flex items-center space-x-3">
-          <img src={getTeamJersey(player.teamName)} alt="jersey" className="w-8 h-10 object-contain" />
-          <div>
-            {/* --- MODIFIED: Use player.name instead of player.full_name --- */}
-            <p className="font-bold text-sm">{player.name}</p>
-            <p className="text-xs text-gray-500">{player.pos} · {player.teamName}</p>
+  const PlayerRow = ({ player }: { player: any }) => {
+    // --- NEW: Check availability status ---
+    const isUnavailable = player.status && player.status !== 'ACTIVE';
+
+    return (
+      <tr className={cn("border-b border-gray-200", player.is_benched && "bg-gray-50 opacity-80")}>
+        <td className="p-3">
+          <div className="flex items-center space-x-3">
+            <img src={getTeamJersey(player.teamName)} alt="jersey" className="w-8 h-10 object-contain" />
+            <div>
+              {/* --- MODIFIED: Added flex and the italic "i" icon --- */}
+              <p className="font-bold text-sm flex items-center gap-1">
+                {player.name}
+                {isUnavailable && (
+                  <span 
+                    title={player.news || player.status} 
+                    className="bg-red-600 text-white rounded-[3px] px-1.5 py-0.5 text-[10px] font-serif italic leading-none cursor-help shadow-sm"
+                  >
+                    i
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-gray-500">{player.pos} · {player.teamName}</p>
+            </div>
           </div>
-        </div>
-      </td>
-      <td className="p-3 text-center font-bold text-sm">£{player.price.toFixed(1)}m</td>
-      {/* --- MODIFIED: Use player.fixture instead of player.fixture_str --- */}
-      <td className="p-3 text-center text-xs font-semibold text-gray-600">{player.fixture || '—'}</td>
-    </tr>
-  );
+        </td>
+        <td className="p-3 text-center font-bold text-sm">£{player.price.toFixed(1)}m</td>
+        <td className="p-3 text-center text-xs font-semibold text-gray-600">{player.fixture || '—'}</td>
+      </tr>
+    );
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md h-full overflow-auto">

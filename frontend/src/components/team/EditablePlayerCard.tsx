@@ -13,13 +13,14 @@ import titansJersey from '@/assets/images/jerseys/titans.png';
 import umaagJersey from '@/assets/images/jerseys/umang.png';
 import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png'
 import tshirtRed from '@/assets/images/jerseys/tshirt-red.png'
-const TEAM_JERSEYS = {
+
+const TEAM_JERSEYS: Record<string, string> = {
   'Satans': satansJersey,
-    'Roarers': roarersJersey,
-    'Trana': traanaJersey,
-    'Southside': southsideJersey,
-    'Titans': titansJersey,
-    'Umang': umaagJersey,
+  'Roarers': roarersJersey,
+  'Trana': traanaJersey,
+  'Southside': southsideJersey,
+  'Titans': titansJersey,
+  'Umang': umaagJersey,
 };
 
 interface EditablePlayerCardProps {
@@ -30,7 +31,7 @@ interface EditablePlayerCardProps {
   onViewProfile: () => void;
 }
 
-const FixtureRow = ({ gameweek, opponent, points }) => (
+const FixtureRow = ({ gameweek, opponent, points }: { gameweek: string, opponent: string, points: number }) => (
     <div className="flex justify-between items-center py-2 border-b border-gray-200 text-sm">
         <p className="font-semibold">{gameweek}</p>
         <p className="text-gray-600">{opponent}</p>
@@ -41,11 +42,17 @@ const FixtureRow = ({ gameweek, opponent, points }) => (
 export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, onClose, onSubstitute,  onSetArmband, onViewProfile }) => {
   if (!player) return null;
 
-  // --- MODIFIED: Use player.team which is a string ---
   const jerseySrc = TEAM_JERSEYS[player.team] || tshirtRed;
   const isCaptain = !!player.isCaptain || !!player.is_captain;
   const isVice    = !!player.isVice || !!player.is_vice_captain;
-  const isUnavailable = player.status && player.status !== 'ACTIVE';
+  
+  // --- NEW STATUS BANNER LOGIC ---
+  const status = player.status;
+  const chance = player.chance_of_playing;
+  const hasWarning = status && status !== 'ACTIVE';
+  
+  const isYellowWarning = chance !== undefined && chance !== null && chance > 0 && chance <= 75;
+  const bannerBgClass = isYellowWarning ? 'bg-yellow-400 text-yellow-900' : 'bg-[#B2002D] text-white';
 
   return (
     <motion.div
@@ -62,22 +69,27 @@ export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, 
         className="relative w-full max-w-sm bg-white rounded-lg shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {isUnavailable && (
-            <div className="bg-red-600 text-white p-3 text-center text-sm font-semibold rounded-t-lg flex items-center justify-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                <span>{player.news || player.status}</span>
+        {/* --- DYNAMIC WARNING BANNER --- */}
+        {hasWarning && (
+            <div className={`${bannerBgClass} p-3 text-center text-sm font-semibold rounded-t-lg flex items-center justify-center gap-2`}>
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>
+                  {status === 'INJURED' ? 'Injured' : 
+                   status === 'SUSPENDED' ? 'Suspended' : 
+                   status === 'UNAVAILABLE' ? 'Unavailable' : 'Doubtful'}
+                  {chance !== null && chance !== undefined && ` (${chance}%)`}
+                  {player.news && ` - ${player.news}`}
+                </span>
             </div>
         )}
-        <Card className="border-2 border-gray-300">
+        
+        <Card className={`border-2 border-gray-300 ${hasWarning ? 'rounded-t-none border-t-0' : ''}`}>
           <CardHeader className="bg-gray-100 p-4">
             <div className="flex items-center space-x-4">
-               {/* --- MODIFIED: Use player.team for alt text --- */}
                <img src={jerseySrc} alt={`${player.team} jersey`} className="w-16 h-auto" />
                 <div>
-                    {/* --- MODIFIED: Use player.position --- */}
                     <p className="text-xs text-gray-500 font-bold">{player.position}</p>
                     <CardTitle className="text-2xl font-bold">{player.name}</CardTitle>
-                    {/* --- MODIFIED: Use player.team directly --- */}
                     <p className="text-md font-semibold text-gray-700">{player.team}</p>
                 </div>
             </div>

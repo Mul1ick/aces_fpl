@@ -82,6 +82,11 @@ export const transformApiPlayer = (rawPlayer: any): any => {
     isCaptain: rawPlayer.is_captain ?? rawPlayer.isCaptain ?? false,
     isVice: rawPlayer.is_vice_captain ?? rawPlayer.isVice ?? false,
     isBenched: rawPlayer.is_benched ?? rawPlayer.isBenched ?? false,
+    
+    status: rawPlayer.status ?? 'ACTIVE',
+    news: rawPlayer.news ?? null,
+    chance_of_playing: rawPlayer.chance_of_playing ?? null,
+    return_date: rawPlayer.return_date ?? null,
     // Add the detailed stats from the API response
     recent_fixtures: rawPlayer.recent_fixtures ?? [],
     raw_stats: rawPlayer.raw_stats ?? {},

@@ -23,6 +23,11 @@ type PlayerView = {
   breakdown?: any[];
   raw_stats?: any;
   fixture_str?: string;
+  // --- ADDED STATUS TYPES TO FIX TS ERRORS ---
+  status?: string;
+  news?: string | null;
+  chance_of_playing?: number | null;
+  return_date?: string | null;
 };
 
 type TeamStats = { overall_points?: number; total_players?: number; gameweek_points?: number };
@@ -39,13 +44,14 @@ type TeamData = {
   transfers?: string;
   starting: PlayerView[];
   bench: PlayerView[];
-  active_chip?: string | null; // <--- ADDED TYPE
+  active_chip?: string | null; 
 };
 
 const TeamView: React.FC = () => {
   const { gw, userId } = useParams();
   const navigate = useNavigate();
-  const [view, setView] = useState<'pitch' | 'list'>('pitch');
+  // --- TS FIX: Relaxed state to string ---
+  const [view, setView] = useState<string>('pitch');
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [detailedPlayer, setDetailedPlayer] = useState<PlayerView | null>(null);
   const [loading, setLoading] = useState(false);
@@ -94,12 +100,18 @@ const TeamView: React.FC = () => {
             id: p.id,
             full_name: p.full_name ?? p.name ?? '',
             position: normPos(p.position ?? p.pos),
-            team: { name: p.team?.name ?? p.team_name ?? '' },
+            team: { name: p.team?.name ?? p.team_name ?? p.team ?? '' },
             points: Number(p.points ?? p.gw_points ?? 0),
             is_captain: Boolean(p.is_captain ?? p.captain),
             is_vice_captain: Boolean(p.is_vice_captain ?? p.vice_captain),
             is_benched: Boolean(p.is_benched ?? p.bench),
-            // Ensure stats are passed through
+            
+            // STATUS DATA KEPT SAFE
+            status: p.status ?? 'ACTIVE',
+            news: p.news ?? null,
+            chance_of_playing: p.chance_of_playing ?? null,
+            return_date: p.return_date ?? null,
+
             breakdown: p.breakdown || [],
             raw_stats: p.raw_stats || {},
             fixture_str: p.fixture_str || ''
@@ -132,7 +144,7 @@ const TeamView: React.FC = () => {
           transfers: data.transfers ?? '',
           starting: normalize(startingRaw),
           bench: normalize(benchRaw),
-          active_chip: data.active_chip // <--- CAPTURE THE CHIP
+          active_chip: data.active_chip 
         });
       } catch (err: any) {
         if (err.name !== 'AbortError') setError(err.message || 'Team not found or fetch failed');
@@ -194,7 +206,8 @@ const TeamView: React.FC = () => {
               averagePoints={teamData.average_points ?? 0}
               highestPoints={teamData.highest_points ?? 0}
               gwRank={teamData.gw_rank ?? ''}
-              freeTransfers={teamData.transfers ?? ''}
+              // --- TS FIX: Force string to number ---
+              freeTransfers={Number(teamData.transfers || 0)}
               onNavigate={handleNavigation}
             />
           </div>
@@ -204,12 +217,12 @@ const TeamView: React.FC = () => {
               playersByPos={playersByPos}
               bench={teamData.bench}
               onPlayerClick={setDetailedPlayer}
-              activeChip={teamData.active_chip as any} // <--- PASS CHIP TO PITCH
+              activeChip={teamData.active_chip as any} 
             />
           ) : (
             <ListView 
                 players={allPlayers} 
-                activeChip={teamData.active_chip as any} // <--- PASS CHIP TO LIST
+                activeChip={teamData.active_chip as any} 
             />
           )}
         </div>
@@ -233,7 +246,7 @@ const TeamView: React.FC = () => {
           <PlayerDetailCard
             player={detailedPlayer}
             onClose={() => setDetailedPlayer(null)}
-            activeChip={teamData.active_chip as any} // <--- PASS CHIP TO MODAL
+            activeChip={teamData.active_chip as any} 
           />
         )}
       </AnimatePresence>

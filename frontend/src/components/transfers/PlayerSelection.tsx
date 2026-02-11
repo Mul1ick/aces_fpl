@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Search, Filter, ArrowUpDown, DollarSign, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Search, Filter, ArrowUpDown, DollarSign, RotateCcw, ChevronLeft, ChevronRight, Info, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { API } from '@/lib/api';
 import { Slider } from '@/components/ui/slider';
 import { getTeamJersey } from '@/lib/player-utils';
-
+import { PlayerDetailModal } from './PlayerDetailModal'; // Import the detailed modal
 
 // ============================================================================
 // SUB-COMPONENT: FilterModal
@@ -49,9 +49,59 @@ const FilterModal = ({ isOpen, onClose, title, children }: { isOpen: boolean; on
 );
 
 // ============================================================================
+// SUB-COMPONENT: PlayerStatusIcon (UPDATED FOR CORRECT STATUS LOGIC)
+// ============================================================================
+const PlayerStatusIcon = ({ player, onClick }: { player: any, onClick: (e: React.MouseEvent) => void }) => {
+    const chance = player.chance_of_playing;
+    const status = player.status;
+
+    // 1. Check if perfectly healthy first
+    const isHealthy = !status || status === 'ACTIVE';
+
+    if (isHealthy) {
+        return (
+            <div 
+                className="cursor-pointer w-7 h-7 flex items-center justify-center hover:bg-gray-200 rounded transition-colors" 
+                onClick={onClick}
+                title="View Player Info"
+            >
+                <span className="font-bold italic text-gray-500 font-serif text-base leading-none mb-0.5 pointer-events-none">
+                    i
+                </span>
+            </div>
+        );
+    }
+    
+    // 2. Check if doubtful (Yellow Warning)
+    const isYellowWarning = chance !== null && chance !== undefined && chance > 0 && chance <= 75;
+    
+    if (isYellowWarning) {
+        return (
+            <div 
+                className="cursor-pointer w-7 h-7 flex items-center justify-center hover:bg-yellow-100 rounded-full transition-colors" 
+                onClick={onClick}
+                title="View Injury News"
+            >
+                <AlertTriangle className="w-4 h-4 text-yellow-500 pointer-events-none" fill="currentColor" />
+            </div>
+        );
+    }
+    
+    // 3. Otherwise, they are Ruled Out / Suspended / Unavailable (Red Warning)
+    return (
+        <div 
+            className="cursor-pointer w-7 h-7 flex items-center justify-center hover:bg-[#B2002D] rounded-full transition-colors" 
+            onClick={onClick}
+            title="View Status Details"
+        >
+            <AlertTriangle className="w-4 h-4 text-red-600 pointer-events-none" fill="currentColor" />
+        </div>
+    );
+};
+// ============================================================================
 // SUB-COMPONENT: PlayerTable
 // ============================================================================
-const PlayerTable = ({ players, onPlayerSelect }: { players: any[], onPlayerSelect: (player: any) => void }) => (
+const PlayerTable = ({ players, onPlayerSelect, onInfoClick }: { players: any[], onPlayerSelect: (player: any) => void, onInfoClick: (player: any) => void }) => (
     <table className="w-full text-left">
         <thead className="sticky top-0 bg-gray-50 z-10">
             <tr className="border-b">
@@ -63,8 +113,18 @@ const PlayerTable = ({ players, onPlayerSelect }: { players: any[], onPlayerSele
         <tbody>
             {players.map(player => (
             <tr key={player.id} className="border-b hover:bg-gray-100 cursor-pointer" onClick={() => onPlayerSelect(player)}>
-                <td className="p-3 flex items-center space-x-3">
-                 <img src={getTeamJersey(player.club)} alt="jersey" className="w-8 h-10 object-contain" />
+                <td className="p-3 flex items-center space-x-2">
+                 
+                 {/* The new interactive Info/Warning icon */}
+                 <PlayerStatusIcon 
+                    player={player} 
+                    onClick={(e) => {
+                        e.stopPropagation(); // Stops the row click from firing so we don't accidentally buy the player
+                        onInfoClick(player);
+                    }} 
+                 />
+
+                 <img src={getTeamJersey(player.club)} alt="jersey" className="w-8 h-10 object-contain ml-1" />
                 <div>
                     <p className="font-bold text-sm">{player.name}</p>
                     <p className="text-xs text-gray-500">{player.pos} · {player.club}</p>
@@ -163,31 +223,36 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 
-     useEffect(() => {
-    const fetchPlayers = async () => {
-      try {
-        // MODIFIED: Fetch from the player stats endpoint which includes total points
-        const response = await fetch(API.endpoints.playerStats);
-        if (!response.ok) throw new Error('API failed to fetch player stats');
-        const data = await response.json();
+    // NEW STATE: Tracks which player to show in the info modal
+    const [infoPlayer, setInfoPlayer] = useState<any | null>(null);
 
-        // MODIFIED: Map the real data from the API response, not placeholders
-        const mapped = data.map((player: any) => ({
-          id: player.id,
-          name: player.full_name,
-          pos: player.position === 'ST' ? 'FWD' : player.position,
-          club: player.team?.name || 'Unknown',
-          price: player.price,
-          points: player.total_points, // Use the real total_points field from the backend
-          tsb: Math.floor(Math.random() * 50) + 30 // TSB can remain a placeholder for now
-        }));
-        setPlayers(mapped);
-      } catch (err: any) {
-        console.warn('API fetch failed:', err.message);
-      }
-    };
-    fetchPlayers();
-  }, []);
+    useEffect(() => {
+        const fetchPlayers = async () => {
+          try {
+            const response = await fetch(API.endpoints.playerStats);
+            if (!response.ok) throw new Error('API failed to fetch player stats');
+            const data = await response.json();
+    
+            // MODIFIED: Added mapping for status, news, chance_of_playing
+            const mapped = data.map((player: any) => ({
+              id: player.id,
+              name: player.full_name,
+              pos: player.position === 'ST' ? 'FWD' : player.position,
+              club: player.team?.name || 'Unknown',
+              price: player.price,
+              points: player.total_points,
+              tsb: Math.floor(Math.random() * 50) + 30,
+              status: player.status ?? 'ACTIVE',
+              news: player.news ?? null,
+              chance_of_playing: player.chance_of_playing ?? null,
+            }));
+            setPlayers(mapped);
+          } catch (err: any) {
+            console.warn('API fetch failed:', err.message);
+          }
+        };
+        fetchPlayers();
+      }, []);
 
     useEffect(() => {
         if (positionFilter) {
@@ -207,17 +272,14 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     }, [squad]);
 
     const resetFilters = () => {
-    setSearchQuery('');
-    setSelectedPositions(positionFilter ? [positionFilter] : []);
-    setSelectedClubs([]);
-    setSortBy('points');
-    setPriceRange([1.0, 25.0]);
+        setSearchQuery('');
+        setSelectedPositions(positionFilter ? [positionFilter] : []);
+        setSelectedClubs([]);
+        setSortBy('points');
+        setPriceRange([1.0, 25.0]);
     };
 
     const isFiltered = useMemo(() => {
-        // A view is considered "filtered" if any filter is active.
-        // This is the key logic change. If a position is selected (from the pitch or modal),
-        // we switch to the paginated list view.
         return (
             searchQuery.trim() !== '' ||
             selectedPositions.length > 0 ||
@@ -266,7 +328,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
 
 
     return (
-         <Card className="w-full h-full flex flex-col border-gray-300 border-2 rounded-none lg:rounded-lg">
+         <Card className="w-full h-full flex flex-col border-gray-300 border-2 rounded-none lg:rounded-lg relative">
             <CardHeader className="border-b">
                 <div className="flex justify-between items-center">
                      <CardTitle className="text-2xl font-bold">Player Selection</CardTitle>
@@ -274,7 +336,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                         <X className="w-5 h-5" />
                      </Button>
                 </div>
-                <p className="text-sm text-gray-500">Select a maximum of 2 players from a single team or 'Auto Pick' if you're short of time.</p>
+                <p className="text-sm text-gray-500">Select a maximum of 3 players from a single team.</p>
                 <div className="pt-4">
                      <Label className="text-sm font-bold">Find a player</Label>
                     <div className="relative mt-1">
@@ -299,7 +361,8 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
             <div className="flex-1 overflow-y-auto">
                 {isFiltered ? (
                     <>
-                        <PlayerTable players={paginatedPlayers} onPlayerSelect={onPlayerSelect} />
+                        {/* Passed the onInfoClick handler to the table */}
+                        <PlayerTable players={paginatedPlayers} onPlayerSelect={onPlayerSelect} onInfoClick={(p) => setInfoPlayer(p)} />
                          {totalPages > 1 && (
                             <div className="p-4 flex justify-center items-center gap-2 sticky bottom-0 bg-white border-t">
                                  <Button variant="outline" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}><ChevronLeft className="size-4" /></Button>
@@ -314,13 +377,20 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                              posPlayers.length > 0 && (
                                 <div key={pos}>
                                      <h3 className="font-bold text-lg mb-2">{pos}</h3>
-                                     <PlayerTable players={posPlayers.slice(0, 5)} onPlayerSelect={onPlayerSelect} />
+                                     {/* Passed the onInfoClick handler to the table */}
+                                     <PlayerTable players={posPlayers.slice(0, 5)} onPlayerSelect={onPlayerSelect} onInfoClick={(p) => setInfoPlayer(p)} />
                                 </div>
                             )
                         ))}
                     </div>
                 )}
              </div>
+
+             {/* Modals rendered on top */}
+                        <PlayerDetailModal
+                player={infoPlayer}
+                onClose={() => setInfoPlayer(null)}
+            />
         </Card>
     )
 }

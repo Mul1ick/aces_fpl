@@ -60,7 +60,11 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
                                          ...player,
                                          name: player.name,
                                          pos: player.pos,
-                                         team: player.club 
+                                         team: player.club || player.team,
+                                         // --- EXPLICITLY PASSING STATUS DATA ---
+                                         status: player.status,
+                                         chance_of_playing: player.chance_of_playing,
+                                         news: player.news
                                     }} 
                                      isBench={pos === 'SUB'}
                                      displayMode="fixture" 

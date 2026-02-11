@@ -1,3 +1,5 @@
+// frontend/src/components/gameweek/ListView.tsx
+
 import React, { useMemo } from 'react';
 import { cn } from '../../lib/utils';
 import { ChipName } from '../../lib/api';
@@ -56,13 +58,27 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
               
               const finalPoints = (player.points || 0) * multiplier;
 
+              // --- NEW: Check availability status ---
+              const isUnavailable = player.status && player.status !== 'ACTIVE';
+
               return (
                 <tr key={player.id} className="border-b border-gray-200">
                   <td className="p-3">
                      <div className="flex items-center space-x-2">
                        <div>
-                          <p className="font-bold text-sm text-black">
+                          {/* --- MODIFIED: Added flex and the italic "i" icon --- */}
+                          <p className="font-bold text-sm text-black flex items-center flex-wrap gap-1">
                             {player.full_name}
+                            
+                            {isUnavailable && (
+                              <span 
+                                title={player.news || player.status} 
+                                className="bg-red-600 text-white rounded-[3px] px-1.5 py-0.5 text-[10px] font-serif italic leading-none cursor-help shadow-sm"
+                              >
+                                i
+                              </span>
+                            )}
+
                             {isCaptain && <span className="font-semibold text-gray-600"> (C)</span>}
                             {isViceCaptain && <span className="font-semibold text-gray-600"> (VC)</span>}
                           </p>
@@ -95,21 +111,38 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
             </tr>
 
             {/* Render Bench */}
-            {sortedBench.map((player) => (
-              <tr key={player.id} className="border-b border-gray-200 bg-gray-50 opacity-80">
-                <td className="p-3">
-                   <div className="flex items-center space-x-2">
-                     <div>
-                        <p className="font-bold text-sm text-black">{player.full_name}</p>
-                        <p className="text-xs text-gray-500">{player.team?.name || 'N/A'} • {player.position}</p>
+            {sortedBench.map((player) => {
+              // --- NEW: Check availability status for bench ---
+              const isUnavailable = player.status && player.status !== 'ACTIVE';
+
+              return (
+                <tr key={player.id} className="border-b border-gray-200 bg-gray-50 opacity-80">
+                  <td className="p-3">
+                     <div className="flex items-center space-x-2">
+                       <div>
+                          {/* --- MODIFIED: Added flex and the italic "i" icon --- */}
+                          <p className="font-bold text-sm text-black flex items-center flex-wrap gap-1">
+                            {player.full_name}
+                            
+                            {isUnavailable && (
+                              <span 
+                                title={player.news || player.status} 
+                                className="bg-red-600 text-white rounded-[3px] px-1.5 py-0.5 text-[10px] font-serif italic leading-none cursor-help shadow-sm"
+                              >
+                                i
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500">{player.team?.name || 'N/A'} • {player.position}</p>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="p-3 text-right font-bold text-lg text-black tabular-nums">
-                  {player.points}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="p-3 text-right font-bold text-lg text-black tabular-nums">
+                    {player.points}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
          </table>
       </div>

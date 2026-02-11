@@ -14,7 +14,9 @@ const DreamTeam: React.FC = () => {
   const { gw } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [view, setView] = useState('pitch');
+  
+  // Explicitly typing this as string prevents the GameweekHeader TS error
+  const [view, setView] = useState<string>('pitch');
   const [data, setData] = useState<any>(null);
   const [detailedPlayer, setDetailedPlayer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,9 +33,32 @@ const DreamTeam: React.FC = () => {
         if (!res.ok) throw new Error("Dream Team not found");
         const json = await res.json();
         
-        // Transform for UI
-        const starting = json.starting.map(transformApiPlayer);
-        const bench = json.bench.map(transformApiPlayer);
+        // Map players to ensure jerseys, names, and status flags work flawlessly
+        const mapDreamTeamPlayer = (p: any) => {
+            const transformed = transformApiPlayer(p);
+            return {
+                ...p, // Keep raw stats and breakdown for the side drawer
+                ...transformed, // Get normalized fields
+                
+                // --- BULLETPROOF OVERRIDES ---
+                // Ensure team is a string for PlayerCard jerseys
+                team: p.team?.name || p.team_name || p.team || '',
+                // Ensure BOTH pos and position exist so PitchView doesn't drop them
+                pos: transformed.pos || p.position || p.pos,
+                position: p.position || transformed.pos || p.pos,
+                // Ensure names are mapped correctly for the drawer
+                full_name: p.full_name || transformed.name || p.name,
+                
+                // --- INJURY & STATUS DATA ---
+                status: p.status ?? 'ACTIVE',
+                news: p.news ?? null,
+                chance_of_playing: p.chance_of_playing ?? null,
+                return_date: p.return_date ?? null,
+            };
+        };
+
+        const starting = (json.starting || []).map(mapDreamTeamPlayer);
+        const bench = (json.bench || []).map(mapDreamTeamPlayer);
         
         setData({ ...json, starting, bench });
       } catch (e) {
