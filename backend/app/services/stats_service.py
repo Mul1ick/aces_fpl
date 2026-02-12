@@ -491,7 +491,6 @@ async def calculate_dream_team(db: Prisma, gameweek_id: int):
                 "assists": stat_entry.assists,
                 "clean_sheets": stat_entry.clean_sheets,
                 "bonus_points": stat_entry.bonus_points,
-                "played": stat_entry.played
             }
         }
 

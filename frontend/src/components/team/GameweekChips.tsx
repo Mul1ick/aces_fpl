@@ -135,7 +135,8 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
   return (
     <>
       {/* --- MAIN CHIP CONTROL PANEL --- */}
-      <div className="bg-[#38003c] rounded-xl p-4 mb-6 shadow-md text-white">
+      {/* --- APPLIED THE NEW GRADIENT HERE --- */}
+      <div className="bg-gradient-to-br from-[#37003C] to-[#23003F] rounded-xl p-4 mb-6 shadow-md text-white">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {chips.map((chip) => {
             const isActive = status.active === chip.id;

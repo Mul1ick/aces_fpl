@@ -12,7 +12,7 @@ import { EnterSquadModal } from '@/components/transfers/EnterSquadModal';
 import { Button } from '@/components/ui/button';
 import { TransferListView } from '@/components/transfers/TransferListView';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChipStatus } from '@/lib/api'; // Make sure ChipStatus is imported
+import { ChipStatus, playChip } from '@/lib/api';
 import acesLogo from "@/assets/aces-logo.png";
 
 // --- LIB & TYPE IMPORTS ---

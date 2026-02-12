@@ -22,12 +22,10 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
     const captain = allPlayers.find((p: any) => p.is_captain || p.isCaptain);
     const viceCaptain = allPlayers.find((p: any) => p.is_vice_captain || p.isVice);
 
-    // ROBUST CHECK HERE TOO
-    const stats = captain?.raw_stats || (captain as any)?.stats;
-    const captainPlayed = stats?.played === true || stats?.played === 1 || stats?.played === "true";
-
-    return captainPlayed ? captain?.id : viceCaptain?.id;
-}, [playersByPos, bench]);
+    // If there is a captain, they get the multiplier. 
+    // Fallback to Vice Captain only if the main captain is completely missing from the squad.
+    return captain ? captain.id : viceCaptain?.id;
+  }, [playersByPos, bench]);
 
   // --- PREVIOUS LOGIC: Separate the goalkeeper from other subs ---
   const benchLayout = useMemo(() => {

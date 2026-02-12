@@ -10,18 +10,14 @@ interface ListViewProps {
 }
 
 export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
-  // --- NEW LOGIC: Calculate the Effective Captain ---
-  // Identify who is actually receiving the bonus points (C or VC)
+  // --- CORRECTED LOGIC: Calculate the Effective Captain ---
   const effectiveCaptainId = useMemo(() => {
     const captain = players.find(p => p.is_captain || p.isCaptain);
     const viceCaptain = players.find(p => p.is_vice_captain || p.isVice);
 
-    // Check if the Captain actually entered the field (matches backend logic)
-    const captainPlayed = captain?.raw_stats?.played === true;
-
-    // If Captain played, they get the bonus. 
-    // If Captain didn't play, the Vice-Captain gets the bonus.
-    return captainPlayed ? captain?.id : viceCaptain?.id;
+    // If there is a captain, they get the multiplier. 
+    // Fallback to Vice Captain only if the main captain is completely missing.
+    return captain ? captain.id : viceCaptain?.id;
   }, [players]);
 
   const starters = players.filter(p => !p.is_benched);
@@ -48,7 +44,6 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
               const isCaptain = player.is_captain || player.isCaptain;
               const isViceCaptain = player.is_vice_captain || player.isVice;
               
-              // --- UPDATED MULTIPLIER LOGIC ---
               // Check if this specific player is the one currently receiving the bonus
               const isEffCap = player.id === effectiveCaptainId;
               
@@ -58,7 +53,7 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
               
               const finalPoints = (player.points || 0) * multiplier;
 
-              // --- NEW: Check availability status ---
+              // Check availability status
               const isUnavailable = player.status && player.status !== 'ACTIVE';
 
               return (
@@ -66,7 +61,6 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
                   <td className="p-3">
                      <div className="flex items-center space-x-2">
                        <div>
-                          {/* --- MODIFIED: Added flex and the italic "i" icon --- */}
                           <p className="font-bold text-sm text-black flex items-center flex-wrap gap-1">
                             {player.full_name}
                             
@@ -91,7 +85,7 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
                       <span className="font-bold text-lg text-black tabular-nums">
                         {finalPoints}
                       </span>
-                      {/* Optional: Add a small badge if the Triple Captain chip is active on this player */}
+                      {/* Add a small badge if the Triple Captain chip is active on this player */}
                       {isEffCap && activeChip === 'TRIPLE_CAPTAIN' && (
                         <span className="text-[10px] font-bold text-white bg-pl-purple px-1 rounded">3x</span>
                       )}
@@ -112,7 +106,7 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
 
             {/* Render Bench */}
             {sortedBench.map((player) => {
-              // --- NEW: Check availability status for bench ---
+              // Check availability status for bench
               const isUnavailable = player.status && player.status !== 'ACTIVE';
 
               return (
@@ -120,7 +114,6 @@ export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
                   <td className="p-3">
                      <div className="flex items-center space-x-2">
                        <div>
-                          {/* --- MODIFIED: Added flex and the italic "i" icon --- */}
                           <p className="font-bold text-sm text-black flex items-center flex-wrap gap-1">
                             {player.full_name}
                             

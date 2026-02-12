@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from prisma import Prisma
 from app.repositories.gameweek_repo import determine_active_gameweek
 from app.repositories.team_repo import get_top_pick_for_gameweek
+from datetime import datetime
 
 async def get_current_gameweek_with_stats(db: Prisma):
     gameweek = await determine_active_gameweek(db)
@@ -26,3 +27,14 @@ async def get_current_gameweek_with_stats(db: Prisma):
     })
     
     return response_data
+
+async def get_next_gameweek_service(db: Prisma):
+    # Find the first gameweek where the deadline is in the future
+    return await db.gameweek.find_first(
+        where={
+            "deadline": {
+                "gt": datetime.now() # "Greater Than" Now
+            }
+        },
+        order={"deadline": "asc"}
+    )
