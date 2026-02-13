@@ -48,7 +48,6 @@ const navigationItems = [
     title: 'Game Control',
     items: [
       { title: 'Gameweek Manager', url: '/gameweek', icon: Calendar },
-      { title: 'System Settings', url: '/settings', icon: Settings },
     ],
   },
 ];

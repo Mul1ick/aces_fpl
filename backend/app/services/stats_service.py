@@ -634,9 +634,7 @@ async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsReq
         "assists": "assists",
         "clean_sheets": "clean_sheets",
         "yellow_cards": "yellow_cards",
-        "red_cards": "red_cards",
-        "played": "played"
-    }
+        "red_cards": "red_cards"    }
     
     db_update_data = {}
     for key, value in raw_data.items():
@@ -674,13 +672,17 @@ async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsReq
     )
 
     # 5. Trigger the ripple effect for affected users
+    # 5. Find ALL users who have this player in their team (Starters OR Bench)
     affected_users = await db.userteam.find_many(
         where={'player_id': player_id, 'gameweek_id': gameweek_id},
         distinct=['user_id']
     )
 
+    # 6. Force Recalculation for every affected user
+    # This updates the UserGameweekScore table (Fixes the Total Points Box)
     for record in affected_users:
-        # Call the local function to update UserGameweekScore and Leaderboards
         await compute_user_score_for_gw(db, record.user_id, gameweek_id)
+    
+    # --- CRITICAL FIX ENDS HERE ---
     
     return {"message": f"Successfully updated stats for {player.full_name}. New GW points: {new_total_points}"}
