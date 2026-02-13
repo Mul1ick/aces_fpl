@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock, AlertTriangle, Pencil } from 'lucide-react';
 import type { Team, GameweekStatus } from '@/types';
 import { formatDistanceToNow, isPast } from 'date-fns';
 
@@ -13,16 +13,18 @@ interface Fixture {
   home_score?: number | null;
   away_score?: number | null;
   stats_entered: boolean;
-  kickoff: string; // --- MODIFIED --- Changed from kickoff_time to kickoff
+  kickoff: string;
 }
 
 interface FixturesListProps {
   fixtures: Fixture[];
   gameweekStatus?: GameweekStatus;
   onOpenStatsModal: (fixtureId: number) => void;
+  // --- ADDED: New prop for correction mode ---
+  onOpenCorrectionModal: (fixtureId: number) => void;
 }
 
-export function FixturesList({ fixtures, gameweekStatus, onOpenStatsModal }: FixturesListProps) {
+export function FixturesList({ fixtures, gameweekStatus, onOpenStatsModal, onOpenCorrectionModal }: FixturesListProps) {
   const getLogoPath = (logoUrl: string | undefined) => {
     if (!logoUrl) return `/src/assets/images/team-logos/grey.png`;
     return `/src/assets/images/team-logos/${logoUrl}`;
@@ -39,7 +41,6 @@ export function FixturesList({ fixtures, gameweekStatus, onOpenStatsModal }: Fix
       <CardContent className="space-y-2">
         {fixtures.length > 0 ? (
           fixtures.map((fixture) => {
-            // --- MODIFIED --- Now reads from fixture.kickoff
             const kickoffDate = fixture.kickoff ? new Date(fixture.kickoff) : null;
             const isKickoffValid = kickoffDate && !isNaN(kickoffDate.getTime());
             const hasMatchPassed = isKickoffValid ? isPast(kickoffDate) : false;
@@ -99,8 +100,22 @@ export function FixturesList({ fixtures, gameweekStatus, onOpenStatsModal }: Fix
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 ml-4">
+                <div className="flex items-center gap-2 ml-4">
                   {getStatusBadge()}
+                  
+                  {/* --- MODIFIED: Added Edit Button Logic --- */}
+                  {fixture.stats_entered && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => onOpenCorrectionModal(fixture.id)}
+                      title="Edit / Correct Stats"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+
                   <Button
                     size="sm"
                     onClick={() => onOpenStatsModal(fixture.id)}
@@ -123,4 +138,3 @@ export function FixturesList({ fixtures, gameweekStatus, onOpenStatsModal }: Fix
     </Card>
   );
 }
-

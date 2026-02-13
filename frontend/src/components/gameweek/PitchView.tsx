@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import PlayerCard from '@/components/layout/PlayerCard'; 
 import pitchBackground from '@/assets/images/pitch.png';
 import { ChipName } from '@/lib/api';
@@ -8,27 +8,22 @@ interface PitchViewProps {
   bench: any[];
   onPlayerClick: (player: any) => void;
   activeChip?: ChipName | null;
+  // --- ADDED PROP ---
+  effectiveCaptainId?: number | null;
 }
 
-export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPlayerClick, activeChip }) => {
+export const PitchView: React.FC<PitchViewProps> = ({ 
+  playersByPos, 
+  bench, 
+  onPlayerClick, 
+  activeChip,
+  effectiveCaptainId 
+}) => {
   
-  // --- NEW LOGIC: Calculate the Effective Captain ---
-  // We need to find who is actually receiving the bonus points (C or VC)
-
-  const effectiveCaptainId = useMemo(() => {
-    const starters = Object.values(playersByPos).flat();
-    const allPlayers = [...starters, ...bench];
-    
-    const captain = allPlayers.find((p: any) => p.is_captain || p.isCaptain);
-    const viceCaptain = allPlayers.find((p: any) => p.is_vice_captain || p.isVice);
-
-    // If there is a captain, they get the multiplier. 
-    // Fallback to Vice Captain only if the main captain is completely missing from the squad.
-    return captain ? captain.id : viceCaptain?.id;
-  }, [playersByPos, bench]);
-
-  // --- PREVIOUS LOGIC: Separate the goalkeeper from other subs ---
-  const benchLayout = useMemo(() => {
+  // Logic Removed: effectiveCaptainId is now calculated in parent (Gameweek.tsx)
+  
+  // Bench Layout Logic
+  const benchLayout = React.useMemo(() => {
     if (!bench) return { goalkeeper: null, outfielders: [] };
     const goalkeeper = bench.find((p: any) => p.position === 'GK') || null;
     const outfielders = bench.filter((p: any) => p.position !== 'GK');
@@ -56,9 +51,8 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   pos: p.position,
                   team: p.team?.name || p.team,
                   points: p.points,
-                  isCaptain: p.is_captain,
-                  isVice: p.is_vice_captain,
-                  // --- INJECTED STATUS FIELDS ---
+                  isCaptain: p.is_captain || p.isCaptain,
+                  isVice: p.is_vice_captain || p.isVice,
                   status: p.status,
                   chance_of_playing: p.chance_of_playing,
                   news: p.news
@@ -81,9 +75,8 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   pos: p.position,
                   team: p.team?.name || p.team,
                   points: p.points,
-                  isCaptain: p.is_captain,
-                  isVice: p.is_vice_captain,
-                  // --- INJECTED STATUS FIELDS ---
+                  isCaptain: p.is_captain || p.isCaptain,
+                  isVice: p.is_vice_captain || p.isVice,
                   status: p.status,
                   chance_of_playing: p.chance_of_playing,
                   news: p.news
@@ -106,9 +99,8 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   pos: p.position,
                   team: p.team?.name || p.team,
                   points: p.points,
-                  isCaptain: p.is_captain,
-                  isVice: p.is_vice_captain,
-                  // --- INJECTED STATUS FIELDS ---
+                  isCaptain: p.is_captain || p.isCaptain,
+                  isVice: p.is_vice_captain || p.isVice,
                   status: p.status,
                   chance_of_playing: p.chance_of_playing,
                   news: p.news
@@ -131,9 +123,8 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   pos: p.position,
                   team: p.team?.name || p.team,
                   points: p.points ?? 0,
-                  isCaptain: p.is_captain,
-                  isVice: p.is_vice_captain,
-                  // --- INJECTED STATUS FIELDS ---
+                  isCaptain: p.is_captain || p.isCaptain,
+                  isVice: p.is_vice_captain || p.isVice,
                   status: p.status,
                   chance_of_playing: p.chance_of_playing,
                   news: p.news
@@ -158,9 +149,8 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                   pos: benchLayout.goalkeeper.position,
                   team: benchLayout.goalkeeper.team?.name || benchLayout.goalkeeper.team,
                   points: benchLayout.goalkeeper.points,
-                  isCaptain: benchLayout.goalkeeper.is_captain,
-                  isVice: benchLayout.goalkeeper.is_vice_captain,
-                  // --- INJECTED STATUS FIELDS ---
+                  isCaptain: benchLayout.goalkeeper.is_captain || benchLayout.goalkeeper.isCaptain,
+                  isVice: benchLayout.goalkeeper.is_vice_captain || benchLayout.goalkeeper.isVice,
                   status: benchLayout.goalkeeper.status,
                   chance_of_playing: benchLayout.goalkeeper.chance_of_playing,
                   news: benchLayout.goalkeeper.news
@@ -182,9 +172,8 @@ export const PitchView: React.FC<PitchViewProps> = ({ playersByPos, bench, onPla
                     pos: p.position,
                     team: p.team?.name || p.team,
                     points: p.points,
-                    isCaptain: p.is_captain,
-                    isVice: p.is_vice_captain,
-                    // --- INJECTED STATUS FIELDS ---
+                    isCaptain: p.is_captain || p.isCaptain,
+                    isVice: p.is_vice_captain || p.isVice,
                     status: p.status,
                     chance_of_playing: p.chance_of_playing,
                     news: p.news

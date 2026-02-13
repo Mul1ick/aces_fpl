@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { getChipStatus, playChip, type ChipStatus } from '@/lib/api';
@@ -7,13 +7,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 
-// --- 1. IMPORT BUTTON ICONS (Transparent) ---
+// ... imports remain the same ...
 import wildcardIcon from '@/assets/images/chips/wildcard-transparent.png';
 import tripleCaptainIcon from '@/assets/images/chips/triplecaptain-transparent.png';
 import benchBoostIcon from '@/assets/images/chips/benchboost-transparent.png';
 import freeHitIcon from '@/assets/images/chips/free-hit-transparent.png';
-
-// --- 2. IMPORT SLIDER IMAGES (Big/Solid) ---
 import wildcardIll from '@/assets/images/chips/wild-card.png';
 import tripleCaptainIll from '@/assets/images/chips/triple-captain.png';
 import benchBoostIll from '@/assets/images/chips/bench-boost.png';
@@ -59,8 +57,12 @@ const chips = [
 
 type ChipItem = typeof chips[number];
 
-// Added isFirstGameweek prop here
-export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGameweek?: boolean }> = ({ token, gw, isFirstGameweek = false }) => {
+export const GameweekChips: React.FC<{ 
+  token: string; 
+  gw?: number; 
+  isFirstGameweek?: boolean;
+  isLocked?: boolean;
+}> = ({ token, gw, isFirstGameweek = false, isLocked = false }) => {
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -69,7 +71,6 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
   const [loading, setLoading] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
 
-  // Track screen size for animation & layout logic
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(window.innerWidth >= 768); 
     checkDesktop();
@@ -89,7 +90,24 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
     fetchStatus();
   }, [token]);
 
-  const handleOpenSlider = (chip: ChipItem) => {
+  // --- NEW HANDLER: Intercept click to show Warning if Locked ---
+  const handleChipClick = (chip: ChipItem, isUsed: boolean, isDisabled: boolean) => {
+    if (isUsed) return; // Completely dead if used
+
+    // If locked, show the error toast
+    if (isLocked) {
+        toast({
+            variant: "destructive",
+            title: "Gameweek Deadline Passed",
+            description: "Chips cannot be played after the deadline. Please wait for the next gameweek.",
+        });
+        return;
+    }
+
+    // If otherwise disabled (e.g., restricted GW1 or another chip active), do nothing
+    if (isDisabled) return;
+
+    // Open Slider
     setSelectedChip(chip);
   };
 
@@ -116,16 +134,17 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
     }
   };
 
-  // Helper to determine the text for the button
+  // --- MODIFIED: Priority Logic ---
   const getButtonText = (chipId: string, isActive: boolean, isUsed: boolean, isAnyActive: boolean, isRestricted: boolean) => {
     if (isActive) return "Active";
-    if (isUsed) return "Used"; 
-    if (isRestricted) return "Unavailable for GW 1"; // Or "Unavailable"
+    if (isUsed) return "Used"; // "Used" now takes priority over "Locked"
+    if (isRestricted) return "Unavailable for GW 1";
     if (isAnyActive && !isActive) return "Unavailable";
+    
+    // If simply locked but available otherwise, show Play (so they click it and get the error)
     return "Play";
   };
 
-  // Animation Variants: Right Slide for Desktop, Bottom Slide for Mobile
   const sidebarVariants = {
     hidden: isDesktop ? { x: "100%", y: 0 } : { y: "100%", x: 0 },
     visible: { x: 0, y: 0 },
@@ -134,24 +153,22 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
 
   return (
     <>
-      {/* --- MAIN CHIP CONTROL PANEL --- */}
-      {/* --- APPLIED THE NEW GRADIENT HERE --- */}
-      <div className="bg-gradient-to-br from-[#37003C] to-[#23003F] rounded-xl p-4 mb-6 shadow-md text-white">
+      <div className="bg-gradient-to-br from-[#37003C] to-[#23003F] rounded-xl p-4 mb-6 shadow-md text-white relative overflow-hidden">
+        
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {chips.map((chip) => {
             const isActive = status.active === chip.id;
             const isUsed = status.used.includes(chip.id) && !isActive;
             const isAnyActive = status.active !== null;
             
-            // CONSTRAINT LOGIC: 
-            // If it is the first gameweek, Wildcard and Free Hit are restricted.
-            
             const isRestricted = 
                 (!user?.played_first_gameweek) && 
                 (chip.id === 'WILDCARD' || chip.id === 'FREE_HIT');
 
+            // --- LOGIC CHANGE: isLocked is NOT included in isDisabled anymore ---
+            // This allows the click event to fire so we can show the toast.
             const isDisabled = isUsed || (isAnyActive && !isActive) || isRestricted;
-
 
             return (
               <div
@@ -168,8 +185,8 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
                     isDisabled && !isUsed ? "opacity-50" : "", 
                     isUsed ? "opacity-30 grayscale" : ""       
                   )}
-                  onClick={() => !isDisabled && !isActive && handleOpenSlider(chip)}
-                  style={{ cursor: isDisabled ? 'default' : 'pointer' }}
+                  onClick={() => handleChipClick(chip, isUsed, isDisabled)}
+                  style={{ cursor: isUsed ? 'default' : 'pointer' }}
                 >
                     <img 
                       src={chip.icon} 
@@ -177,7 +194,7 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
                       className={cn(
                           "w-12 h-12 object-contain mb-2 transition-transform duration-300",
                           "brightness-0 invert",
-                          !isDisabled && !isActive && "group-hover:scale-110"
+                          !isDisabled && !isActive && !isLocked && "group-hover:scale-110"
                       )}
                     />
                     <h4 className="text-[10px] sm:text-xs font-bold tracking-wide text-center leading-tight">
@@ -187,21 +204,24 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
 
                 <button
                     type="button"
-                    disabled={isDisabled} 
-                    onClick={() => !isDisabled && !isActive && handleOpenSlider(chip)}
+                    // Only disable HTML button if Used or Restricted. 
+                    // If Locked, keep enabled to capture click.
+                    disabled={isUsed || (isAnyActive && !isActive) || isRestricted} 
+                    onClick={() => handleChipClick(chip, isUsed, isDisabled)}
                     className={cn(
                         "w-full mt-3 py-1.5 px-2 rounded text-[10px] font-bold  tracking-wider transition-all duration-300",
                         isActive 
                             ? "bg-gradient-to-r from-cyan-300 via-blue-600 to-purple-700 text-white shadow-md border-none opacity-100 cursor-default"
                             : "",
-                        // Unavailable States (Other active OR Restricted OR Used)
+                        
                         (!isActive && isAnyActive) || isRestricted
                             ? "bg-transparent text-gray-400 border border-gray-600 cursor-not-allowed"
                             : "",
                         isUsed
                             ? "bg-transparent text-gray-500 border border-gray-700 cursor-not-allowed"
                             : "",
-                        // Play State
+                        
+                        // Play State (Includes Locked state visually)
                         !isActive && !isAnyActive && !isUsed && !isRestricted
                             ? "bg-transparent border border-white text-white hover:bg-white hover:text-[#38003c] shadow-sm"
                             : ""
@@ -215,11 +235,9 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
         </div>
       </div>
 
-      {/* --- RESPONSIVE SLIDER --- */}
       <AnimatePresence>
         {selectedChip && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -228,7 +246,6 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
               onClick={() => setSelectedChip(null)}
             />
             
-            {/* Slider Content */}
             <motion.div
               variants={sidebarVariants}
               initial="hidden"
@@ -237,9 +254,7 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className={cn(
                 "fixed z-50 bg-white shadow-2xl overflow-y-auto",
-                // MOBILE
                 "bottom-0 left-0 right-0 w-full rounded-t-[2rem] max-h-[90vh]",
-                // DESKTOP (Right Drawer, 30%)
                 "md:top-0 md:right-0 md:left-auto md:bottom-auto", 
                 "md:h-full md:w-[30%] md:min-w-[400px] md:max-h-full", 
                 "md:rounded-none md:rounded-l-3xl"
@@ -247,7 +262,6 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
             >
               <div className="p-8 h-full flex flex-col items-center text-center text-black relative">
                 
-                {/* Close Button */}
                 <button 
                   onClick={() => setSelectedChip(null)}
                   className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
@@ -255,7 +269,6 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
 
-                {/* 1. Big Chip Logo */}
                 <div className="mt-4 md:mt-8 mb-4">
                    <img 
                     src={selectedChip.illustration} 
@@ -264,19 +277,16 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
                    />
                 </div>
 
-                {/* 2. Chip Name */}
                 <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-2 text-[#38003c]">
                   {selectedChip.name}
                 </h2>
 
-                {/* 3. Description */}
                 <div className="mb-6 max-w-sm mx-auto">
                     <p className="text-gray-800 text-base md:text-lg font-medium leading-relaxed">
                         {selectedChip.description}
                     </p>
                 </div>
 
-                {/* 4. Warning */}
                 <div className="bg-gray-100 rounded-xl p-4 w-full mb-8">
                     <h4 className="flex items-center justify-center gap-2 text-sm font-bold text-gray-700 mb-2 tracking-wider">
                         <AlertTriangle className="w-4 h-4 text-black" /> Important
@@ -287,7 +297,6 @@ export const GameweekChips: React.FC<{ token: string; gw?: number; isFirstGamewe
                     </ul>
                 </div>
 
-                {/* 5. Play Button (Gradient) */}
                 <Button 
                   onClick={executePlayChip}
                   disabled={loading}

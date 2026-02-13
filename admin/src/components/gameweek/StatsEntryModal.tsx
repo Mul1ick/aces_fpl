@@ -21,10 +21,9 @@ import {
 } from '@/components/ui/select';
 import type { Team, Player, PlayerGameweekStats } from '@/types';
 import { CompactInput } from '@/components/shared/CompactInput';
-import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, Footprints, ShieldAlert, Ban, Star, Timer, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Make sure you import cn for conditional row styling
+import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, ShieldAlert, Ban, Star, Timer, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-// --- MODIFIED: Extend type locally to include suspension duration & penalties saved ---
 type ExtendedPlayerGameweekStats = PlayerGameweekStats & {
   suspension_duration?: number;
   penalties_saved?: number;
@@ -35,10 +34,11 @@ type PlayerStatInputs = {
 };
 
 const DEFAULT_ROW_STATS: ExtendedPlayerGameweekStats = {
-  played: false, goals_scored: 0, assists: 0, clean_sheets: false,
+  played: false, // This is now handled implicitly by the backend
+  goals_scored: 0, assists: 0, clean_sheets: false,
   goals_conceded: 0, own_goals: 0, penalties_missed: 0, penalties_saved: 0, yellow_cards: 0,
   red_cards: 0, bonus_points: 0,
-  suspension_duration: 1, // Default duration
+  suspension_duration: 1,
 };
 
 type StatKey = keyof ExtendedPlayerGameweekStats;
@@ -51,6 +51,7 @@ interface Fixture {
   away_score?: number | null;
 }
 
+// --- UPDATED: Props interface to handle modes and different save functions ---
 interface StatsEntryModalProps {
   fixture: Fixture | null;
   players: Player[];
@@ -60,18 +61,18 @@ interface StatsEntryModalProps {
   initialStats?: PlayerStatInputs | null;
   onClose: () => void;
   onSave: (fixtureId: number, scores: { home_score: number; away_score: number }, stats: PlayerStatInputs) => void;
+  onCorrectionSave?: (stats: PlayerStatInputs) => void;
+  mode?: 'view' | 'entry' | 'correction';
 }
 
 const StatsTableHeader = () => {
     const headers = [
-        { icon: <Footprints className="h-5 w-5" />, label: 'Played' },
         { icon: <Goal className="h-5 w-5 text-blue-500" />, label: 'Goals' },
         { icon: <PlusCircle className="h-5 w-5 text-green-500" />, label: 'Assists' },
         { icon: <ShieldCheck className="h-5 w-5 text-green-500" />, label: 'Clean Sheet' },
         { icon: <ShieldX className="h-5 w-5 text-red-500" />, label: 'Goals Conceded' },
         { icon: <ShieldAlert className="h-5 w-5" />, label: 'Own Goals' },
         { icon: <Ban className="h-5 w-5" />, label: 'Pen Miss' },
-        // --- NEW: Pen Saved Header ---
         { icon: <ShieldCheck className="h-5 w-5 text-blue-400" />, label: 'Pen Saved' },
         { icon: <Square className="h-5 w-5 text-yellow-500 fill-yellow-500" />, label: 'Yellow Card' },
         { icon: <Square className="h-5 w-5 text-red-600 fill-red-600" />, label: 'Red Card' },
@@ -79,8 +80,7 @@ const StatsTableHeader = () => {
     ];
 
     return (
-        // --- MODIFIED: grid-cols updated to repeat(11, ...) ---
-        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(11,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
+        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(10,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
             <div className="text-left font-bold">Player</div>
             {headers.map(h => (
                 <div key={h.label} className="flex flex-col items-center justify-center gap-1.5 h-12">
@@ -96,24 +96,21 @@ const PlayerStatRow = ({
   player,
   stats,
   onStatChange,
-  isReadOnly,
+  disabled, // Renamed from isReadOnly for clarity
 }: {
   player: Player;
   stats: ExtendedPlayerGameweekStats;
   onStatChange: (playerId: number, field: StatKey, value: number | boolean) => void;
-  isReadOnly?: boolean;
+  disabled?: boolean;
 }) => {
-  // --- NEW: Check availability status ---
   const isUnavailable = player.status && player.status !== 'ACTIVE';
 
   return (
-    // --- MODIFIED: grid-cols updated to 11, and dynamic background applied ---
     <div className={cn(
-      "grid grid-cols-[minmax(200px,_1.5fr)_repeat(11,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 border-b last:border-b-0",
+      "grid grid-cols-[minmax(200px,_1.5fr)_repeat(10,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 border-b last:border-b-0",
       isUnavailable && "bg-red-50/60 dark:bg-red-950/20"
     )}>
       <div className="flex items-center gap-2">
-        {/* --- NEW: Alert Icon for unavailable players --- */}
         {isUnavailable && (
           <AlertTriangle 
             className="h-4 w-4 text-red-500 flex-shrink-0" 
@@ -125,22 +122,18 @@ const PlayerStatRow = ({
           <p className="text-xs text-muted-foreground">{player.position}</p>
         </div>
       </div>
-      <div className="flex justify-center"><Switch checked={stats.played} onCheckedChange={(val) => onStatChange(player.id, 'played', val)} disabled={isReadOnly} /></div>
-      <CompactInput value={stats.goals_scored} onValueChange={(val) => onStatChange(player.id, 'goals_scored', val)} disabled={isReadOnly} />
-      <CompactInput value={stats.assists} onValueChange={(val) => onStatChange(player.id, 'assists', val)} disabled={isReadOnly} />
-      <div className="flex justify-center"><Switch checked={stats.clean_sheets} onCheckedChange={(val) => onStatChange(player.id, 'clean_sheets', val)} disabled={isReadOnly} /></div>
-      <CompactInput value={stats.goals_conceded} onValueChange={(val) => onStatChange(player.id, 'goals_conceded', val)} disabled={isReadOnly} />
-      <CompactInput value={stats.own_goals} onValueChange={(val) => onStatChange(player.id, 'own_goals', val)} disabled={isReadOnly} />
-      <CompactInput value={stats.penalties_missed} onValueChange={(val) => onStatChange(player.id, 'penalties_missed', val)} disabled={isReadOnly} />
-      
-      {/* --- NEW: Penalties Saved Input --- */}
-      <CompactInput value={stats.penalties_saved || 0} onValueChange={(val) => onStatChange(player.id, 'penalties_saved', val)} disabled={isReadOnly} />
-      
-      <CompactInput value={stats.yellow_cards} onValueChange={(val) => onStatChange(player.id, 'yellow_cards', val)} max={1} disabled={isReadOnly} />
+      <CompactInput value={stats.goals_scored} onValueChange={(val) => onStatChange(player.id, 'goals_scored', val)} disabled={disabled} />
+      <CompactInput value={stats.assists} onValueChange={(val) => onStatChange(player.id, 'assists', val)} disabled={disabled} />
+      <div className="flex justify-center"><Switch checked={stats.clean_sheets} onCheckedChange={(val) => onStatChange(player.id, 'clean_sheets', val)} disabled={disabled} /></div>
+      <CompactInput value={stats.goals_conceded} onValueChange={(val) => onStatChange(player.id, 'goals_conceded', val)} disabled={disabled} />
+      <CompactInput value={stats.own_goals} onValueChange={(val) => onStatChange(player.id, 'own_goals', val)} disabled={disabled} />
+      <CompactInput value={stats.penalties_missed} onValueChange={(val) => onStatChange(player.id, 'penalties_missed', val)} disabled={disabled} />
+      <CompactInput value={stats.penalties_saved || 0} onValueChange={(val) => onStatChange(player.id, 'penalties_saved', val)} disabled={disabled} />
+      <CompactInput value={stats.yellow_cards} onValueChange={(val) => onStatChange(player.id, 'yellow_cards', val)} max={1} disabled={disabled} />
       
       <div className="flex flex-col items-center gap-1">
-        <CompactInput value={stats.red_cards} onValueChange={(val) => onStatChange(player.id, 'red_cards', val)} max={1} disabled={isReadOnly} />
-        {stats.red_cards > 0 && !isReadOnly && (
+        <CompactInput value={stats.red_cards} onValueChange={(val) => onStatChange(player.id, 'red_cards', val)} max={1} disabled={disabled} />
+        {stats.red_cards > 0 && !disabled && (
            <div className="flex items-center gap-1 scale-75 origin-top">
              <Timer className="w-3 h-3 text-red-500" />
              <Select 
@@ -160,12 +153,15 @@ const PlayerStatRow = ({
            </div>
         )}
       </div>
-      <CompactInput value={stats.bonus_points} onValueChange={(val) => onStatChange(player.id, 'bonus_points', val)} max={3} disabled={isReadOnly} />
+      <CompactInput value={stats.bonus_points} onValueChange={(val) => onStatChange(player.id, 'bonus_points', val)} max={3} disabled={disabled} />
     </div>
   );
 };
 
-export function StatsEntryModal({ fixture, players, isOpen, loading = false, isReadOnly = false, initialStats, onClose, onSave }: StatsEntryModalProps) {
+export function StatsEntryModal({
+    fixture, players, isOpen, loading = false, initialStats,
+    onClose, onSave, onCorrectionSave, mode = 'entry'
+}: StatsEntryModalProps) {
   const [stats, setStats] = useState<PlayerStatInputs>({});
   const [homeScore, setHomeScore] = useState<number | string>('');
   const [awayScore, setAwayScore] = useState<number | string>('');
@@ -194,24 +190,9 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
 
       allFixturePlayers.forEach(player => {
         const savedStat = initialStats ? initialStats[player.id] : null;
-        if (savedStat) {
-          populatedStats[player.id] = {
-            played: savedStat.played ?? false,
-            goals_scored: savedStat.goals_scored ?? 0,
-            assists: savedStat.assists ?? 0,
-            clean_sheets: savedStat.clean_sheets ?? false,
-            goals_conceded: savedStat.goals_conceded ?? 0,
-            own_goals: savedStat.own_goals ?? 0,
-            penalties_missed: savedStat.penalties_missed ?? 0,
-            penalties_saved: savedStat.penalties_saved ?? 0, // --- NEW ---
-            yellow_cards: savedStat.yellow_cards ?? 0,
-            red_cards: savedStat.red_cards ?? 0,
-            bonus_points: savedStat.bonus_points ?? 0,
-            suspension_duration: 1, 
-          };
-        } else {
-          populatedStats[player.id] = { ...DEFAULT_ROW_STATS };
-        }
+        populatedStats[player.id] = savedStat 
+          ? { ...DEFAULT_ROW_STATS, ...savedStat }
+          : { ...DEFAULT_ROW_STATS };
       });
       
       setStats(populatedStats);
@@ -224,12 +205,18 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
 
   const handleSave = () => {
     if (fixture) {
-      const scores = { home_score: Number(homeScore), away_score: Number(awayScore) };
-      onSave(fixture.id, scores, stats);
+      if (mode === 'correction' && onCorrectionSave) {
+        onCorrectionSave(stats);
+      } else {
+        const scores = { home_score: Number(homeScore), away_score: Number(awayScore) };
+        onSave(fixture.id, scores, stats);
+      }
     }
   };
 
   if (!fixture) return null;
+
+  const isReadOnly = mode === 'view';
 
   const renderPlayerTable = (teamPlayers: Player[]) => (
     <div className="border rounded-lg bg-card">
@@ -241,7 +228,7 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
             player={player}
             stats={stats[player.id] || DEFAULT_ROW_STATS}
             onStatChange={handleStatChange}
-            isReadOnly={isReadOnly}
+            disabled={isReadOnly}
           />
         ))}
       </div>
@@ -252,9 +239,13 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] xl:max-w-7xl p-0">
         <DialogHeader className="bg-sidebar text-sidebar-foreground p-4 rounded-t-lg">
-          <DialogTitle className="text-xl">{isReadOnly ? 'View Match Stats' : 'Enter Match Stats'}</DialogTitle>
+          <DialogTitle className="text-xl">
+            {mode === 'correction' ? 'Correct Stats (Live Update)' : (isReadOnly ? 'View Match Stats' : 'Enter Match Stats')}
+          </DialogTitle>
           <DialogDescription className="text-sidebar-foreground/80">
-            {isReadOnly ? 'These stats have been finalized and cannot be edited.' : 'Update the final score and individual player performance for this fixture.'}
+            {mode === 'correction' 
+              ? '⚠ Changes saved here will immediately update user scores and leaderboards.' 
+              : (isReadOnly ? 'These stats have been finalized.' : 'Update score and performance.')}
           </DialogDescription>
           <div className="flex items-center justify-center pt-4 gap-4">
             <div className="flex items-center gap-3 w-2/5 justify-end">
@@ -304,7 +295,13 @@ export function StatsEntryModal({ fixture, players, isOpen, loading = false, isR
           ) : (
             <>
               <Button variant="outline" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleSave} disabled={loading || homePlayers.length === 0 || awayPlayers.length === 0}>Save Stats & Results</Button>
+              <Button 
+                onClick={handleSave} 
+                disabled={loading || homePlayers.length === 0 || awayPlayers.length === 0}
+                className={mode === 'correction' ? 'bg-amber-600 hover:bg-amber-700' : ''}
+              >
+                {mode === 'correction' ? 'Update Corrections' : 'Save Stats & Results'}
+              </Button>
             </>
           )}
         </DialogFooter>

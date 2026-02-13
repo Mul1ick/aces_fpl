@@ -161,6 +161,14 @@ const Team: React.FC = () => {
         fetchAllData();
     }, [toast]);
 
+    const isLocked = useMemo(() => {
+        if (!gameweek) return false;
+        if (gameweek.deadline) {
+            return new Date(gameweek.deadline) < new Date();
+        }
+        return false;
+    }, [gameweek]);
+
     const userRank = useMemo(() => {
         if (!leaderboard || !user) return undefined;
         const userEntry: any = leaderboard.find((entry: any) => entry.manager_email === user.email);
@@ -433,7 +441,7 @@ const Team: React.FC = () => {
                          <p className="text-sm text-gray-500">{deadlineText}</p>
                     </div>
                 </div>
-                {token && <GameweekChips token={token} />}
+                {token && <GameweekChips token={token} isLocked={isLocked} />}
             </motion.div>
             
              <motion.main 

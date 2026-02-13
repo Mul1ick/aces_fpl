@@ -158,6 +158,11 @@ export const playerAPI = {
         return apiRequest(`/admin/players/${playerId}`, { method: 'DELETE' }, token);
     },
 };
+export const statsAPI = {
+  async updatePlayerStats(token: string, payload: any) {
+    return apiRequest('/admin/edit-stats', { method: 'PATCH', body: JSON.stringify(payload) }, token);
+  }
+};
 
 // Gameweek Management API calls
 export const gameweekAPI = {

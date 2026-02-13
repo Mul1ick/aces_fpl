@@ -57,8 +57,7 @@ const Gameweek: React.FC = () => {
         ]);
 
         if (!teamRes.ok) throw new Error("Failed to fetch team data");
-        if (!hubRes.ok || !leaderboardRes.ok || !gwStatsRes.ok) console.warn("Failed to fetch manager or gameweek data");
-
+        
         const teamData: TeamResponse = await teamRes.json();
         setSquad(teamData);
 
@@ -84,19 +83,32 @@ const Gameweek: React.FC = () => {
     fetchAllData();
   }, [toast, gw, user]);
 
-  // --- NEW LOGIC: Determine Effective Captain for Modal Points ---
+  // --- UPDATED LOGIC: Determine Effective Captain ---
+  // This logic now reliably checks if the Captain actually played
   const effectiveCaptainId = useMemo(() => {
     if (!squad) return null;
     const allPlayers = [...squad.starting, ...squad.bench];
     
-    // Using property names matching your types.ts
-    const captain = allPlayers.find(p => p.is_captain);
-    const viceCaptain = allPlayers.find(p => p.is_vice_captain);
+    // Find players with flags
+    const captain = allPlayers.find(p => p.is_captain || (p as any).isCaptain);
+    const viceCaptain = allPlayers.find(p => p.is_vice_captain || (p as any).isVice);
 
-    // Using 'as any' to access raw_stats which isn't in the base Player type
-    const captainPlayed = (captain as any)?.raw_stats?.played === true;
+    if (!captain) return viceCaptain?.id;
+
+    // Check if Captain played using robust checks
+    // 1. Check points != 0 (Simplest indicator of activity, usually)
+    // 2. Check explicit 'played' flag in raw_stats
+    // 3. Check minutes in raw_stats
+    const stats = (captain as any).raw_stats || (captain as any).stats || {};
+    const points = (captain as any).points || 0;
     
-    return captainPlayed ? captain?.id : viceCaptain?.id;
+    const captainPlayed = 
+        (points !== 0) || 
+        (stats.played === true || stats.played === 1) || 
+        (stats.minutes > 0);
+    
+    // If captain played, they keep the armband. If not, it goes to VC.
+    return captainPlayed ? captain.id : viceCaptain?.id;
   }, [squad]);
 
   const userRank = useMemo(() => {
@@ -113,8 +125,7 @@ const Gameweek: React.FC = () => {
     }
   };
 
-
-    if (!squad) {
+  if (!squad) {
     return <div className="p-4 text-center">Loading your gameweek data...</div>;
   }
 
@@ -167,6 +178,8 @@ const Gameweek: React.FC = () => {
                   bench={squad.bench} 
                   onPlayerClick={setDetailedPlayer} 
                   activeChip={chipStatus?.active}
+                  // --- FIX: Pass the calculated effective ID down ---
+                  effectiveCaptainId={effectiveCaptainId}
                 />
             ) : (
                 <ListView 
@@ -195,7 +208,8 @@ const Gameweek: React.FC = () => {
             player={detailedPlayer} 
             onClose={() => setDetailedPlayer(null)} 
             activeChip={chipStatus?.active}
-            isEffectiveCaptain={detailedPlayer.id === effectiveCaptainId} // --- ADDED ---
+            // --- FIX: Pass the check to the modal ---
+            isEffectiveCaptain={detailedPlayer.id === effectiveCaptainId} 
           />
         )}
       </AnimatePresence>

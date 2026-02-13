@@ -9,19 +9,19 @@ interface PlayerDetailCardProps {
   player: any;
   onClose: () => void;
   activeChip?: string | null;
-  isEffectiveCaptain?: boolean;
+  // Change default: Allow it to be undefined to detect if parent passed it
+  isEffectiveCaptain?: boolean; 
 }
 
 export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({ 
   player, 
   onClose, 
   activeChip,
-  isEffectiveCaptain = false
+  isEffectiveCaptain // Removed default 'false' here to allow fallback logic
 }) => {
   const navigate = useNavigate();
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
-  // Update layout orientation based on screen size changes
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
     window.addEventListener('resize', handleResize);
@@ -29,6 +29,40 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
   }, []);
 
   if (!player) return null;
+
+  // --- LOGIC FIX: Determine Points Multiplier ---
+  const determineMultiplier = () => {
+    // 1. Check if the player actually played (Points != 0 OR 'played' flag is true)
+    // Note: Checking points alone handles 0 pts = 0 multiplier logic naturally, 
+    // but semantically we check participation.
+    const stats = player.raw_stats || player.stats || {};
+    const didPlay = (player.points !== 0) || (stats.played === true) || (stats.minutes > 0);
+
+    // 2. Determine Captaincy status from player object
+    const isCap = player.is_captain || player.isCaptain;
+    
+    // 3. Determine if this player gets the bonus
+    let getsBonus = false;
+
+    if (isEffectiveCaptain !== undefined) {
+      // Priority 1: Parent component explicitly told us (Handles VC promotion logic)
+      getsBonus = isEffectiveCaptain;
+    } else {
+      // Priority 2: Fallback (e.g., viewing in Transfer list or Team View without calc)
+      // Default to Captain gets bonus, VC does not (we can't know if Cap played here)
+      getsBonus = isCap;
+    }
+
+    // 4. Calculate final multiplier
+    // If they didn't play, they technically get 0 points, so multiplier doesn't affect math,
+    // but visually 1x is cleaner than 2x for a non-playing captain.
+    if (getsBonus) {
+      return activeChip === 'TRIPLE_CAPTAIN' ? 3 : 2;
+    }
+    return 1;
+  };
+
+  const multiplier = determineMultiplier();
 
   // --- Animation Variants ---
   const slideVariants = isDesktop
@@ -47,16 +81,12 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
     ? new Date(player.return_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : null;
 
-  // --- Points Multiplier (Captaincy) ---
-  const multiplier = isEffectiveCaptain ? (activeChip === 'TRIPLE_CAPTAIN' ? 3 : 2) : 1;
-
   // --- Safe Data Extractors ---
   const recentFixture = player.recent_fixtures?.[0] || null;
   const breakdown = player.breakdown || [];
 
   return (
     <>
-      {/* Dark Overlay */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -65,7 +95,6 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
         onClick={onClose}
       />
 
-      {/* The Drawer / Bottom Sheet */}
       <motion.div
         variants={slideVariants}
         initial="hidden"
@@ -79,7 +108,6 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header Section */}
         <div className="relative p-6 pb-4 border-b border-gray-100">
           <button 
             onClick={onClose} 
@@ -96,7 +124,6 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
             </div>
           </div>
 
-          {/* Dynamic Status Banner */}
           {hasWarning && (
             <div className={`mt-4 p-3 rounded-lg border flex items-start gap-3 ${bannerBgClass}`}>
               <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${iconColor}`} />
@@ -114,10 +141,8 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
           )}
         </div>
 
-        {/* Scrollable Content Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Fixture Div */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
             <h3 className="text-sm font-bold text-gray-800 mb-3 text-center">Current Fixture</h3>
             {recentFixture ? (
@@ -132,21 +157,17 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
             )}
           </div>
 
-          {/* Points Breakdown Div */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
             <h3 className="text-lg font-bold text-black mb-4">Points breakdown</h3>
             
-            {/* Table Header */}
             <div className="grid grid-cols-4 gap-4 pb-2 border-b border-gray-300 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
               <div className="col-span-2">Statistic</div>
               <div className="text-center">Value</div>
               <div className="text-right">Points</div>
             </div>
 
-            {/* Table Rows */}
             <div className="space-y-3 mt-3">
               {breakdown.length > 0 ? breakdown.map((stat: any, index: number) => {
-                // Only show stats that actually happened (value > 0), unless it's Appearance which we might want to show anyway if played
                 if (stat.value === 0 && stat.points === 0) return null;
                 
                 return (
@@ -161,15 +182,20 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
               )}
             </div>
 
-            {/* Total Row */}
             <div className="mt-4 pt-4 border-t border-gray-300 grid grid-cols-4 gap-4 font-black text-base text-black">
-              <div className="col-span-3 text-right">Total</div>
+              <div className="col-span-3 text-right flex items-center justify-end gap-2">
+                Total
+                {multiplier > 1 && (
+                  <span className="bg-pl-purple text-white text-[10px] px-1.5 py-0.5 rounded">
+                    {multiplier}x
+                  </span>
+                )}
+              </div>
               <div className="text-right">{(player.points || 0) * multiplier} pts</div>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-6 border-t border-gray-100 bg-white">
           <Button 
             className="w-full h-12 text-base font-bold bg-black text-white hover:bg-gray-800 rounded-xl"

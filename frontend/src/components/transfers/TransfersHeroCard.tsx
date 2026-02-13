@@ -3,9 +3,12 @@ import { Card } from '@/components/ui/card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { format, isValid } from 'date-fns';
-import { ChipName } from '@/lib/api';
 import { X, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+
+// --- NEW IMPORT: Use the shared hook ---
+import { useChipStatus } from '@/hooks/useChipStatus';
 
 // --- CHIP IMAGES ---
 import wildcardIcon from '@/assets/images/chips/wild-card.png';
@@ -33,9 +36,9 @@ interface TransfersHeroCardProps {
   transferCount: number;
   transferCost: number;
   chipStatus: { active: string | null; used: string[] } | null;
-  onActivateChip: (chip: 'WILDCARD' | 'FREE_HIT') => Promise<void>; // <-- Update this line!
-  isChipLoading: boolean;
-  
+  onActivateChip?: (chip: 'WILDCARD' | 'FREE_HIT') => Promise<void>; 
+  isChipLoading?: boolean;
+  isLocked?: boolean;
 }
 
 // --- CHIP DETAILS FOR SLIDER ---
@@ -56,7 +59,7 @@ const chipDetails = {
 
 type SelectedChipType = typeof chipDetails[keyof typeof chipDetails];
 
-// --- FPL STYLE STAT ITEM (Scaled Down) ---
+// --- STAT ITEM ---
 const StatItem = ({ value, label, isPill = false }: { value: string | number; label: string; isPill?: boolean }) => (
   <div className="flex flex-col items-center justify-start text-center flex-1">
     <div className={cn(
@@ -79,14 +82,14 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   gameweek,
   transferCount,
   transferCost,
-  chipStatus,
-  onActivateChip,
-  isChipLoading
+  isLocked = false
 }) => {
   const [selectedChip, setSelectedChip] = useState<SelectedChipType | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
+  const { toast } = useToast();
+  
+  const { activeChip, usedChips, activateChip, isActivating } = useChipStatus();
 
-  // Track screen size for animation & layout logic
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(window.innerWidth >= 768); 
     checkDesktop();
@@ -94,11 +97,37 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
 
-  const activeChip = chipStatus?.active;
-  const usedChips = chipStatus?.used || [];
+  const handleChipClick = (chip: SelectedChipType, isUsed: boolean, isDisabled: boolean) => {
+    if (isUsed) return;
+
+    if (isLocked) {
+        toast({
+            variant: "destructive",
+            title: "Gameweek Deadline Passed",
+            description: "Chips cannot be played after the deadline. Please wait for the next gameweek.",
+        });
+        return;
+    }
+
+    if (isDisabled) return;
+
+    setSelectedChip(chip);
+  };
+
+  const handleConfirmActivation = () => {
+    if (selectedChip) {
+      activateChip(selectedChip.id, {
+        onSuccess: () => {
+          setSelectedChip(null);
+        }
+      });
+    }
+  };
+
+  const isChipActive = activeChip === 'WILDCARD' || activeChip === 'FREE_HIT';
 
   const getTransfersText = () => {
-    if (activeChip === 'WILDCARD' || activeChip === 'FREE_HIT' || user?.played_first_gameweek === false) {
+    if (isChipActive || user?.played_first_gameweek === false) {
       return "Unlimited";
     }
     return `${user?.free_transfers ?? 0}`;
@@ -110,28 +139,17 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
     ? `Deadline: ${format(deadlineDate, "E dd MMM, HH:mm")}`
     : "Deadline: TBC";
 
-  // --- LOGIC OVERRIDES FOR ACTIVE CHIPS ---
-  const isChipActive = activeChip === 'WILDCARD' || activeChip === 'FREE_HIT';
   const displayTransfersValue = isChipActive ? "Unlimited" : (transferCount > 0 ? transferCount : transfersText);
   const displayCostValue = isChipActive ? 0 : transferCost;
 
-  const handleConfirmActivation = async () => {
-    if (selectedChip) {
-      await onActivateChip(selectedChip.id);
-      setSelectedChip(null); // Closes the slider ONLY after the API succeeds/fails
-    }
-  };
-
-  // --- EXACT FPL STYLE CHIP RENDERER (Scaled Down) ---
   const renderChip = (chipId: 'WILDCARD' | 'FREE_HIT', name: string, icon: string) => {
     const isActive = activeChip === chipId;
     const isUsed = usedChips.includes(chipId);
     const anyActive = activeChip !== null && activeChip !== undefined;
     const isRestricted = !user?.played_first_gameweek;
 
-    const isUnavailable = (anyActive && !isActive) || isRestricted;
+    const isUnavailable = (anyActive && !isActive) || isRestricted || (isLocked && !isActive);
 
-    // FPL Style: If unavailable or used, hide the button entirely and show faded text
     if (isUsed || isUnavailable) {
       return (
         <div className="flex flex-col items-center justify-center p-2 w-[90px] sm:w-[110px] h-[90px] transition-all">
@@ -142,13 +160,12 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
           />
           <span className="text-[9px] sm:text-[10px] font-bold tracking-wide text-gray-400 mb-0.5">{name}</span>
           <span className="text-[9px] sm:text-[10px] font-semibold text-gray-500">
-            {isUsed ? 'Used' : 'Unavailable'}
+            {isUsed ? 'Used' : isLocked ? 'Locked' : 'Unavailable'}
           </span>
         </div>
       );
     }
 
-    // Active or Default Playable State
     return (
       <div className={cn(
         "flex flex-col items-center justify-between border rounded-xl p-2 w-[90px] sm:w-[110px] h-[90px] transition-all",
@@ -163,22 +180,22 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
             <span className="text-[9px] sm:text-[10px] font-bold tracking-wide text-black">{name}</span>
         </div>
         <button
-          onClick={() => isActive ? null : setSelectedChip(chipDetails[chipId])}
-          disabled={isActive || isChipLoading}
+          onClick={() => handleChipClick(chipDetails[chipId], isUsed, isUnavailable)}
+          disabled={isActive || isActivating || isUsed}
           className={cn(
-            "w-full text-[9px] sm:text-[10px] font-bold rounded-full py-1 transition-all border",
+            "w-full text-[9px] sm:text-[10px] font-bold rounded-full py-1 transition-all",
+            // --- UPDATED: This block now matches the GameweekChips style exactly ---
             isActive
-                ? "bg-gradient-to-r from-cyan-300 via-blue-600 to-purple-700 text-white border-transparent cursor-default shadow-sm"
-                : "bg-transparent text-black border-black hover:bg-black hover:text-white"
+                ? "bg-gradient-to-r from-cyan-300 via-blue-600 to-purple-700 text-white shadow-md border-none opacity-100 cursor-default"
+                : "bg-transparent text-black border border-black hover:bg-black hover:text-white"
           )}
         >
-          {isActive ? 'Activated' : 'Play'}
+          {isActive ? 'Active' : 'Play'}
         </button>
       </div>
     );
   };
 
-  // Animation Variants for Slider
   const sidebarVariants = {
     hidden: isDesktop ? { x: "100%", y: 0 } : { y: "100%", x: 0 },
     visible: { x: 0, y: 0 },
@@ -190,7 +207,6 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
       <Card className="overflow-hidden bg-white text-black border-none shadow-sm rounded-xl mb-4 relative z-10">
         <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
 
-          {/* --- HEADER ROW --- */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
               <h2 className="text-xl sm:text-2xl font-black tracking-tight">Transfers</h2>
@@ -199,7 +215,6 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
               </p>
             </div>
 
-            {/* DESKTOP VIEW TOGGLES */}
             {user?.has_team && (
               <div className="hidden md:flex gap-2">
                 <button
@@ -224,17 +239,13 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
             )}
           </div>
 
-          {/* --- GAMEWEEK / DEADLINE --- */}
           <div className="text-center flex justify-center">
             <p className="font-bold text-[10px] sm:text-xs text-black">
                {gameweek ? `Gameweek ${gameweek.gw_number}` : 'Current Gameweek'} <span className="text-gray-300 mx-1.5 sm:mx-2">•</span> {deadlineText}
             </p>
           </div>
 
-          {/* --- CHIPS & STATS ROW --- */}
           <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6 w-full mt-1">
-
-            {/* CHIPS */}
             {user?.has_team && (
                 <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto shrink-0 justify-center">
                   {renderChip('WILDCARD', 'Wildcard', wildcardIcon)}
@@ -242,7 +253,6 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
                 </div>
             )}
 
-            {/* STATS */}
             <div className="flex flex-row items-center justify-between w-full flex-1 gap-1 sm:gap-3">
               <StatItem value={`${playersSelected} / 11`} label="Players Selected" isPill />
               <StatItem value={`£${bank.toFixed(1)}m`} label="Budget" isPill />
@@ -251,7 +261,6 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
             </div>
           </div>
 
-          {/* --- MOBILE VIEW TOGGLES --- */}
           {user?.has_team && (
             <div className="flex md:hidden bg-gray-100 p-1 rounded-lg border border-gray-200 mt-2">
                 <button
@@ -274,10 +283,8 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
                 </button>
             </div>
           )}
-
         </div>
 
-        {/* --- NOTIFICATION --- */}
         <AnimatePresence>
           {notification && (
             <motion.div
@@ -296,11 +303,9 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
          </AnimatePresence>
       </Card>
 
-      {/* --- RESPONSIVE SLIDER FOR CHIP ACTIVATION --- */}
       <AnimatePresence>
         {selectedChip && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -309,7 +314,6 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
               onClick={() => setSelectedChip(null)}
             />
             
-            {/* Slider Content */}
             <motion.div
               variants={sidebarVariants}
               initial="hidden"
@@ -318,9 +322,7 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className={cn(
                 "fixed z-[70] bg-white shadow-2xl overflow-y-auto",
-                // MOBILE
                 "bottom-0 left-0 right-0 w-full rounded-t-[2rem] max-h-[90vh]",
-                // DESKTOP (Right Drawer, 30%)
                 "md:top-0 md:right-0 md:left-auto md:bottom-auto", 
                 "md:h-full md:w-[30%] md:min-w-[400px] md:max-h-full", 
                 "md:rounded-none md:rounded-l-3xl"
@@ -328,7 +330,6 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
             >
               <div className="p-8 h-full flex flex-col items-center text-center text-black relative">
                 
-                {/* Close Button */}
                 <button 
                   onClick={() => setSelectedChip(null)}
                   className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
@@ -336,7 +337,6 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
 
-                {/* 1. Big Chip Logo */}
                 <div className="mt-4 md:mt-8 mb-4">
                    <img 
                     src={selectedChip.illustration} 
@@ -345,19 +345,16 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
                    />
                 </div>
 
-                {/* 2. Chip Name */}
                 <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-2 text-[#38003c]">
                   {selectedChip.name}
                 </h2>
 
-                {/* 3. Description */}
                 <div className="mb-6 max-w-sm mx-auto">
                     <p className="text-gray-800 text-base md:text-lg font-medium leading-relaxed">
                         {selectedChip.description}
                     </p>
                 </div>
 
-                {/* 4. Warning */}
                 <div className="bg-gray-100 rounded-xl p-4 w-full mb-8">
                     <h4 className="flex items-center justify-center gap-2 text-sm font-bold text-gray-700 mb-2 tracking-wider">
                         <AlertTriangle className="w-4 h-4 text-black" /> Important
@@ -368,13 +365,12 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
                     </ul>
                 </div>
 
-                {/* 5. Play Button (Gradient) */}
                 <Button 
                   onClick={handleConfirmActivation}
-                  disabled={isChipLoading}
+                  disabled={isActivating}
                   className="w-full bg-gradient-to-r from-cyan-300 via-blue-600 to-purple-700 hover:opacity-90 text-white font-black text-lg md:text-xl py-6 md:py-8 rounded-xl shadow-lg transition-all active:scale-95 tracking-widest mt-auto mb-4 border-none"
                 >
-                  {isChipLoading ? "Activating..." : `Play ${selectedChip.name}`}
+                  {isActivating ? "Activating..." : `Play ${selectedChip.name}`}
                 </Button>
                 
               </div>

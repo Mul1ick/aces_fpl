@@ -131,6 +131,15 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
         .catch(() => console.error("Failed to fetch chip status"));
   }, [hasTeam, isAuthLoading, fetchAndSetTeam, token]);
 
+  const isLocked = useMemo(() => {
+    if (!gameweek) return false;
+    // Lock if the deadline is in the past (implies LIVE or FINISHED but not rolled over)
+    if (gameweek.deadline) {
+        return new Date(gameweek.deadline) < new Date();
+    }
+    return false;
+  }, [gameweek]);
+
   // --- SQUAD LOGIC & VALIDATION ---
   const { playersOut, playersIn, bank, transferCost, playersSelected } = useMemo(() => {
     const initialPlayers = Object.values(initialSquadObject).flat().filter(p => p !== null);

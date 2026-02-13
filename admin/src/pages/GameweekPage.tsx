@@ -7,10 +7,10 @@ import { StatsEntryModal } from '../components/gameweek/StatsEntryModal';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { ChevronLeft, ChevronRight, Check, ShieldQuestion, Loader2, PlayCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, ShieldQuestion, Loader2, PlayCircle, Pencil } from 'lucide-react';
 import type { Player, PlayerGameweekStats, Gameweek } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { gameweekAPI, playerAPI, API_BASE_URL } from '../lib/api';
+import { gameweekAPI, playerAPI, statsAPI, API_BASE_URL } from '../lib/api';
 
 // A new component for navigation
 const GameweekNavigator = ({ allGameweeks, selectedId, onNavigate, onSelect }) => {
@@ -57,6 +57,7 @@ export function GameweekPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [modalPlayers, setModalPlayers] = useState<Player[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
+  const [modalMode, setModalMode] = useState<'view' | 'entry' | 'correction'>('view');
   const [initialModalStats, setInitialModalStats] = useState(null);
 
   const fetchAllGameweekData = useCallback(async () => {
@@ -129,13 +130,20 @@ export function GameweekPage() {
   
   const allStatsEntered = useMemo(() => fixtures.length > 0 && fixtures.every(f => f.stats_entered), [fixtures]);
 
-  const handleOpenStatsModal = async (fixtureId: number) => {
+  const handleOpenStatsModal = async (fixtureId: number, mode: 'view' | 'entry' | 'correction' = 'view') => {
     const t = token || localStorage.getItem("admin_token");
     const fx = fixtures.find(f => f.id === fixtureId);
     if (!t || !fx) return;
 
+    // Logic to determine mode if not explicitly passed (backward compatibility)
+    let targetMode = mode;
+    if (mode === 'view' && !fx.stats_entered && gameweek?.status === 'LIVE') {
+        targetMode = 'entry'; // Auto-switch to entry if live and not entered
+    }
+
     try {
       setModalLoading(true);
+      setModalMode(targetMode); // Set the mode state
       setSelectedFixture(fx);
 
       const [players, savedStats] = await Promise.all([
@@ -145,7 +153,7 @@ export function GameweekPage() {
 
       setModalPlayers(players);
       
-      const statsMap = (savedStats as any).player_stats.reduce((acc, stat) => {
+      const statsMap = (savedStats as any).player_stats.reduce((acc: any, stat: any) => {
         acc[stat.player_id] = stat;
         return acc;
       }, {});
@@ -175,6 +183,60 @@ export function GameweekPage() {
       toast({ title: "Saved", description: "Stats updated successfully." });
     } catch (e:any) {
       toast({ variant: "destructive", title: "Save failed", description: e.message || "An unknown error occurred." });
+    }
+  };
+
+  const handleSaveCorrections = async (statsMap: {[playerId: number]: PlayerGameweekStats}) => {
+    const t = token || localStorage.getItem("admin_token");
+    if (!t || !gameweek || !selectedFixture || !initialModalStats) return;
+
+    setModalLoading(true);
+    const updates = [];
+    let updateCount = 0;
+
+    // 1. Iterate over new stats and compare with initial
+    for (const [playerIdStr, newStat] of Object.entries(statsMap)) {
+      const playerId = Number(playerIdStr);
+      const oldStat = (initialModalStats as any)[playerId];
+
+      if (!oldStat) continue; // Should not happen
+
+      // 2. Diffing: Check if any relevant field changed
+      // We manually check fields to avoid noise from backend-only fields like 'id' or timestamps
+      const fieldsToCheck = ['goals_scored', 'assists', 'clean_sheets', 'goals_conceded', 'own_goals', 'penalties_missed', 'penalties_saved', 'yellow_cards', 'red_cards', 'bonus_points'];
+      
+      const hasChanged = fieldsToCheck.some(field => (newStat as any)[field] !== (oldStat as any)[field]);
+
+      if (hasChanged) {
+        // 3. Prepare payload for this specific player
+        const payload = {
+          player_id: playerId,
+          gameweek_id: gameweek.id,
+          ...newStat
+        };
+        // Remove unnecessary fields if your API is strict, but spread usually works fine
+        
+        updates.push(statsAPI.updatePlayerStats(t, payload));
+        updateCount++;
+      }
+    }
+
+    try {
+      if (updateCount === 0) {
+        toast({ title: "No Changes", description: "No stats were modified." });
+        return;
+      }
+
+      await Promise.all(updates);
+      toast({ title: "Corrections Saved", description: `Updated stats for ${updateCount} players. Scores recalculated.` });
+      
+      // Refresh to get new data
+      setSelectedFixture(null);
+      // Optional: Refresh gameweek data if needed
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Correction Failed", description: e.message || "Error updating stats." });
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -316,7 +378,12 @@ export function GameweekPage() {
       ) : gameweek && (
         <>
           <GameweekInfoCard gameweek={gameweek} />
-          <FixturesList fixtures={fixtures} gameweekStatus={gameweek.status} onOpenStatsModal={handleOpenStatsModal} />
+          <FixturesList 
+            fixtures={fixtures} 
+            gameweekStatus={gameweek.status} 
+            onOpenStatsModal={(id) => handleOpenStatsModal(id, 'entry')} // Standard Entry
+            onOpenCorrectionModal={(id) => handleOpenStatsModal(id, 'correction')} // New Correction Action
+          />
           {gameweek.status !== 'FINISHED' && (
             <Card className="admin-card-shadow">
               <CardContent className="p-6 flex items-center justify-center">
@@ -327,16 +394,27 @@ export function GameweekPage() {
         </>
       )}
 
-      <StatsEntryModal
-        isOpen={!!selectedFixture}
-        onClose={() => setSelectedFixture(null)}
-        fixture={selectedFixture}
-        players={modalPlayers}
-        loading={modalLoading}
-        onSave={handleSaveStats}
-        isReadOnly={gameweek?.status === 'FINISHED'}
-        initialStats={initialModalStats}
-      />
+          <StatsEntryModal
+            isOpen={!!selectedFixture}
+            onClose={() => setSelectedFixture(null)}
+            fixture={selectedFixture}
+            players={modalPlayers}
+            loading={modalLoading}
+            
+            // 1. Pass the standard Entry handler to onSave
+            onSave={(fixtureId, scores, stats) => handleSaveStats(fixtureId, scores, stats)}
+            
+            // 2. Pass the Correction handler to new prop
+            onCorrectionSave={handleSaveCorrections}
+            
+            // 3. Pass mode
+            mode={modalMode}
+            
+            // 4. isReadOnly is true ONLY if in view mode
+            isReadOnly={modalMode === 'view'}
+            
+            initialStats={initialModalStats}
+          />
 
       <ConfirmDialog
         open={!!isConfirming}
