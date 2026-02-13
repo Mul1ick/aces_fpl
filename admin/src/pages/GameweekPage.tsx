@@ -186,60 +186,81 @@ export function GameweekPage() {
     }
   };
 
-  const handleSaveCorrections = async (statsMap: {[playerId: number]: PlayerGameweekStats}) => {
+  const handleSaveCorrections = async (statsMap: {[playerId: number]: ExtendedPlayerGameweekStats}) => {
     const t = token || localStorage.getItem("admin_token");
     if (!t || !gameweek || !selectedFixture || !initialModalStats) return;
 
     setModalLoading(true);
-    const updates = [];
+    
+    // We store promises here
+    const updatePromises: Promise<any>[] = [];
     let updateCount = 0;
 
-    // 1. Iterate over new stats and compare with initial
-    for (const [playerIdStr, newStat] of Object.entries(statsMap)) {
-      const playerId = Number(playerIdStr);
-      const oldStat = (initialModalStats as any)[playerId];
-
-      if (!oldStat) continue; // Should not happen
-
-      // 2. Diffing: Check if any relevant field changed
-      // We manually check fields to avoid noise from backend-only fields like 'id' or timestamps
-      const fieldsToCheck = ['goals_scored', 'assists', 'clean_sheets', 'goals_conceded', 'own_goals', 'penalties_missed', 'penalties_saved', 'yellow_cards', 'red_cards', 'bonus_points'];
-      
-      const hasChanged = fieldsToCheck.some(field => (newStat as any)[field] !== (oldStat as any)[field]);
-
-      if (hasChanged) {
-        // 3. Prepare payload for this specific player
-        const payload = {
-          player_id: playerId,
-          gameweek_id: gameweek.id,
-          ...newStat
-        };
-        // Remove unnecessary fields if your API is strict, but spread usually works fine
-        
-        updates.push(statsAPI.updatePlayerStats(t, payload));
-        updateCount++;
-      }
-    }
+    // 1. Define strictly what we check and save (Exclude 'played', 'minutes', 'id')
+    const fieldsToCheck = [
+        'goals_scored', 'assists', 'clean_sheets', 
+        'goals_conceded', 'own_goals', 'penalties_missed', 
+        'yellow_cards', 'red_cards', 'bonus_points'
+    ] as const;
 
     try {
-      if (updateCount === 0) {
-        toast({ title: "No Changes", description: "No stats were modified." });
-        return;
-      }
+        for (const [playerIdStr, newStat] of Object.entries(statsMap)) {
+            const playerId = Number(playerIdStr);
+            const oldStat = initialModalStats[playerId];
 
-      await Promise.all(updates);
-      toast({ title: "Corrections Saved", description: `Updated stats for ${updateCount} players. Scores recalculated.` });
-      
-      // Refresh to get new data
-      setSelectedFixture(null);
-      // Optional: Refresh gameweek data if needed
+            if (!oldStat) continue;
+
+            // 2. Diffing: Check if any relevant field changed
+            const hasChanged = fieldsToCheck.some(field => {
+                 // Force comparison as numbers/booleans to avoid "1" vs 1 issues
+                 return newStat[field] !== oldStat[field];
+            });
+
+            if (hasChanged) {
+                // 3. Prepare CLEAN payload (No 'played', no extra UI fields)
+                // We manually map to ensure no garbage gets sent to the API
+                const payload = {
+                    player_id: playerId,
+                    gameweek_id: gameweek.id,
+                    goals: Number(newStat.goals_scored), // Map to API alias 'goals' if needed, or use 'goals_scored' depending on your backend schema aliases
+                    assists: Number(newStat.assists),
+                    clean_sheets: Boolean(newStat.clean_sheets),
+                    goals_conceded: Number(newStat.goals_conceded),
+                    own_goals: Number(newStat.own_goals),
+                    penalties_missed: Number(newStat.penalties_missed),
+                    yellow_cards: Number(newStat.yellow_cards),
+                    red_cards: Number(newStat.red_cards),
+                    bonus_points: Number(newStat.bonus_points)
+                };
+
+                // 4. Push the API call promise to our array
+                updatePromises.push(statsAPI.updatePlayerStats(t, payload));
+                updateCount++;
+            }
+        }
+
+        if (updateCount === 0) {
+            toast({ title: "No Changes", description: "No stats were modified." });
+            setModalLoading(false);
+            return;
+        }
+
+        // 5. Execute all updates in parallel
+        await Promise.all(updatePromises);
+        
+        toast({ title: "Corrections Saved", description: `Updated stats for ${updateCount} players. Scores recalculated.` });
+        
+        // Refresh data
+        setSelectedFixture(null);
+        // await fetchGameweekData(); // If you have a refresh function
+        
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Correction Failed", description: e.message || "Error updating stats." });
+        console.error(e);
+        toast({ variant: "destructive", title: "Correction Failed", description: e.message || "Error updating stats." });
     } finally {
-      setModalLoading(false);
+        setModalLoading(false);
     }
-  };
-
+};
   const handleStartSeason = useCallback(async () => {
     const t = token || localStorage.getItem("admin_token");
     if (!t) return;
