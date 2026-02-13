@@ -28,7 +28,7 @@ def did_player_play(stats: Dict) -> bool:
     stat_keys = [
         'goals_scored', 'assists', 'yellow_cards', 'red_cards', 
         'bonus_points', 'clean_sheets', 'goals_conceded', 
-        'own_goals', 'penalties_missed'
+        'own_goals', 'penalties_missed','penalties_saved'
     ]
     
     for key in stat_keys:

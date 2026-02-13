@@ -151,9 +151,16 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
         if s.points != 0: return True
         # If points are 0, check for any non-zero stat (Yellow cards, etc.)
         return any([
-            s.goals_scored > 0, s.assists > 0, s.yellow_cards > 0, 
-            s.red_cards > 0, s.bonus_points > 0, s.clean_sheets,
-            s.goals_conceded > 0, s.own_goals > 0, s.penalties_missed > 0
+            s.goals_scored > 0, 
+            s.assists > 0, 
+            s.yellow_cards > 0, 
+            s.red_cards > 0, 
+            s.bonus_points > 0, 
+            s.clean_sheets,
+            s.goals_conceded > 0, 
+            s.own_goals > 0, 
+            s.penalties_missed > 0,
+            s.penalties_saved > 0
         ])
 
     # --- 1. CHECK CHIPS FIRST ---
@@ -631,10 +638,20 @@ async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsReq
     # Map common aliases to schema names
     mapping = {
         "goals": "goals_scored",
+        "goals_scored": "goals_scored",
         "assists": "assists",
         "clean_sheets": "clean_sheets",
+        "goals_conceded": "goals_conceded",
+        "own_goals": "own_goals",
+        "penalties_missed": "penalties_missed",
         "yellow_cards": "yellow_cards",
-        "red_cards": "red_cards"    }
+        "red_cards": "red_cards",
+        "bonus": "bonus_points",
+        "bonus_points": "bonus_points",
+        
+        # ✅ NEW MAPPINGS
+        "penalties_saved": "penalties_saved",
+    }
     
     db_update_data = {}
     for key, value in raw_data.items():

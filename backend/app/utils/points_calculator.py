@@ -15,6 +15,7 @@ def calculate_player_points(position: str, stats: schemas.PlayerStatIn) -> int:
         elif position == "MID": points += 1
     if position in ["GK", "DEF"]:
         points -= (stats.goals_conceded // 2)
+    points += stats.penalties_saved * 5  # Standard FPL is +5 for pen save
     points -= stats.penalties_missed * 2
     points -= stats.own_goals * 2
     points -= stats.yellow_cards * 1

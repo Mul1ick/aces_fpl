@@ -197,7 +197,7 @@ class GameweekOutWithFixtures(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 # --- Stats Schemas ---
-class PlayerStatIn(BaseModel):
+class   PlayerStatIn(BaseModel):
     player_id: int
     played: bool = False
     goals_scored: int = 0
@@ -206,6 +206,7 @@ class PlayerStatIn(BaseModel):
     goals_conceded: int = 0
     own_goals: int = 0
     penalties_missed: int = 0
+    penalties_saved: int = 0
     yellow_cards: int = 0
     red_cards: int = 0
     bonus_points: int = 0
@@ -325,4 +326,13 @@ class UpdatePlayerStatsRequest(BaseModel):
     goals: Optional[int] = None
     assists: Optional[int] = None
     clean_sheets: Optional[bool] = None
+    goals_conceded: Optional[int] = None
+    own_goals: Optional[int] = None
+    penalties_missed: Optional[int] = None
+    
+    # ✅ ADD THESE
+    penalties_saved: Optional[int] = None
+    
     yellow_cards: Optional[int] = None
+    red_cards: Optional[int] = None
+    bonus_points: Optional[int] = None

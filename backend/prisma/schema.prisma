@@ -131,6 +131,7 @@ model GameweekPlayerStats {
   goals_conceded  Int     @default(0)         // NEW
   own_goals       Int     @default(0)         // NEW
   penalties_missed Int    @default(0)         // NEW
+  penalties_saved Int     @default(0)
   yellow_cards  Int     @default(0)
   red_cards     Int     @default(0)
   bonus_points  Int     @default(0)
