@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameweekHeader } from '@/components/gameweek/GameweekHeader';
@@ -156,6 +156,22 @@ const TeamView: React.FC = () => {
     return () => controller.abort();
   }, [gw, userId]);
 
+  // --- FIXED: Find Effective Captain ---
+  const effectiveCaptainId = useMemo(() => {
+    if (!teamData) return null;
+    const allPlayers = [...teamData.starting, ...teamData.bench];
+    const captain = allPlayers.find(p => p.is_captain);
+    const viceCaptain = allPlayers.find(p => p.is_vice_captain);
+
+    // Checks minutes first to ensure 0-point playing captains don't lose the armband
+    const captainPlayed = 
+        (captain?.raw_stats?.minutes > 0) || 
+        (captain?.raw_stats?.played === true) || 
+        (captain?.points !== 0);
+    
+    return (captainPlayed ? captain?.id : viceCaptain?.id) ?? null;
+  }, [teamData]);
+
   const handleNavigation = (direction: 'next' | 'prev') => {
     const currentGw = parseInt(gw || '1', 10);
     const newGw = direction === 'next' ? currentGw + 1 : currentGw - 1;
@@ -218,6 +234,8 @@ const TeamView: React.FC = () => {
               bench={teamData.bench}
               onPlayerClick={setDetailedPlayer}
               activeChip={teamData.active_chip as any} 
+              // 👇 PASSED DOWN CAPTAIN ID
+              effectiveCaptainId={effectiveCaptainId}
             />
           ) : (
             <ListView 
@@ -247,6 +265,8 @@ const TeamView: React.FC = () => {
             player={detailedPlayer}
             onClose={() => setDetailedPlayer(null)}
             activeChip={teamData.active_chip as any} 
+            // 👇 PASSED DOWN BOOLEAN TO MODAL
+            isEffectiveCaptain={detailedPlayer.id === effectiveCaptainId}
           />
         )}
       </AnimatePresence>

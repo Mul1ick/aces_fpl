@@ -355,7 +355,9 @@ async def get_player_card(
             "yellow_cards": int(st_row.yellow_cards or 0),
             "red_cards": int(st_row.red_cards or 0),
             "bonus_points": int(st_row.bonus_points or 0),
-            "penalties_missed": int(st_row("penalties_missed")),
+            "goals_conceded": int(st_row.goals_conceded or 0),
+            # 👇 FIX THE SYNTAX BUGS HERE
+            "penalties_missed": int(getattr(st_row, 'penalties_missed', 0)),
             "own_goals": int(st_row("own_goals")),
         }
         pos = (position or "").upper()

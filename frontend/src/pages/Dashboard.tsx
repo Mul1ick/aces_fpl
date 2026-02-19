@@ -386,13 +386,12 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="bg-white min-h-screen text-black">
+    <div className="bg-white min-h-screen text-black overflow-x-hidden">
       <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
         <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            // Use 12-column grid
             className="grid grid-cols-1 lg:grid-cols-12 lg:gap-8 space-y-8 lg:space-y-0"
         >
           {/* Left Column (Approx 40%) */}
@@ -474,7 +473,6 @@ const Dashboard: React.FC = () => {
                                 <CardContent>
                                     <div className="text-center text-gray-400 py-8">
                                       Check back here after the gameweek is finalized.
-
                                     </div>
                                 </CardContent>
                             </Card>
@@ -484,13 +482,18 @@ const Dashboard: React.FC = () => {
             </Card>
           </motion.div>
         </motion.div>
+      </div>
 
-        {/* ✅ MOVED HERE: TOTS Strip spans FULL WIDTH below the columns */}
-        <motion.div variants={itemVariants}>
+      <div className="w-full pb-12">
+        <motion.div 
+            variants={itemVariants}
+            initial="hidden"
+            animate="visible"
+        >
           <TeamOfTheSeasonStrip team={tots} />
         </motion.div>
-
       </div>
+      
     </div>
   );
 };

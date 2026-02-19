@@ -1,179 +1,180 @@
-// frontend/src/components/transfers/PlayerDetailModal.tsx
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getTeamJersey } from '@/lib/player-utils';
 
-// --- SUB-COMPONENTS for the Modal ---
-
-const StatBox = ({ label, value }: { label: string, value: string | number }) => (
-    <div className="bg-gray-100 p-2 rounded-lg text-center">
-        <p className="font-bold text-lg text-black">{value}</p>
-        <p className="text-xs text-gray-600">{label}</p>
-    </div>
-);
-
-const FixtureRow = ({ gameweek, opponent, points }: { gameweek: string, opponent: string, points: number }) => (
-    <div className="flex justify-between items-center py-2 border-b border-gray-200 text-sm">
-        <p className="font-semibold text-gray-800">{gameweek}</p>
-        <p className="text-gray-600">{opponent}</p>
-        <p className="font-bold text-black">{points} pts</p>
-    </div>
-);
-
-// --- NEW STATUS BANNER COMPONENT ---
-const PlayerStatusBanner = ({ player }: { player: any }) => {
-    // Hide banner if player is perfectly healthy
-    if (!player.status || player.status === 'ACTIVE') return null;
-
-    const isYellow = player.chance_of_playing > 0 && player.chance_of_playing <= 75;
-    const bgColor = isYellow ? 'bg-yellow-50 border-yellow-400' : 'bg-[#B2002D] border-red-500';
-    const textColor = isYellow ? 'text-yellow-800' : 'text-red-800';
-    const iconColor = isYellow ? 'text-yellow-600' : 'text-red-600';
-
-    // Format the date to look like "15 Feb"
-    const returnDateStr = player.return_date
-        ? new Date(player.return_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-        : null;
-
-    return (
-        <div className={`mb-4 p-3 border rounded-lg flex items-start gap-3 ${bgColor} ${textColor}`}>
-            <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${iconColor}`} />
-            <div className="flex-1">
-                <p className="font-bold text-sm">
-                    {player.status === 'INJURED' ? 'Injured' :
-                     player.status === 'SUSPENDED' ? 'Suspended' :
-                     player.status === 'UNAVAILABLE' ? 'Unavailable' : 'Doubtful'}
-                     {player.chance_of_playing !== null && ` - ${player.chance_of_playing}% chance`}
-                </p>
-                {player.news && <p className="text-xs mt-1">{player.news}</p>}
-                {returnDateStr && <p className="text-xs mt-1 font-semibold">Expected Return: {returnDateStr}</p>}
-            </div>
-        </div>
-    );
-};
-
-const PlayerDetailModalContent = ({ player, onRemove, onTransfer, onClose }: {
-  player: any;
+interface PlayerDetailModalProps {
+  player: any | null;
+  onClose: () => void;
   onRemove?: () => void;
   onTransfer?: (player: any) => void;
-  onClose: () => void;
-}) => {
-    const jerseySrc = getTeamJersey(player.club || player.teamName);
+}
 
-    return (
+export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ 
+  player, 
+  onClose, 
+  onRemove, 
+  onTransfer 
+}) => {
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const slideVariants = isDesktop
+    ? { hidden: { x: '100%' }, visible: { x: 0 }, exit: { x: '100%' } }
+    : { hidden: { y: '100%' }, visible: { y: 0 }, exit: { y: '100%' } };
+
+  // Helper variables for the status banner
+  const status = player?.status;
+  const chance = player?.chance_of_playing;
+  const hasWarning = status && status !== 'ACTIVE';
+  const isYellowWarning = chance !== undefined && chance !== null && chance > 0 && chance <= 75;
+  const bannerBgClass = isYellowWarning ? 'bg-yellow-100 text-yellow-900 border-yellow-400' : 'bg-[#B2002D] text-white border-[#B2002D]';
+  const iconColor = isYellowWarning ? 'text-yellow-600' : 'text-white';
+
+  const returnDateStr = player?.return_date
+    ? new Date(player.return_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    : null;
+
+  return (
+    <AnimatePresence>
+      {player && (
         <>
-            <CardHeader className="p-4 bg-gradient-to-r from-accent-blue to-accent-purple text-white rounded-t-2xl lg:rounded-none">
-                <div className="flex items-center space-x-4">
-                    <img src={jerseySrc} alt="jersey" className="w-16 h-auto" />
-                    <div>
-                        <p className="text-xs font-bold">{player.pos}</p>
-                        <h3 className="text-2xl font-bold">{player.name}</h3>
-                        <p className="font-semibold">{player.club}</p>
-                    </div>
-                </div>
-            </CardHeader>
-            
-            <CardContent className="p-4 flex-1 overflow-y-auto">
-                {/* --- INJECTED THE BANNER HERE --- */}
-                <PlayerStatusBanner player={player} />
+          {/* Overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-[60]"
+            onClick={onClose}
+          />
 
-                {/* Stats Section */}
-                <div className="mb-4">
-                    <StatBox label="Price" value={`£${player.price?.toFixed(1)}m`} />
+          {/* Modal Container */}
+          <motion.div
+            variants={slideVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className={`fixed z-[70] bg-white shadow-2xl flex flex-col ${
+              isDesktop 
+                ? 'top-0 right-0 bottom-0 w-[420px] rounded-l-2xl' 
+                : 'bottom-0 left-0 right-0 max-h-[85vh] rounded-t-3xl'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* --- HEADER --- */}
+            <div className="relative p-6 pb-4 border-b border-gray-100">
+              <button 
+                onClick={onClose} 
+                className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+              
+              <div className="flex items-center gap-4 mb-2">
+                <img 
+                    src={getTeamJersey(player.club || player.teamName || player.team)} 
+                    alt="Jersey" 
+                    className="w-10 h-12 object-contain" 
+                />
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    {player.pos} • {player.club || player.teamName || player.team}
+                  </p>
+                  <h2 className="text-2xl font-black text-black leading-tight">
+                    {player.name || player.full_name}
+                  </h2>
                 </div>
+              </div>
 
-                {/* Recent Fixtures Section */}
-                <div className="space-y-4">
-                    <div>
-                        <h4 className="font-bold text-sm mb-2 text-black">Recent Form</h4>
-                        {player.recent_fixtures && player.recent_fixtures.length > 0 ? (
-                            <div className="space-y-1">
-                                {player.recent_fixtures.slice(0, 5).map((fx: any) => ( // Show last 5
-                                    <FixtureRow
-                                        key={`gw-${fx.gw}`}
-                                        gameweek={`GW${fx.gw}`}
-                                        opponent={`${fx.opp} (${fx.ha})`}
-                                        points={fx.points ?? 0}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-xs text-gray-500 text-center py-4">No recent fixture data available.</p>
-                        )}
-                    </div>
+              {/* Status Banner */}
+              {hasWarning && (
+                <div className={`mt-4 p-3 rounded-lg border flex items-start gap-3 ${bannerBgClass}`}>
+                  <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${iconColor}`} />
+                  <div className="flex-1">
+                    <p className="font-bold text-sm">
+                      {status === 'INJURED' ? 'Injured' : 
+                       status === 'SUSPENDED' ? 'Suspended' : 
+                       status === 'UNAVAILABLE' ? 'Unavailable' : 'Doubtful'}
+                      {chance !== null && chance !== undefined && ` - ${chance}% chance`}
+                    </p>
+                    {player.news && <p className="text-xs mt-1 opacity-90">{player.news}</p>}
+                    {returnDateStr && <p className="text-xs mt-1 font-semibold opacity-90">Expected Return: {returnDateStr}</p>}
+                  </div>
                 </div>
-            </CardContent>
-
-            <div className="p-4 border-t space-y-2">
-                {onTransfer && (
-                    <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => {
-                            onTransfer(player);
-                            onClose();
-                        }}
-                        title="Transfer this player"
-                    >
-                        Transfer
-                    </Button>
-                )}
-                {onRemove && (
-                    <Button variant="destructive" className="w-full" onClick={onRemove}>
-                        Remove
-                    </Button>
-                )}
+              )}
             </div>
-        </>
-    );
-};
 
-// --- MAIN MODAL COMPONENT ---
-export const PlayerDetailModal = ({ player, onClose, onRemove, onTransfer }: {
-    player: any | null;
-    onClose: () => void;
-    onRemove?: () => void;
-    onTransfer?: (player: any) => void;
-}) => {
-    // The modal hides itself entirely if player is null
-    if (!player) return null;
+            {/* --- BODY --- */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* Price Tag */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Current Price</h3>
+                <p className="text-3xl font-black text-black">£{player.price?.toFixed(1)}m</p>
+              </div>
 
-    return (
-        <AnimatePresence>
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/70 z-[60] flex"
-            >
-                {/* Desktop: Translucent overlay */}
-                <div className="hidden lg:block w-[70%]" onClick={onClose}></div>
+              {/* Recent Form / Fixtures */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <h3 className="text-lg font-bold text-black mb-4">Recent Form</h3>
+                
+                <div className="grid grid-cols-4 gap-4 pb-2 border-b border-gray-300 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  <div className="col-span-1">GW</div>
+                  <div className="col-span-2">Opponent</div>
+                  <div className="text-right">Points</div>
+                </div>
 
-                {/* Mobile: Full screen / Desktop: 30% solid panel */}
-                <motion.div
-                    initial={{ x: "100%" }}
-                    animate={{ x: 0 }}
-                    exit={{ x: "100%" }}
-                    className="bg-white h-full w-full lg:w-[30%] flex flex-col ml-auto"
-                    onClick={(e) => e.stopPropagation()}
+                <div className="space-y-3 mt-3">
+                  {player.recent_fixtures && player.recent_fixtures.length > 0 ? (
+                    player.recent_fixtures.slice(0, 5).map((fx: any, idx: number) => (
+                      <div key={`fx-${idx}`} className="grid grid-cols-4 gap-4 text-sm font-semibold items-center">
+                        <div className="col-span-1 text-gray-500">GW{fx.gw}</div>
+                        <div className="col-span-2 text-gray-900">{fx.opp} ({fx.ha})</div>
+                        <div className="text-right text-black">{fx.points ?? 0} pts</div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-4">No recent fixture data available.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* --- FOOTER ACTIONS --- */}
+            <div className="p-6 border-t border-gray-100 bg-white space-y-3 shrink-0">
+              {onTransfer && (
+                <Button 
+                  className="w-full h-12 text-base font-bold bg-black text-white hover:bg-gray-800 rounded-xl"
+                  onClick={() => {
+                    onTransfer(player);
+                    onClose();
+                  }}
                 >
-                    <PlayerDetailModalContent 
-                        player={player} 
-                        onRemove={onRemove} 
-                        onTransfer={onTransfer}
-                        onClose={onClose}
-                    />
-                    <Button variant="ghost" size="icon" onClick={onClose} className="absolute top-4 right-4 text-white lg:hidden">
-                        <X className="w-5 h-5" />
-                    </Button>
-                </motion.div>
-            </motion.div>
-        </AnimatePresence>
-    );
+                  Transfer Player
+                </Button>
+              )}
+              
+              {onRemove && (
+                <Button 
+                  variant="outline"
+                  className="w-full h-12 text-base font-bold text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 rounded-xl"
+                  onClick={onRemove}
+                >
+                  Remove from Squad
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
 };
 
 export default PlayerDetailModal;

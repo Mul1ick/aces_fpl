@@ -363,7 +363,11 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
             "is_benched": entry.is_benched, "team": entry.player.team,
             "points": final_points,
             "stats": raw_stats,
-            "breakdown": breakdown_list
+            "breakdown": breakdown_list,
+            "status": entry.player.status,
+            "news": entry.player.news,
+            "chance_of_playing": entry.player.chance_of_playing,
+            "return_date": entry.player.return_date
         }
 
     all_players = [to_display(p) for p in user_team_entries]
@@ -422,6 +426,15 @@ async def calculate_dream_team(db: Prisma, gameweek_id: int):
 
     if not stats:
         return None
+    
+    fixtures_current = await db.fixture.find_many(
+        where={'gameweek_id': gameweek_id},
+        include={'home': True, 'away': True}
+    )
+    fixture_map_current = {}
+    for f in fixtures_current:
+        fixture_map_current[f.home_team_id] = f"{f.away.short_name} (H)"
+        fixture_map_current[f.away_team_id] = f"{f.home.short_name} (A)"
 
     # 2. Bucket by Position
     # We sort by points DESC. Secondary sort usually price or ID, 
@@ -482,6 +495,9 @@ async def calculate_dream_team(db: Prisma, gameweek_id: int):
 
     # 5. Format for Response (Reusing PlayerDisplay logic roughly)
     def map_to_view(stat_entry, is_starter):
+        # 👇 Calculate the full raw_stats and breakdown using your utility
+        raw_stats, breakdown_list = calculate_breakdown(stat_entry.player.position, stat_entry)
+
         # We need to simulate Captaincy for visual flair (Highest scorer gets C)
         return {
             "id": stat_entry.player.id,
@@ -493,12 +509,16 @@ async def calculate_dream_team(db: Prisma, gameweek_id: int):
             "is_captain": False,      # Will calculate below
             "is_vice_captain": False, # Will calculate below
             "is_benched": not is_starter,
-            "raw_stats": {
-                "goals_scored": stat_entry.goals_scored,
-                "assists": stat_entry.assists,
-                "clean_sheets": stat_entry.clean_sheets,
-                "bonus_points": stat_entry.bonus_points,
-            }
+            
+            # 👇 Replace the hardcoded raw_stats with the calculated ones
+            "raw_stats": raw_stats,
+            "breakdown": breakdown_list,
+            "fixture_str": fixture_map_current.get(stat_entry.player.team_id, "—"),
+            # 👇 (Optional but recommended) Add status fields so injury flags work here too!
+            "status": stat_entry.player.status,
+            "news": stat_entry.player.news,
+            "chance_of_playing": stat_entry.player.chance_of_playing,
+            "return_date": stat_entry.player.return_date
         }
 
     formatted_starters = [map_to_view(s, True) for s in starters]

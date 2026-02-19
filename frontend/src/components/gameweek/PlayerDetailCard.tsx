@@ -191,7 +191,7 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
                   <div key={index} className="grid grid-cols-4 gap-4 text-sm font-semibold items-center">
                     <div className="col-span-2 text-gray-800">{stat.label}</div>
                     <div className="text-center text-gray-600">{stat.value}</div>
-                    <div className="text-right text-black">{stat.points * multiplier} pts</div>
+                    <div className="text-right text-black">{stat.points} pts</div>
                   </div>
                 );
               }) : (
@@ -208,7 +208,7 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
                   </span>
                 )}
               </div>
-              <div className="text-right">{(player.points || 0) * multiplier} pts</div>
+              <div className="text-right">{(player.points || 0)} pts</div>
             </div>
           </div>
         </div>

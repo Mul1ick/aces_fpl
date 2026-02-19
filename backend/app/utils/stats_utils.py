@@ -25,6 +25,7 @@ def calculate_breakdown(position: str, st: Any) -> Tuple[Dict, List[Dict]]:
         "clean_sheets": int(get("clean_sheets")),
         "penalties_missed": int(get("penalties_missed")),
         "own_goals": int(get("own_goals")),
+        "goals_conceded": int(get("goals_conceded")),
     }
 
     # 2. Determine Point Values based on Position
@@ -41,12 +42,17 @@ def calculate_breakdown(position: str, st: Any) -> Tuple[Dict, List[Dict]]:
     elif pos == "MID": cs_pts = 1
     else: cs_pts = 0
 
+    gc_pts = 0
+    if pos in ["GK", "GKP", "DEF"]:
+        gc_pts = -1 * (raw["goals_conceded"] // 2)
+
     # 3. Build the Breakdown List (for the Popup)
     breakdown = [
         #{"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
         {"label": "Goals",        "value": raw["goals_scored"],       "points": raw["goals_scored"] * goal_pts},
         {"label": "Assists",      "value": raw["assists"],            "points": raw["assists"] * 3},
         {"label": "Clean Sheet",  "value": raw["clean_sheets"],       "points": raw["clean_sheets"] * cs_pts},
+        {"label": "Goals Conceded", "value": raw["goals_conceded"],   "points": gc_pts},
         {"label": "Yellow cards", "value": raw["yellow_cards"],       "points": -1 * raw["yellow_cards"]},
         {"label": "Red cards",    "value": raw["red_cards"],          "points": -3 * raw["red_cards"]},
         {"label": "Penalty Miss", "value": raw["penalties_missed"],   "points": -2 * raw["penalties_missed"]},

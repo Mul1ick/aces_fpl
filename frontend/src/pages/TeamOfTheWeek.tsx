@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { GameweekHeader } from '@/components/gameweek/GameweekHeader';
 import { PitchView } from '@/components/gameweek/PitchView';
 import { ListView } from '@/components/gameweek/ListView';
@@ -14,17 +14,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 type PlayerView = {
   id: number;
   full_name: string;
-  name?: string; // Fallback for PlayerCard
+  name?: string; 
   position: string;
-  pos?: string;  // Fallback for PlayerCard
-  team: any;     // Relaxed to handle both string (for jerseys) and objects
+  pos?: string;  
+  team: any;     
   points: number;
   is_captain: boolean;
   is_vice_captain: boolean;
   is_benched: boolean;
   raw_stats?: any;
   breakdown?: any[];
-  // --- ADDED FOR INJURIES & DRAWER ---
   status?: string;
   news?: string | null;
   chance_of_playing?: number | null;
@@ -56,7 +55,6 @@ const TeamOfTheWeek: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Explicitly type as string to match GameweekHeader
   const [view, setView] = useState<string>('pitch'); 
   const [teamData, setTeamData] = useState<TeamOfTheWeekData | null>(null);
   const [detailedPlayer, setDetailedPlayer] = useState<PlayerView | null>(null);
@@ -83,35 +81,27 @@ const TeamOfTheWeek: React.FC = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || `Team of the Week for GW${gw} not found.`);
 
-        // --- BULLETPROOF DATA MAPPING ---
-        const mapPlayer = (p: any): PlayerView => {
-            // Find stats regardless of whether they are in 'stats', 'raw_stats', or 'p' itself
+        // --- FIXED: Explicitly requires isBenched to satisfy your Type ---
+        const mapPlayer = (p: any, isBenched: boolean): PlayerView => {
             const statsObj = p.raw_stats || p.stats || p;
             
             return {
                 ...p,
-                // Name and Position safety nets for PitchView and Drawer
                 full_name: p.full_name || p.name || '',
                 name: p.full_name || p.name || '',
                 position: p.position || p.pos || '',
                 pos: p.position || p.pos || '',
-                // Ensure team is a string so getTeamJersey() doesn't break
                 team: p.team?.name || p.team_name || p.team || '',
-                
-                // Standardize captain/vice naming
                 is_captain: p.is_captain || p.isCaptain || false,
                 is_vice_captain: p.is_vice_captain || p.isVice || false,
-                
-                // --- INJURY FLAGS CARRY-FORWARD ---
+                is_benched: isBenched, // Satisfies strict type
                 status: p.status ?? 'ACTIVE',
                 news: p.news ?? null,
                 chance_of_playing: p.chance_of_playing ?? null,
                 return_date: p.return_date ?? null,
-
-                // Explicitly extract the 'played' flag
                 raw_stats: {
                     ...statsObj,
-                    played: statsObj.played === true || statsObj.played === 1 || statsObj.played === "true" || (p.points > 0)
+                    played: statsObj.played === true || statsObj.played === 1 || statsObj.played === "true" || (p.points !== 0)
                 },
                 points: Number(p.points || 0)
             };
@@ -119,8 +109,8 @@ const TeamOfTheWeek: React.FC = () => {
 
         setTeamData({
             ...data,
-            starting: (data.starting || []).map(mapPlayer),
-            bench: (data.bench || []).map(mapPlayer)
+            starting: (data.starting || []).map((p: any) => mapPlayer(p, false)),
+            bench: (data.bench || []).map((p: any) => mapPlayer(p, true))
         });
       } catch (err: any) {
         if (err.name !== 'AbortError') {
@@ -136,21 +126,22 @@ const TeamOfTheWeek: React.FC = () => {
     return () => controller.abort();
   }, [gw, toast]);
 
-  // --- 1. Identify the Effective Captain ID ---
+  // --- FIXED: Safer Captain Fallback Logic ---
   const effectiveCaptainId = useMemo(() => {
     if (!teamData) return null;
     const allPlayers = [...teamData.starting, ...teamData.bench];
     const captain = allPlayers.find(p => p.is_captain);
     const viceCaptain = allPlayers.find(p => p.is_vice_captain);
 
-    // Check played status with the standardized raw_stats we mapped above
-    const captainPlayed = captain?.raw_stats?.played === true;
+    // Checks minutes first to ensure 0-point playing captains don't lose the armband
+    const captainPlayed = 
+        (captain?.raw_stats?.minutes > 0) || 
+        (captain?.raw_stats?.played === true) || 
+        (captain?.points !== 0);
     
-    // If Captain played, they hold the bonus. Otherwise, it goes to the Vice.
-    return captainPlayed ? captain?.id : viceCaptain?.id;
+    return (captainPlayed ? captain?.id : viceCaptain?.id) ?? null;
   }, [teamData]);
 
-  // --- 2. Deduce Active Chip (Triple Captain) ---
   const derivedActiveChip = useMemo<ChipName | null>(() => {
     if (!teamData || !teamData.starting || !effectiveCaptainId) return null;
 
@@ -160,7 +151,6 @@ const TeamOfTheWeek: React.FC = () => {
     const rawTotal = teamData.starting.reduce((sum, p) => sum + p.points, 0);
     const bonusPointsPart = teamData.points - rawTotal;
 
-    // Triple Captain bonus is 2x the base points.
     if (Math.abs(bonusPointsPart - (bonusTarget.points * 2)) < 0.1) {
       return 'TRIPLE_CAPTAIN';
     }
@@ -227,6 +217,7 @@ const TeamOfTheWeek: React.FC = () => {
                 bench={teamData.bench}
                 onPlayerClick={setDetailedPlayer}
                 activeChip={derivedActiveChip}
+                effectiveCaptainId={effectiveCaptainId}
               />
             ) : (
               <ListView 
