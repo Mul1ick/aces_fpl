@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { X, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { getTeamJersey } from '@/lib/player-utils';
+// --- 1. IMPORT getTeamLogo ---
+import { getTeamJersey, getTeamLogo } from '@/lib/player-utils';
 
 interface PlayerDetailCardProps {
   player: any;
   onClose: () => void;
   activeChip?: string | null;
-  // Change default: Allow it to be undefined to detect if parent passed it
   isEffectiveCaptain?: boolean; 
 }
 
@@ -17,7 +17,7 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
   player, 
   onClose, 
   activeChip,
-  isEffectiveCaptain // Removed default 'false' here to allow fallback logic
+  isEffectiveCaptain
 }) => {
   const navigate = useNavigate();
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
@@ -30,32 +30,18 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
 
   if (!player) return null;
 
-  // --- LOGIC FIX: Determine Points Multiplier ---
   const determineMultiplier = () => {
-    // 1. Check if the player actually played (Points != 0 OR 'played' flag is true)
-    // Note: Checking points alone handles 0 pts = 0 multiplier logic naturally, 
-    // but semantically we check participation.
     const stats = player.raw_stats || player.stats || {};
     const didPlay = (player.points !== 0) || (stats.played === true) || (stats.minutes > 0);
-
-    // 2. Determine Captaincy status from player object
     const isCap = player.is_captain || player.isCaptain;
     
-    // 3. Determine if this player gets the bonus
     let getsBonus = false;
-
     if (isEffectiveCaptain !== undefined) {
-      // Priority 1: Parent component explicitly told us (Handles VC promotion logic)
       getsBonus = isEffectiveCaptain;
     } else {
-      // Priority 2: Fallback (e.g., viewing in Transfer list or Team View without calc)
-      // Default to Captain gets bonus, VC does not (we can't know if Cap played here)
       getsBonus = isCap;
     }
 
-    // 4. Calculate final multiplier
-    // If they didn't play, they technically get 0 points, so multiplier doesn't affect math,
-    // but visually 1x is cleaner than 2x for a non-playing captain.
     if (getsBonus) {
       return activeChip === 'TRIPLE_CAPTAIN' ? 3 : 2;
     }
@@ -64,12 +50,10 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
 
   const multiplier = determineMultiplier();
 
-  // --- Animation Variants ---
   const slideVariants = isDesktop
     ? { hidden: { x: '100%' }, visible: { x: 0 }, exit: { x: '100%' } }
     : { hidden: { y: '100%' }, visible: { y: 0 }, exit: { y: '100%' } };
 
-  // --- Status Banner Logic ---
   const status = player.status;
   const chance = player.chance_of_playing;
   const hasWarning = status && status !== 'ACTIVE';
@@ -81,9 +65,33 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
     ? new Date(player.return_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : null;
 
-  // --- Safe Data Extractors ---
   const recentFixture = player.recent_fixtures?.[0] || null;
-  const breakdown = player.breakdown || [];
+  
+  // --- 2. LOGIC TO INJECT MISSING BREAKDOWN STATS ---
+  const augmentedBreakdown = useMemo(() => {
+    let newBreakdown = player.breakdown || [];
+    const stats = player.raw_stats || {};
+    const position = player.position || player.pos;
+
+    // Check if Goals Conceded stat exists in raw stats but not in breakdown
+    if (stats.goals_conceded > 0 && !newBreakdown.some((s: any) => s.label === "Goals Conceded")) {
+      let points = 0;
+      // Apply scoring rule only for GK and DEF
+      if (position === 'GK' || position === 'DEF') {
+        points = Math.floor(stats.goals_conceded / 2) * -1;
+      }
+      
+      if (points !== 0) {
+        newBreakdown.push({
+          label: "Goals Conceded",
+          value: stats.goals_conceded,
+          points: points
+        });
+      }
+    }
+    return newBreakdown;
+  }, [player.breakdown, player.raw_stats, player.position, player.pos]);
+
 
   return (
     <>
@@ -146,11 +154,19 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
             <h3 className="text-sm font-bold text-gray-800 mb-3 text-center">Current Fixture</h3>
             {recentFixture ? (
-              <div className="flex justify-center items-center gap-4 font-bold text-lg">
-                <span className="text-gray-900">{player.team?.short_name || player.team}</span>
+              // --- 3. UPDATED JSX FOR FIXTURE DISPLAY ---
+              <div className="flex justify-between items-center gap-2 font-bold text-lg">
+                <div className="flex items-center gap-2 flex-1 justify-end">
+                    <span className="text-gray-900 text-right">{player.team?.name || player.team}</span>
+                    <img src={getTeamLogo(player.team?.short_name)} alt={player.team?.name} className="w-8 h-8 object-contain" />
+                </div>
                 <span className="bg-black text-white px-3 py-1 rounded-md text-sm">
-                  vs {recentFixture.opp} ({recentFixture.ha})
+                  vs
                 </span>
+                <div className="flex items-center gap-2 flex-1 justify-start">
+                    <img src={getTeamLogo(recentFixture.opp)} alt={recentFixture.opp} className="w-8 h-8 object-contain" />
+                    <span className="text-gray-900 text-left">{recentFixture.opp} ({recentFixture.ha})</span>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-gray-500 text-center">No current fixture data available.</p>
@@ -167,7 +183,8 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
             </div>
 
             <div className="space-y-3 mt-3">
-              {breakdown.length > 0 ? breakdown.map((stat: any, index: number) => {
+              {/* --- 4. USE THE NEW AUGMENTED ARRAY --- */}
+              {augmentedBreakdown.length > 0 ? augmentedBreakdown.map((stat: any, index: number) => {
                 if (stat.value === 0 && stat.points === 0) return null;
                 
                 return (

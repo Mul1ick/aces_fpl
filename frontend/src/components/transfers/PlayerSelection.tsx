@@ -4,15 +4,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Search, Filter, ArrowUpDown, DollarSign, RotateCcw, ChevronLeft, ChevronRight, Info, AlertTriangle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { X, Search, Filter, ArrowUpDown, DollarSign, RotateCcw, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { API } from '@/lib/api';
 import { Slider } from '@/components/ui/slider';
 import { getTeamJersey } from '@/lib/player-utils';
-import { PlayerDetailModal } from './PlayerDetailModal'; // Import the detailed modal
+import { PlayerDetailModal } from './PlayerDetailModal'; 
 
 // ============================================================================
 // SUB-COMPONENT: FilterModal
@@ -49,13 +48,12 @@ const FilterModal = ({ isOpen, onClose, title, children }: { isOpen: boolean; on
 );
 
 // ============================================================================
-// SUB-COMPONENT: PlayerStatusIcon (UPDATED FOR CORRECT STATUS LOGIC)
+// SUB-COMPONENT: PlayerStatusIcon
 // ============================================================================
 const PlayerStatusIcon = ({ player, onClick }: { player: any, onClick: (e: React.MouseEvent) => void }) => {
     const chance = player.chance_of_playing;
     const status = player.status;
 
-    // 1. Check if perfectly healthy first
     const isHealthy = !status || status === 'ACTIVE';
 
     if (isHealthy) {
@@ -72,7 +70,6 @@ const PlayerStatusIcon = ({ player, onClick }: { player: any, onClick: (e: React
         );
     }
     
-    // 2. Check if doubtful (Yellow Warning)
     const isYellowWarning = chance !== null && chance !== undefined && chance > 0 && chance <= 75;
     
     if (isYellowWarning) {
@@ -87,7 +84,6 @@ const PlayerStatusIcon = ({ player, onClick }: { player: any, onClick: (e: React
         );
     }
     
-    // 3. Otherwise, they are Ruled Out / Suspended / Unavailable (Red Warning)
     return (
         <div 
             className="cursor-pointer w-7 h-7 flex items-center justify-center hover:bg-[#B2002D] rounded-full transition-colors" 
@@ -98,6 +94,7 @@ const PlayerStatusIcon = ({ player, onClick }: { player: any, onClick: (e: React
         </div>
     );
 };
+
 // ============================================================================
 // SUB-COMPONENT: PlayerTable
 // ============================================================================
@@ -115,11 +112,10 @@ const PlayerTable = ({ players, onPlayerSelect, onInfoClick }: { players: any[],
             <tr key={player.id} className="border-b hover:bg-gray-100 cursor-pointer" onClick={() => onPlayerSelect(player)}>
                 <td className="p-3 flex items-center space-x-2">
                  
-                 {/* The new interactive Info/Warning icon */}
                  <PlayerStatusIcon 
                     player={player} 
                     onClick={(e) => {
-                        e.stopPropagation(); // Stops the row click from firing so we don't accidentally buy the player
+                        e.stopPropagation();
                         onInfoClick(player);
                     }} 
                  />
@@ -127,7 +123,10 @@ const PlayerTable = ({ players, onPlayerSelect, onInfoClick }: { players: any[],
                  <img src={getTeamJersey(player.club)} alt="jersey" className="w-8 h-10 object-contain ml-1" />
                 <div>
                     <p className="font-bold text-sm">{player.name}</p>
-                    <p className="text-xs text-gray-500">{player.pos} · {player.club}</p>
+                    {/* REMOVED: The fixture pill <span> and the flex/gap classes */}
+                    <p className="text-xs text-gray-500">
+                        {player.pos} · {player.club}
+                    </p>
                 </div>
                 </td>
                 <td className="p-3 text-right font-bold text-sm">£{player.price.toFixed(1)}m</td>
@@ -137,6 +136,7 @@ const PlayerTable = ({ players, onPlayerSelect, onInfoClick }: { players: any[],
         </tbody>
     </table>
 );
+
 
 // ============================================================================
 // SUB-COMPONENT: PlayerFilterControls
@@ -223,35 +223,86 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 
-    // NEW STATE: Tracks which player to show in the info modal
     const [infoPlayer, setInfoPlayer] = useState<any | null>(null);
 
+    // --- UPDATED: Fetch players AND fixtures to map the fixture string ---
     useEffect(() => {
-        const fetchPlayers = async () => {
+        const fetchData = async () => {
           try {
-            const response = await fetch(API.endpoints.playerStats);
-            if (!response.ok) throw new Error('API failed to fetch player stats');
-            const data = await response.json();
-    
-            // MODIFIED: Added mapping for status, news, chance_of_playing
-            const mapped = data.map((player: any) => ({
-              id: player.id,
-              name: player.full_name,
-              pos: player.position === 'ST' ? 'FWD' : player.position,
-              club: player.team?.name || 'Unknown',
-              price: player.price,
-              points: player.total_points,
-              tsb: Math.floor(Math.random() * 50) + 30,
-              status: player.status ?? 'ACTIVE',
-              news: player.news ?? null,
-              chance_of_playing: player.chance_of_playing ?? null,
-            }));
+            const token = localStorage.getItem('access_token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+            // 1. Fetch Players, Fixtures, and Current Gameweek in parallel
+            const [playerRes, fixtureRes, gameweekRes] = await Promise.all([
+                fetch(API.endpoints.playerStats),
+                fetch(API.endpoints.fixtures, { headers }),
+                fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers })
+            ]);
+
+            if (!playerRes.ok) throw new Error('API failed to fetch player stats');
+            
+            const playerData = await playerRes.json();
+            const fixtureData = fixtureRes.ok ? await fixtureRes.json() : [];
+            const gameweekData = gameweekRes.ok ? await gameweekRes.json() : null;
+
+            // 2. Logic to determine the "Next" gameweek for transfers
+            // If current GW is upcoming, that's the one. If live/finished, it's the next one.
+            // A simple approximation is to find the first deadline in the future.
+            // Since we have all fixtures, we can just find fixtures where gameweek_id matches our target.
+            
+            // NOTE: The `fixtureData` contains gameweek_id.
+            // `gameweekData` gives us current status. 
+            // We need to map TeamID -> FixtureString.
+            
+            const teamFixtureMap: Record<string, string> = {};
+
+            if (fixtureData.length > 0) {
+                const now = new Date();
+                // Filter for upcoming fixtures only
+                const upcomingFixtures = fixtureData.filter((f: any) => new Date(f.kickoff) > now);
+                
+                // Sort by time to get the very next one
+                upcomingFixtures.sort((a: any, b: any) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
+
+                // Populate map with the NEXT fixture for each team
+                upcomingFixtures.forEach((f: any) => {
+                    const homeName = f.home.name;
+                    const awayName = f.away.name;
+                    
+                    // Only set if not already set (ensures we get the nearest one)
+                    if (!teamFixtureMap[homeName]) {
+                        teamFixtureMap[homeName] = `${f.away.short_name} (H)`;
+                    }
+                    if (!teamFixtureMap[awayName]) {
+                        teamFixtureMap[awayName] = `${f.home.short_name} (A)`;
+                    }
+                });
+            }
+
+            // 3. Map players and inject fixture string
+            const mapped = playerData.map((player: any) => {
+                const teamName = player.team?.name || 'Unknown';
+                return {
+                    id: player.id,
+                    name: player.full_name,
+                    pos: player.position === 'ST' ? 'FWD' : player.position,
+                    club: teamName,
+                    price: player.price,
+                    points: player.total_points,
+                    tsb: Math.floor(Math.random() * 50) + 30,
+                    status: player.status ?? 'ACTIVE',
+                    news: player.news ?? null,
+                    chance_of_playing: player.chance_of_playing ?? null,
+                    // --- INJECTED FIXTURE ---
+                    fixture_str: teamFixtureMap[teamName] || '-' 
+                };
+            });
             setPlayers(mapped);
           } catch (err: any) {
             console.warn('API fetch failed:', err.message);
           }
         };
-        fetchPlayers();
+        fetchData();
       }, []);
 
     useEffect(() => {
@@ -284,8 +335,8 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
             searchQuery.trim() !== '' ||
             selectedPositions.length > 0 ||
             selectedClubs.length > 0 ||
-            priceRange[0] !== 3.5 ||
-            priceRange[1] !== 14.0
+            priceRange[0] !== 1.0 ||
+            priceRange[1] !== 25.0
         );
     }, [searchQuery, selectedPositions, selectedClubs, priceRange]);
     
@@ -361,7 +412,6 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
             <div className="flex-1 overflow-y-auto">
                 {isFiltered ? (
                     <>
-                        {/* Passed the onInfoClick handler to the table */}
                         <PlayerTable players={paginatedPlayers} onPlayerSelect={onPlayerSelect} onInfoClick={(p) => setInfoPlayer(p)} />
                          {totalPages > 1 && (
                             <div className="p-4 flex justify-center items-center gap-2 sticky bottom-0 bg-white border-t">
@@ -377,7 +427,6 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                              posPlayers.length > 0 && (
                                 <div key={pos}>
                                      <h3 className="font-bold text-lg mb-2">{pos}</h3>
-                                     {/* Passed the onInfoClick handler to the table */}
                                      <PlayerTable players={posPlayers.slice(0, 5)} onPlayerSelect={onPlayerSelect} onInfoClick={(p) => setInfoPlayer(p)} />
                                 </div>
                             )

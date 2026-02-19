@@ -19,6 +19,7 @@ import Stats from "./pages/Stats";
 import Help from "./pages/Help";
 import TeamView from "./pages/TeamView";
 import TeamOfTheWeek from "./pages/TeamOfTheWeek"; // ✅ 1. ADD THIS IMPORT
+import DreamTeam from "./pages/DreamTeam";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 
@@ -56,6 +57,7 @@ const App = () => (
 
                   {/* ✅ 2. ADD THIS NEW, DEDICATED ROUTE */}
                   <Route path="/team-of-the-week/:gw" element={<ProtectedRoute><TeamOfTheWeek /></ProtectedRoute>} />
+                  <Route path="/dream-team/:gw" element={<ProtectedRoute><DreamTeam /></ProtectedRoute>} />
                 </Route>
 
                 {/* --- Catch-all Not Found Route --- */}

@@ -45,8 +45,10 @@ async def submit_fixture_stats_service(db: Prisma, gameweek_id: int, payload: sc
                 },
                 data={
                     "create": {
-                        "gameweek_id": gameweek_id,
-                        "player_id": s.player_id,
+                        # Use connect syntax for relations
+                        "gameweek": {"connect": {"id": gameweek_id}},
+                        "player": {"connect": {"id": s.player_id}},
+                        # Spread the rest of the data
                         **stat_data, 
                         "points": total_points
                     }, 
