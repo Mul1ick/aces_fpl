@@ -88,13 +88,13 @@ async def main() -> None:
 
         
         # 3. GENERATE AND SEED DYNAMIC SCHEDULE
-        print("⏰ Generating custom schedule starting Feb 20, 2026 @ 2:00 PM IST...")
+        print("⏰ Generating custom schedule starting Feb 20, 2026 @ 1:00 PM IST...")
         
         # Define IST Timezone (UTC +5:30)
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         
         # Season start time: Feb 20, 2026 at 2:00 PM IST
-        season_start = datetime(2026, 2, 20, 14, 0, 0, tzinfo=ist_tz)
+        season_start = datetime(2026, 2, 20, 13, 0, 0, tzinfo=ist_tz)
         
         gameweek_data = []
         fixture_data = []
