@@ -86,21 +86,24 @@ async def main() -> None:
                 await db.player.create_many(data=[{"team_id": team_id, **p} for p in players], skip_duplicates=True)
         print("✅ Teams and players seeded.")
 
+        
         # 3. GENERATE AND SEED DYNAMIC SCHEDULE
-        print("⏰ Generating compressed schedule for testing...")
-        now = datetime.now(timezone.utc)
+        print("⏰ Generating custom schedule starting Feb 20, 2026 @ 2:00 PM IST...")
+        
+        # Define IST Timezone (UTC +5:30)
+        ist_tz = timezone(timedelta(hours=5, minutes=30))
+        
+        # Season start time: Feb 20, 2026 at 2:00 PM IST
+        season_start = datetime(2026, 2, 20, 14, 0, 0, tzinfo=ist_tz)
         
         gameweek_data = []
         fixture_data = []
 
-        # Gameweek 1 deadline is 10 minutes from now
-        current_deadline = now + timedelta(minutes=10)
-
         for gw_num in range(1, 11):
-            # Set the deadline for this gameweek
-            deadline = current_deadline + timedelta(minutes=(gw_num - 1) * 10)
+            # Each GW deadline is exactly 30 minutes after the previous one
+            deadline = season_start + timedelta(minutes=(gw_num - 1) * 30)
             gameweek_data.append({"gw_number": gw_num, "deadline": deadline, "status": "UPCOMING"})
-            print(f"  - Gameweek {gw_num} Deadline set for: {deadline.strftime('%H:%M:%S')}")
+            print(f"  - Gameweek {gw_num} Deadline set for: {deadline.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
             # Set kickoff times for fixtures within this gameweek
             pairings = FIXTURE_PAIRINGS.get(gw_num, [])
@@ -108,8 +111,9 @@ async def main() -> None:
                 home_id = team_map_name.get(home_name)
                 away_id = team_map_name.get(away_name)
                 
-                # Kickoffs are 2, 4, and 6 minutes past the deadline
-                kickoff_time = deadline + timedelta(minutes=(i + 1) * 2)
+                # Kickoffs are 5, 7, and 9 minutes past the deadline
+                # i=0 -> 5 mins, i=1 -> 7 mins, i=2 -> 9 mins
+                kickoff_time = deadline + timedelta(minutes=5 + (i * 2))
 
                 if home_id and away_id:
                     fixture_data.append({
