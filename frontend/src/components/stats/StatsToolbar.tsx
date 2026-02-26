@@ -6,22 +6,22 @@ import { ChevronDown, RotateCcw } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-// --- MOCK DATA & ASSETS ---
-import southsideLogo from '@/assets/images/team-logos/southside-logo.png';
-import roarersLogo from '@/assets/images/team-logos/roarers-logo.png';
-import satansLogo from '@/assets/images/team-logos/satans-logo.png';
-import titansLogo from '@/assets/images/team-logos/titans-logo.png';
-import tranaLogo from '@/assets/images/team-logos/trana-logo.png';
-import umangLogo from '@/assets/images/team-logos/umang-logo.png';
-
+// --- NEW: Import the centralized logo utility ---
+import { getTeamLogo } from '@/lib/player-utils';
 
 const Teams = [
-    { name: 'Southside', logo: southsideLogo }, 
-    { name: 'Roarers', logo: roarersLogo }, 
-    { name: 'Satans', logo: satansLogo }, 
-    { name: 'Titans', logo: titansLogo },
-    { name: 'Trana', logo: tranaLogo }, 
-    { name: 'Umang', logo: umangLogo },
+    { name: 'Umang', shortName: 'UMA' },
+    { name: 'Satans', shortName: 'SAT' },
+    { name: 'Aer Titans', shortName: 'AER' },
+    { name: 'Trana', shortName: 'TRA' },
+    { name: 'Roarers', shortName: 'ROA' },
+    { name: 'Casuals FC', shortName: 'CAS' },
+    { name: 'Cathect', shortName: 'CAT' },
+    { name: 'Encore United', shortName: 'ENC' },
+    { name: 'Matero Power 8s', shortName: 'MAT' },
+    { name: 'Wolfpack FC', shortName: 'WOLF' },
+    { name: 'Youngblood FC', shortName: 'YBFC' },
+    { name: 'Majithia Reality FC', shortName: 'MRFC' },
 ];
 
 interface FilterSelection {
@@ -29,7 +29,6 @@ interface FilterSelection {
   value: string;
 }
 
-// --- MODIFIED: Updated props interface ---
 interface StatsToolbarProps {
   onFilterChange: (selection: FilterSelection) => void;
   onReset: () => void;
@@ -44,11 +43,10 @@ const FilterSection: React.FC<{ title: string; children: React.ReactNode }> = ({
     </div>
 );
 
-// --- MODIFIED: Destructure new props ---
 export const StatsToolbar: React.FC<StatsToolbarProps> = ({ onFilterChange, onReset, sortBy, onSortByChange }) => {
   const [currentFilter, setCurrentFilter] = useState<FilterSelection>({ type: 'global', value: 'All players' });
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const [isSortOpen, setIsSortOpen] = useState(false); // --- NEW: State for sort modal
+  const [isSortOpen, setIsSortOpen] = useState(false); 
 
   const handleSelect = (selection: FilterSelection) => {
     setCurrentFilter(selection);
@@ -62,13 +60,11 @@ export const StatsToolbar: React.FC<StatsToolbarProps> = ({ onFilterChange, onRe
     onReset();
   }
 
-  // --- NEW: Handle sort changes and close the popover ---
   const handleSortSelect = (value: string) => {
     onSortByChange(value);
     setIsSortOpen(false);
   };
   
-  // --- NEW: Map sort key to readable label ---
   const sortLabel = {
     points: 'Total Points',
     price: 'Price',
@@ -102,11 +98,12 @@ export const StatsToolbar: React.FC<StatsToolbarProps> = ({ onFilterChange, onRe
                 </div>
             </FilterSection>
             <FilterSection title="Teams">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 px-4">
+                {/* Made grid 3 cols on mobile, 4 on desktop so all 12 teams fit nicely */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-2 gap-y-2 px-4 max-h-48 overflow-y-auto">
                     {Teams.map(team => (
-                        <button key={team.name} onClick={() => handleSelect({ type: 'team', value: team.name })} className="flex items-center space-x-2 text-left p-2 hover:bg-gray-100 rounded-lg">
-                            <img src={team.logo} alt={team.name} className="w-6 h-6" />
-                            <span className="text-body">{team.name}</span>
+                        <button key={team.name} onClick={() => handleSelect({ type: 'team', value: team.name })} className="flex flex-col items-center justify-center space-y-1 text-center p-2 hover:bg-gray-100 rounded-lg">
+                            <img src={getTeamLogo(team.shortName)} alt={team.name} className="w-8 h-8 object-contain" />
+                            <span className="text-[10px] font-bold text-gray-700 leading-tight">{team.name}</span>
                         </button>
                     ))}
                 </div>
@@ -114,7 +111,6 @@ export const StatsToolbar: React.FC<StatsToolbarProps> = ({ onFilterChange, onRe
         </PopoverContent>
       </Popover>
 
-      {/* --- MODIFIED: Added bg-white to className --- */}
       <Popover open={isSortOpen} onOpenChange={setIsSortOpen}>
         <PopoverTrigger asChild>
             <Button className="bg-pl-white/5 border border-pl-white/20 hover:bg-pl-white/10 rounded-lg text-pl-white flex items-center justify-between w-48 h-10">

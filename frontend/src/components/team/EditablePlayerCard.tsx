@@ -1,27 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Shirt, Star, User, ChevronsRight, AlertTriangle } from 'lucide-react';
+import { X, Star, User, ChevronsRight, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
-// --- ASSET IMPORTS ---
-import satansJersey from '@/assets/images/jerseys/satans.png';
-import traanaJersey from '@/assets/images/jerseys/traana.png';
-import roarersJersey from '@/assets/images/jerseys/roarers.png';
-import southsideJersey from '@/assets/images/jerseys/southside.png';
-import titansJersey from '@/assets/images/jerseys/titans.png';
-import umaagJersey from '@/assets/images/jerseys/umang.png';
-import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png'
-import tshirtRed from '@/assets/images/jerseys/tshirt-red.png'
-
-const TEAM_JERSEYS: Record<string, string> = {
-  'Satans': satansJersey,
-  'Roarers': roarersJersey,
-  'Trana': traanaJersey,
-  'Southside': southsideJersey,
-  'Titans': titansJersey,
-  'Umang': umaagJersey,
-};
+// --- NEW: Import the central utility instead of hardcoding jerseys ---
+import { getTeamJersey } from '@/lib/player-utils';
 
 interface EditablePlayerCardProps {
   player: any;
@@ -42,11 +26,13 @@ const FixtureRow = ({ gameweek, opponent, points }: { gameweek: string, opponent
 export const EditablePlayerCard: React.FC<EditablePlayerCardProps> = ({ player, onClose, onSubstitute,  onSetArmband, onViewProfile }) => {
   if (!player) return null;
 
-  const jerseySrc = TEAM_JERSEYS[player.team] || tshirtRed;
+  // --- CHANGED: Use the utility function here ---
+  const jerseySrc = getTeamJersey(player.team);
+  
   const isCaptain = !!player.isCaptain || !!player.is_captain;
   const isVice    = !!player.isVice || !!player.is_vice_captain;
   
-  // --- NEW STATUS BANNER LOGIC ---
+  // --- STATUS BANNER LOGIC ---
   const status = player.status;
   const chance = player.chance_of_playing;
   const hasWarning = status && status !== 'ACTIVE';

@@ -39,7 +39,7 @@ model User {
 model Team {
   id         Int      @id @default(autoincrement())
   name       String   @unique
-  short_name String   @unique @db.VarChar(3)
+  short_name String   @unique @db.VarChar(10)
   players    Player[]
   home_fixtures  Fixture[] @relation("HomeTeam")
   away_fixtures  Fixture[] @relation("AwayTeam")

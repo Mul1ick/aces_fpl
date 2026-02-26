@@ -45,7 +45,6 @@ export const DeadlineCard: React.FC<DeadlineCardProps> = ({ gameweek, fixtures }
     return () => clearInterval(timer);
   }, [gameweek]);
 
-  // Helper to Pad Numbers
   const pad = (num: number) => String(num).padStart(2, '0');
 
   // --- SAFEGUARD: Render empty state if no gameweek found ---
@@ -102,39 +101,46 @@ export const DeadlineCard: React.FC<DeadlineCardProps> = ({ gameweek, fixtures }
           </div>
 
           <div className="space-y-0">
-            {fixtures.slice(0, 5).map((fixture) => (
+            {fixtures.slice(0, 6).map((fixture) => (
               <div 
                 key={fixture.id} 
-                className="flex justify-between items-center py-3 border-b border-gray-100 last:border-none hover:bg-gray-50 transition-colors px-1"
+                className="grid grid-cols-12 gap-2 items-center py-3 border-b border-gray-100 last:border-none hover:bg-gray-50 transition-colors"
               >
-                {/* Matchup Column */}
-                <div className="flex items-center gap-2 flex-1 min-w-0 mr-4">
-                  {/* Home Team (Right Aligned Text) */}
-                  <div className="flex items-center gap-2 justify-end flex-1">
-                    <span className="font-bold text-sm text-black text-right leading-tight break-words">{fixture.home.name}</span>
+                {/* Matchup Column (Takes up 8/12 columns on mobile, 9/12 on larger) */}
+                <div className="col-span-8 sm:col-span-9 flex items-center justify-center min-w-0">
+                  
+                  {/* Home Team */}
+                  <div className="flex-1 flex items-center justify-end gap-1.5 min-w-0">
+                    <span className="font-bold text-xs sm:text-sm text-black text-right truncate">
+                        {fixture.home.name}
+                    </span>
                     <img 
                       src={getTeamLogo(fixture.home.short_name)} 
                       alt={fixture.home.short_name} 
-                      className="w-6 h-6 object-contain flex-shrink-0" 
+                      className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0" 
                     />
                   </div>
                   
-                  <span className="text-xs text-gray-300 font-bold flex-shrink-0">v</span>
+                  <span className="text-[10px] sm:text-xs text-gray-300 font-bold px-1 shrink-0">v</span>
 
-                  {/* Away Team (Left Aligned Text) */}
-                  <div className="flex items-center gap-2 flex-1">
+                  {/* Away Team */}
+                  <div className="flex-1 flex items-center justify-start gap-1.5 min-w-0">
                     <img 
                       src={getTeamLogo(fixture.away.short_name)} 
                       alt={fixture.away.short_name} 
-                      className="w-6 h-6 object-contain flex-shrink-0" 
+                      className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0" 
                     />
-                    <span className="font-bold text-sm text-black text-left leading-tight break-words">{fixture.away.name}</span>
+                    <span className="font-bold text-xs sm:text-sm text-black text-left truncate">
+                        {fixture.away.name}
+                    </span>
                   </div>
                 </div>
 
-                {/* Kickoff Time */}
-                <div className="text-sm font-medium text-black tabular-nums whitespace-nowrap flex-shrink-0">
-                  {format(new Date(fixture.kickoff), 'E d MMM, HH:mm')}
+                {/* Kickoff Time (Takes up 4/12 columns on mobile, 3/12 on larger) */}
+                <div className="col-span-4 sm:col-span-3 text-right">
+                  <div className="text-[10px] sm:text-xs font-medium text-black tabular-nums bg-gray-50 rounded px-1.5 py-0.5 inline-block">
+                    {format(new Date(fixture.kickoff), 'E, HH:mm')}
+                  </div>
                 </div>
               </div>
             ))}

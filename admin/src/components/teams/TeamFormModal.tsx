@@ -62,18 +62,21 @@ export function TeamFormModal({
       });
       return;
     }
-    if (formData.short_name.trim().length > 3) {
+    
+    // LIMIT INCREASED TO 10
+    if (formData.short_name.trim().length > 10) {
         toast({
             variant: 'destructive',
             title: 'Validation Error',
-            description: 'Short Name must be 3 characters or less.',
+            description: 'Short Name must be 10 characters or less.',
         });
         return;
     }
+    
     onSubmit(
-   { name: formData.name.trim(), short_name: formData.short_name.trim().toUpperCase() },
-   editingTeam?.id
- );
+      { name: formData.name.trim(), short_name: formData.short_name.trim().toUpperCase() },
+      editingTeam?.id
+    );
   };
 
   return (
@@ -91,8 +94,8 @@ export function TeamFormModal({
                 <Input id="name" value={formData.name} onChange={(e) => handleChange('name', e.target.value)} />
             </div>
             <div>
-                <Label htmlFor="short_name">Short Name (3 chars)</Label>
-                <Input id="short_name" value={formData.short_name} onChange={(e) => handleChange('short_name', e.target.value.toUpperCase())} maxLength={3} />
+                <Label htmlFor="short_name">Short Name</Label>
+                <Input id="short_name" value={formData.short_name} onChange={(e) => handleChange('short_name', e.target.value.toUpperCase())} maxLength={10} />
             </div>
         </form>
         <DialogFooter>
