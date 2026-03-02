@@ -174,19 +174,26 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
                 
                 if is_valid_formation(hypothetical_starters):
                     # VALID SWAP!
-                    logger.info(f"User {user_id}: Autosub {starter_to_remove['player_id']} OUT, {bench_player['player_id']} IN")
+                    # Note: FPL rules allow the Captain to be subbed out. 
+                    # They keep the armband on the bench, but points won't count.
+                    log_msg = f"User {user_id}: Autosub {starter_to_remove['player_id']} OUT"
+                    if starter_to_remove.get('is_captain'):
+                        log_msg += " (Captain)"
+                    log_msg += f", {bench_player['player_id']} IN"
                     
-                    # 1. Update lists
+                    logger.info(log_msg)
+                    
+                    # 1. Update local lists
                     starters.remove(starter_to_remove)
                     starters.append(bench_player)
                     bench.remove(bench_player)
-                    bench.append(starter_to_remove) # Put inactive player on bench
+                    bench.append(starter_to_remove) # Captain/Starter now benched
                     
                     # 2. Update tracking lists
                     current_inactive_starters.remove(starter_to_remove)
                     
                     swap_successful = True
-                    break # Move to next active bench player (this one is used)
+                    break # Move to next active bench player
             
             if not swap_successful:
                 logger.debug(f"User {user_id}: Could not sub in {bench_player['player_id']} - formation constraint.")
