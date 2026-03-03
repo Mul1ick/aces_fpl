@@ -42,7 +42,7 @@ NAME_MAP = {
     "Roarers": "Roarers"
 }
 
-# --- PAIRINGS (From your list) ---
+# --- PAIRINGS ---
 FIXTURE_PAIRINGS = {
     1: [("Trana", "Satans"), ("MRFC", "Matero"), ("Casuals Fc", "Wolfpack"), ("Umang", "Cathect"), ("Aer Titans", "Youngblood"), ("Encore", "Roarers")],
     2: [("Trana", "Matero"), ("Satans", "Wolfpack"), ("MRFC", "Casuals Fc"), ("Umang", "Youngblood"), ("Cathect", "Roarers"), ("Aer Titans", "Encore")],
@@ -204,6 +204,7 @@ async def main() -> None:
         for short_name, players in get_player_data().items():
             team_id = team_map_short.get(short_name)
             if team_id:
+                # Add players
                 await db.player.create_many(data=[{"team_id": team_id, **p} for p in players], skip_duplicates=True)
             else:
                 print(f"⚠️ Warning: Could not find team ID for {short_name}")
@@ -211,44 +212,33 @@ async def main() -> None:
         print("✅ Teams and players seeded.")
 
         
-        # 4. GENERATE REAL SCHEDULE
-        print("⏰ Generating specific match schedule...")
+        # 4. GENERATE TEST SCHEDULE
+        print("⏰ Generating TEST schedule: GW1 in 10 mins. Interval: 10 mins.")
         
         ist_tz = timezone(timedelta(hours=5, minutes=30))
+        now_utc = datetime.now(timezone.utc)
         
-        # --- DEFINED MATCH DATES (Year 2026 based on Sunday dates) ---
-        # If today is before 2026, these are all UPCOMING.
-        
-        MATCH_DATES = {
-            1: datetime(2026, 3, 15, 13, 0, 0, tzinfo=ist_tz), # Sunday
-            2: datetime(2026, 3, 22, 13, 0, 0, tzinfo=ist_tz), # Sunday
-            3: datetime(2026, 3, 28, 13, 0, 0, tzinfo=ist_tz), # Saturday
-            4: datetime(2026, 4, 12, 13, 0, 0, tzinfo=ist_tz), # Sunday
-            5: datetime(2026, 4, 19, 13, 0, 0, tzinfo=ist_tz), # Sunday
-            6: datetime(2026, 4, 26, 13, 0, 0, tzinfo=ist_tz), # Sunday
-            7: datetime(2026, 5, 3, 13, 0, 0, tzinfo=ist_tz),  # Sunday
-            8: datetime(2026, 5, 10, 13, 0, 0, tzinfo=ist_tz), # Sunday
-            9: datetime(2026, 5, 17, 13, 0, 0, tzinfo=ist_tz), # Sunday
-            10: datetime(2026, 5, 24, 13, 0, 0, tzinfo=ist_tz), # Sunday
-        }
+        # Start Time: 10 minutes from NOW
+        start_time = now_utc + timedelta(minutes=10)
+        interval = timedelta(minutes=10)
         
         gameweek_data = []
         fixture_data = []
 
         for gw_num in range(1, 11):
-            deadline = MATCH_DATES.get(gw_num)
+            # Calculate Deadline
+            deadline = start_time + ((gw_num - 1) * interval)
+            # Display in IST for debugging clarity
+            deadline_ist = deadline.astimezone(ist_tz)
             
-            if not deadline:
-                print(f"Skipping GW {gw_num}: No date defined.")
-                continue
-
             gameweek_data.append({
                 "gw_number": gw_num, 
                 "deadline": deadline, 
                 "status": "UPCOMING"
             })
-            print(f"  - Gameweek {gw_num} Deadline: {deadline.strftime('%a %d %b %Y, %H:%M')}")
+            print(f"  - Gameweek {gw_num} Deadline: {deadline_ist.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
+            # Get Pairings for this GW
             pairings = FIXTURE_PAIRINGS.get(gw_num, [])
             
             for i, (home_raw, away_raw) in enumerate(pairings):
@@ -262,10 +252,9 @@ async def main() -> None:
                 home_id = team_map_name.get(home_real_name)
                 away_id = team_map_name.get(away_real_name)
                 
-                # Kickoff Staggering:
-                # Matches kick off 2, 4, 6, 8, 10, 12 mins after the deadline.
-                # This keeps them close to the day's event start.
-                kickoff_time = deadline + timedelta(minutes=2 + (i * 2))
+                # Kickoff Staggering: 1 minute intervals (1, 2, 3, 4, 5, 6 mins after deadline)
+                # to comfortably fit within the 10-minute gameweek window
+                kickoff_time = deadline + timedelta(minutes=1 + i)
 
                 if home_id and away_id:
                     fixture_data.append({
@@ -279,15 +268,18 @@ async def main() -> None:
         await db.gameweek.create_many(data=gameweek_data, skip_duplicates=True)
         print("✅ All gameweeks created.")
 
+        # Map gameweek numbers to their new database IDs
         all_gws = await db.gameweek.find_many()
         gameweek_map = {gw.gw_number: gw.id for gw in all_gws}
         
+        # Add the correct gameweek_id to each fixture
         for fixture in fixture_data:
             fixture["gameweek_id"] = gameweek_map[fixture["gw_number"]]
-            del fixture["gw_number"]
+            del fixture["gw_number"] # Remove the temporary key
 
+        # Create fixtures in DB
         await db.fixture.create_many(data=fixture_data, skip_duplicates=True)
-        print("✅ All fixtures created with Specific Dates.")
+        print("✅ All fixtures created with Fast-Paced Test Schedule.")
 
     except Exception as e:
         print(f"❌ An error occurred during seeding: {e}")

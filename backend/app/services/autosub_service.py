@@ -6,35 +6,69 @@ from collections import Counter
 
 logger = logging.getLogger("aces.autosub")
 
-# --- 1. HELPER: DETERMINE IF PLAYER PLAYED ---
+# # --- 1. HELPER: DETERMINE IF PLAYER PLAYED ---
+# def did_player_play(stats: Dict) -> bool:
+#     """
+#     Determines if a player participated in the match.
+#     Logic:
+#     1. If Total Points != 0 -> They played.
+#     2. If Total Points == 0 BUT they have stats (e.g. Yellow Card + Conceded Goals),
+#        then they played (Net 0).
+#     3. If Total Points == 0 AND No stats -> They did not play.
+#     """
+#     if not stats:
+#         return False
+    
+#     # If points are non-zero, they definitely played
+#     if stats.get('points', 0) != 0:
+#         return True
+
+#     # If points are 0, check for ANY statistical entry (The "Net 0" Check)
+#     # We ignore 'minutes' as per requirements.
+#     stat_keys = [
+#         'goals_scored', 'assists', 'yellow_cards', 'red_cards', 
+#         'bonus_points', 'clean_sheets', 'goals_conceded', 
+#         'own_goals', 'penalties_missed','penalties_saved'
+#     ]
+    
+#     for key in stat_keys:
+#         if stats.get(key, 0) != 0:
+#             return True # Found a stat entry, so they played
+
+#     return False
+
 def did_player_play(stats: Dict) -> bool:
     """
-    Determines if a player participated in the match.
-    Logic:
-    1. If Total Points != 0 -> They played.
-    2. If Total Points == 0 BUT they have stats (e.g. Yellow Card + Conceded Goals),
-       then they played (Net 0).
-    3. If Total Points == 0 AND No stats -> They did not play.
+    Determines if a player participated based strictly on if ANY stat was entered.
+    If all stats are 0 or False, they are considered to have NOT played, and are eligible for autosub.
     """
     if not stats:
         return False
     
-    # If points are non-zero, they definitely played
-    if stats.get('points', 0) != 0:
-        return True
-
-    # If points are 0, check for ANY statistical entry (The "Net 0" Check)
-    # We ignore 'minutes' as per requirements.
+    # List of all statistical number fields entered from the frontend
     stat_keys = [
-        'goals_scored', 'assists', 'yellow_cards', 'red_cards', 
-        'bonus_points', 'clean_sheets', 'goals_conceded', 
-        'own_goals', 'penalties_missed','penalties_saved'
+        'goals_scored', 
+        'assists', 
+        'yellow_cards', 
+        'red_cards', 
+        'bonus_points', 
+        'goals_conceded', 
+        'own_goals', 
+        'penalties_missed', 
+        'penalties_saved'
     ]
     
+    # 1. Check if ANY number stat is greater than 0
     for key in stat_keys:
         if stats.get(key, 0) != 0:
-            return True # Found a stat entry, so they played
+            return True # They have a stat, so they played!
 
+    # 2. Check the boolean field (Clean Sheet)
+    if stats.get('clean_sheets', False) is True:
+        return True # They got a clean sheet, so they played!
+
+    # If we get here, every single stat is 0. 
+    # Therefore, they did not play (or did absolutely nothing) -> Eligible for Autosub.
     return False
 
 # --- 2. HELPER: VALIDATE FORMATION ---
