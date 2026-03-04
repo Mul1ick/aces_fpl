@@ -199,7 +199,7 @@ const TeamOfTheWeek: React.FC = () => {
     const currentGw = parseInt(gw || '1', 10);
     const newGw = direction === 'next' ? currentGw + 1 : currentGw - 1;
     if (newGw > 0) {
-      navigate(`/team-of-the-week/${newGw}`);
+      navigate(`/dream-team/${newGw}`);
     }
   };
 
