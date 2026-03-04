@@ -163,11 +163,22 @@ const TeamView: React.FC = () => {
     const captain = allPlayers.find(p => p.is_captain);
     const viceCaptain = allPlayers.find(p => p.is_vice_captain);
 
-    // Checks minutes first to ensure 0-point playing captains don't lose the armband
-    const captainPlayed = 
-        (captain?.raw_stats?.minutes > 0) || 
-        (captain?.raw_stats?.played === true) || 
-        (captain?.points !== 0);
+    const stats = (captain as any)?.raw_stats || {};
+    const points = captain?.points || 0;
+
+    const hasStats = 
+        (stats.goals_scored > 0) || 
+        (stats.assists > 0) || 
+        (stats.yellow_cards > 0) || 
+        (stats.red_cards > 0) || 
+        (stats.bonus_points > 0) || 
+        (stats.goals_conceded > 0) || 
+        (stats.own_goals > 0) || 
+        (stats.penalties_missed > 0) || 
+        (stats.penalties_saved > 0) || 
+        (stats.clean_sheets === true || stats.clean_sheets === 1);
+
+    const captainPlayed = (points !== 0) || hasStats;
     
     return (captainPlayed ? captain?.id : viceCaptain?.id) ?? null;
   }, [teamData]);
@@ -223,8 +234,10 @@ const TeamView: React.FC = () => {
               highestPoints={teamData.highest_points ?? 0}
               gwRank={teamData.gw_rank ?? ''}
               // --- TS FIX: Force string to number ---
-              freeTransfers={Number(teamData.transfers || 0)}
+              transfersCount={Number(teamData.transfers || 0)}
               onNavigate={handleNavigation}
+              activeChip={teamData.active_chip as any}
+              hideTeamOfTheWeekLink={true} 
             />
           </div>
 
@@ -241,6 +254,7 @@ const TeamView: React.FC = () => {
             <ListView 
                 players={allPlayers} 
                 activeChip={teamData.active_chip as any} 
+                effectiveCaptainId={effectiveCaptainId}
             />
           )}
         </div>

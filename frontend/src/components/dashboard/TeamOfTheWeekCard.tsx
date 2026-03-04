@@ -21,43 +21,63 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
   const totwGameweekToShow = currentGameweekNumber;
 
   // --- NEW ROBUST LOGIC: Deduce Effective Captain and Multiplier ---
+  // --- NEW ROBUST LOGIC: Deduce Effective Captain and Multiplier ---
+// --- NEW ROBUST LOGIC: Mathematical Deduction of Captain ---
   const { multiplier, effectiveCaptainId } = useMemo(() => {
     if (!team || !team.starting) return { multiplier: 2, effectiveCaptainId: null };
 
-    // 1. Find the Captain and Vice using all possible naming conventions
     const captain = team.starting.find((p: any) => p.is_captain || p.isCaptain);
     const vice = team.starting.find((p: any) => p.is_vice_captain || p.isVice);
 
-    // 2. Determine who actually played (Standardizing the check)
+    if (!captain) return { multiplier: 2, effectiveCaptainId: vice?.id };
+
+    // 1. Calculate the exact amount of bonus points added by the multiplier
+    const rawTotal = team.starting.reduce((sum: number, p: any) => sum + Number(p.points || 0), 0);
+    const bonusPortion = Number(team.points) - rawTotal;
+
+    // 2. If the bonus portion is 0, it means the Captain scored 0 and kept the armband
+    // (Or neither played. In both cases, visually keep the armband on the Captain).
+    if (bonusPortion === 0) {
+        return { multiplier: 2, effectiveCaptainId: captain.id };
+    }
+
+    const capPoints = Number(captain.points || 0);
+    const vicePoints = Number(vice?.points || 0);
+
+    // 3. Did the Captain provide the bonus? (Checks for 2x and 3x)
+    if (bonusPortion === capPoints || bonusPortion === capPoints * 2) {
+        const mult = bonusPortion === capPoints * 2 ? 3 : 2;
+        return { multiplier: mult, effectiveCaptainId: captain.id };
+    }
+
+    // 4. Did the Vice Captain provide the bonus? (Checks for 2x and 3x)
+    if (vice && (bonusPortion === vicePoints || bonusPortion === vicePoints * 2)) {
+        const mult = bonusPortion === vicePoints * 2 ? 3 : 2;
+        return { multiplier: mult, effectiveCaptainId: vice.id };
+    }
+
+    // 5. Absolute Fallback just in case admin manually altered total scores
     const checkPlayed = (p: any) => {
         if (!p) return false;
+        if (Number(p.points) !== 0) return true;
         const stats = p.stats || p.raw_stats || p;
-        return stats.played === true || stats.played === 1 || stats.played === "true" || (p.points > 0);
+        return (
+            (Number(stats?.goals_scored) > 0) || (Number(stats?.assists) > 0) ||
+            (Number(stats?.yellow_cards) > 0) || (Number(stats?.red_cards) > 0) ||
+            (Number(stats?.bonus_points) > 0) || (Number(stats?.goals_conceded) > 0) ||
+            (Number(stats?.own_goals) > 0) || (Number(stats?.penalties_missed) > 0) ||
+            (Number(stats?.penalties_saved) > 0) ||
+            (stats?.clean_sheets === true || stats?.clean_sheets === 1 || stats?.clean_sheets === "true") ||
+            (stats?.played === true || stats?.played === 1 || stats?.played === "true")
+        );
     };
 
     const capPlayed = checkPlayed(captain);
-    
-    // The "Bonus Target" is the one receiving the multiplier
     const bonusTarget = capPlayed ? captain : vice;
+    const deducedMult = Math.abs(bonusPortion - (Number(bonusTarget?.points || 0) * 2)) < 0.1 ? 3 : 2;
 
-    if (!bonusTarget || bonusTarget.points === 0) {
-        return { multiplier: 2, effectiveCaptainId: bonusTarget?.id };
-    }
-
-    // 3. Deduce if it was a Triple Captain or standard Captain
-    // Sum the base (1x) points of all starting players
-    const rawTotal = team.starting.reduce((sum: number, p: any) => sum + (p.points || 0), 0);
-    
-    // The difference between the Server Total and the Raw Sum is the extra bonus portion
-    const bonusPortion = team.points - rawTotal;
-    
-    // Triple Captain (3x total): Bonus portion = 2 * base points
-    // Standard Captain (2x total): Bonus portion = 1 * base points
-    const deducedMultiplier = Math.abs(bonusPortion - (bonusTarget.points * 2)) < 0.1 ? 3 : 2;
-
-    return { multiplier: deducedMultiplier, effectiveCaptainId: bonusTarget.id };
+    return { multiplier: deducedMult, effectiveCaptainId: bonusTarget?.id };
   }, [team]);
-
   return (
     <Card className="h-full border-black border-2">
       <CardHeader>

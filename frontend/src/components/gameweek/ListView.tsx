@@ -7,18 +7,11 @@ import { ChipName } from '../../lib/api';
 interface ListViewProps {
   players: any[];
   activeChip?: ChipName | null;
+  effectiveCaptainId?: number | null; // <--- ADD THIS PROP
 }
 
-export const ListView: React.FC<ListViewProps> = ({ players, activeChip }) => {
+export const ListView: React.FC<ListViewProps> = ({ players, activeChip, effectiveCaptainId}) => {
   // --- CORRECTED LOGIC: Calculate the Effective Captain ---
-  const effectiveCaptainId = useMemo(() => {
-    const captain = players.find(p => p.is_captain || p.isCaptain);
-    const viceCaptain = players.find(p => p.is_vice_captain || p.isVice);
-
-    // If there is a captain, they get the multiplier. 
-    // Fallback to Vice Captain only if the main captain is completely missing.
-    return captain ? captain.id : viceCaptain?.id;
-  }, [players]);
 
   const starters = players.filter(p => !p.is_benched);
   const bench = players.filter(p => p.is_benched);

@@ -85,29 +85,33 @@ const Gameweek: React.FC = () => {
 
   // --- UPDATED LOGIC: Determine Effective Captain ---
   // This logic now reliably checks if the Captain actually played
-  const effectiveCaptainId = useMemo(() => {
+const effectiveCaptainId = useMemo(() => {
     if (!squad) return null;
     const allPlayers = [...squad.starting, ...squad.bench];
     
-    // Find players with flags
     const captain = allPlayers.find(p => p.is_captain || (p as any).isCaptain);
     const viceCaptain = allPlayers.find(p => p.is_vice_captain || (p as any).isVice);
 
     if (!captain) return viceCaptain?.id;
 
-    // Check if Captain played using robust checks
-    // 1. Check points != 0 (Simplest indicator of activity, usually)
-    // 2. Check explicit 'played' flag in raw_stats
-    // 3. Check minutes in raw_stats
     const stats = (captain as any).raw_stats || (captain as any).stats || {};
     const points = (captain as any).points || 0;
     
-    const captainPlayed = 
-        (points !== 0) || 
-        (stats.played === true || stats.played === 1) || 
-        (stats.minutes > 0);
+    // NEW MATCHING LOGIC: Check if they have ANY stats entered
+    const hasStats = 
+        (stats.goals_scored > 0) || 
+        (stats.assists > 0) || 
+        (stats.yellow_cards > 0) || 
+        (stats.red_cards > 0) || 
+        (stats.bonus_points > 0) || 
+        (stats.goals_conceded > 0) || 
+        (stats.own_goals > 0) || 
+        (stats.penalties_missed > 0) || 
+        (stats.penalties_saved > 0) || 
+        (stats.clean_sheets === true || stats.clean_sheets === 1);
     
-    // If captain played, they keep the armband. If not, it goes to VC.
+    const captainPlayed = (points !== 0) || hasStats;
+    
     return captainPlayed ? captain.id : viceCaptain?.id;
   }, [squad]);
 
@@ -166,9 +170,10 @@ const Gameweek: React.FC = () => {
                     averagePoints={gameweekStats?.average_points}
                     highestPoints={gameweekStats?.highest_points}
                     gwRank={userRank?.toLocaleString()}
-                    freeTransfers={user?.free_transfers}
+                    transfersCount={hubStats?.gameweek_transfers ?? 0}
                     onNavigate={handleNavigation}
                     currentGameweekNumber={currentGameweek}
+                    activeChip={chipStatus?.active} 
                 />
             </div>
 
@@ -185,6 +190,7 @@ const Gameweek: React.FC = () => {
                 <ListView 
                   players={allPlayers} 
                   activeChip={chipStatus?.active}
+                  effectiveCaptainId={effectiveCaptainId}
                 />
             )}
         </div>

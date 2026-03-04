@@ -127,19 +127,57 @@ const TeamOfTheWeek: React.FC = () => {
   }, [gw, toast]);
 
   // --- FIXED: Safer Captain Fallback Logic ---
+ // --- FIXED: Safer Captain Fallback Logic ---
+  // --- FIXED: Mathematical Deduction for Effective Captain ---
   const effectiveCaptainId = useMemo(() => {
     if (!teamData) return null;
+    // Note: We only sum starting players for the raw total comparison
+    const rawTotal = teamData.starting.reduce((sum, p) => sum + Number(p.points || 0), 0);
+    const bonusPortion = Number(teamData.points) - rawTotal;
+
     const allPlayers = [...teamData.starting, ...teamData.bench];
     const captain = allPlayers.find(p => p.is_captain);
     const viceCaptain = allPlayers.find(p => p.is_vice_captain);
 
-    // Checks minutes first to ensure 0-point playing captains don't lose the armband
-    const captainPlayed = 
-        (captain?.raw_stats?.minutes > 0) || 
-        (captain?.raw_stats?.played === true) || 
-        (captain?.points !== 0);
+    if (!captain) return viceCaptain?.id ?? null;
+
+    // 1. If the bonus portion is 0, it implies the Multiplier was applied to a player with 0 points.
+    // Since the Captain has priority, if the backend calculated 0 bonus, the Captain kept the armband.
+    if (bonusPortion === 0) {
+        return captain.id;
+    }
+
+    const capPoints = Number(captain.points || 0);
+    const vicePoints = Number(viceCaptain?.points || 0);
+
+    // 2. Did the Captain provide the bonus? (Matches Standard 2x or Triple 3x)
+    if (bonusPortion === capPoints || bonusPortion === capPoints * 2) {
+        return captain.id;
+    }
+
+    // 3. Did the Vice Captain provide the bonus?
+    if (viceCaptain && (bonusPortion === vicePoints || bonusPortion === vicePoints * 2)) {
+        return viceCaptain.id;
+    }
+
+    // 4. Fallback: Stat-based check (Only runs if math above is ambiguous)
+    const stats = captain.raw_stats || {};
+    const hasStats = 
+        (Number(stats.goals_scored) > 0) || 
+        (Number(stats.assists) > 0) || 
+        (Number(stats.yellow_cards) > 0) || 
+        (Number(stats.red_cards) > 0) || 
+        (Number(stats.bonus_points) > 0) || 
+        (Number(stats.goals_conceded) > 0) || 
+        (Number(stats.own_goals) > 0) || 
+        (Number(stats.penalties_missed) > 0) || 
+        (Number(stats.penalties_saved) > 0) || 
+        (stats.clean_sheets === true || stats.clean_sheets === 1 || stats.clean_sheets === "true") ||
+        (stats.played === true || stats.played === 1 || stats.played === "true");
+
+    const captainPlayed = (capPoints !== 0) || hasStats;
     
-    return (captainPlayed ? captain?.id : viceCaptain?.id) ?? null;
+    return (captainPlayed ? captain.id : viceCaptain?.id) ?? null;
   }, [teamData]);
 
   const derivedActiveChip = useMemo<ChipName | null>(() => {
@@ -223,6 +261,7 @@ const TeamOfTheWeek: React.FC = () => {
               <ListView 
                 players={allPlayers} 
                 activeChip={derivedActiveChip}
+                effectiveCaptainId={effectiveCaptainId}
               />
             )}
           </div>
