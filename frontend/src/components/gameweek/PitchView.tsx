@@ -35,7 +35,7 @@ export const PitchView: React.FC<PitchViewProps> = ({
       <main 
         className="flex-1 relative flex flex-col justify-around py-4"
         style={{ 
-          backgroundImage: `url(${pitchBackground})`,
+          backgroundImage: `url('/pitch.png')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center top'
         }}

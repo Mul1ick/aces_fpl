@@ -32,7 +32,8 @@ NAME_MAP = {
     "Satans": "Satans",
     "MRFC": "Majithia Reality FC",
     "Matero": "Matero Power 8s",
-    "Casuals Fc": "Casuals FC",
+    "Casuals FC": "Casuals FC",
+    "Casuals Fc": "Casuals FC", # Fallback for lowercase 'c'
     "Wolfpack": "Wolfpack FC",
     "Umang": "Umang",
     "Cathect": "Cathect",
@@ -42,18 +43,18 @@ NAME_MAP = {
     "Roarers": "Roarers"
 }
 
-# --- PAIRINGS ---
+# Tuple Structure: (Home, Away, Kickoff_Hour_in_24H_format)
 FIXTURE_PAIRINGS = {
-    1: [("Trana", "Satans"), ("MRFC", "Matero"), ("Casuals Fc", "Wolfpack"), ("Umang", "Cathect"), ("Aer Titans", "Youngblood"), ("Encore", "Roarers")],
-    2: [("Trana", "Matero"), ("Satans", "Wolfpack"), ("MRFC", "Casuals Fc"), ("Umang", "Youngblood"), ("Cathect", "Roarers"), ("Aer Titans", "Encore")],
-    3: [("Trana", "Wolfpack"), ("Matero", "Casuals Fc"), ("Satans", "MRFC"), ("Umang", "Roarers"), ("Youngblood", "Encore"), ("Cathect", "Aer Titans")],
-    4: [("Trana", "Casuals Fc"), ("Wolfpack", "MRFC"), ("Matero", "Satans"), ("Umang", "Encore"), ("Roarers", "Aer Titans"), ("Youngblood", "Cathect")],
-    5: [("Trana", "MRFC"), ("Casuals Fc", "Satans"), ("Wolfpack", "Matero"), ("Umang", "Aer Titans"), ("Encore", "Cathect"), ("Roarers", "Youngblood")],
-    6: [("Satans", "Trana"), ("Matero", "MRFC"), ("Wolfpack", "Casuals Fc"), ("Cathect", "Umang"), ("Youngblood", "Aer Titans"), ("Roarers", "Encore")],
-    7: [("Matero", "Trana"), ("Wolfpack", "Satans"), ("Casuals Fc", "MRFC"), ("Youngblood", "Umang"), ("Roarers", "Cathect"), ("Encore", "Aer Titans")],
-    8: [("Wolfpack", "Trana"), ("Casuals Fc", "Matero"), ("MRFC", "Satans"), ("Roarers", "Umang"), ("Encore", "Youngblood"), ("Aer Titans", "Cathect")],
-    9: [("Casuals Fc", "Trana"), ("MRFC", "Wolfpack"), ("Satans", "Matero"), ("Encore", "Umang"), ("Aer Titans", "Roarers"), ("Cathect", "Youngblood")],
-    10: [("MRFC", "Trana"), ("Satans", "Casuals Fc"), ("Matero", "Wolfpack"), ("Aer Titans", "Umang"), ("Cathect", "Encore"), ("Youngblood", "Roarers")],
+    1: [("Trana", "Satans", 16), ("MRFC", "Matero", 17), ("Casuals FC", "Wolfpack", 18), ("Umang", "Cathect", 19), ("Aer Titans", "Youngblood", 20), ("Encore", "Roarers", 21)],
+    2: [("Trana", "Matero", 16), ("Satans", "Wolfpack", 17), ("MRFC", "Casuals FC", 18), ("Umang", "Youngblood", 19), ("Cathect", "Roarers", 20), ("Aer Titans", "Encore", 21)],
+    3: [("Trana", "Wolfpack", 16), ("Matero", "Casuals FC", 17), ("Satans", "MRFC", 18), ("Umang", "Roarers", 19), ("Youngblood", "Encore", 20), ("Cathect", "Aer Titans", 21)],
+    4: [("Trana", "Casuals FC", 16), ("Wolfpack", "MRFC", 17), ("Matero", "Satans", 18), ("Umang", "Encore", 19), ("Roarers", "Aer Titans", 20), ("Youngblood", "Cathect", 21)],
+    5: [("Trana", "MRFC", 16), ("Casuals FC", "Satans", 17), ("Wolfpack", "Matero", 18), ("Umang", "Aer Titans", 19), ("Encore", "Cathect", 20), ("Roarers", "Youngblood", 21)],
+    6: [("Satans", "Trana", 16), ("Matero", "MRFC", 17), ("Wolfpack", "Casuals FC", 18), ("Cathect", "Umang", 19), ("Youngblood", "Aer Titans", 20), ("Roarers", "Encore", 21)],
+    7: [("Matero", "Trana", 16), ("Wolfpack", "Satans", 17), ("Casuals FC", "MRFC", 18), ("Youngblood", "Umang", 19), ("Roarers", "Cathect", 20), ("Encore", "Aer Titans", 21)],
+    8: [("Wolfpack", "Trana", 16), ("Casuals FC", "Matero", 17), ("MRFC", "Satans", 18), ("Roarers", "Umang", 19), ("Encore", "Youngblood", 20), ("Aer Titans", "Cathect", 21)],
+    9: [("Casuals FC", "Trana", 16), ("MRFC", "Wolfpack", 17), ("Satans", "Matero", 18), ("Encore", "Umang", 19), ("Aer Titans", "Roarers", 20), ("Cathect", "Youngblood", 21)],
+    10: [("MRFC", "Trana", 16), ("Satans", "Casuals FC", 17), ("Matero", "Wolfpack", 18), ("Aer Titans", "Umang", 19), ("Cathect", "Encore", 20), ("Youngblood", "Roarers", 21)],
 }
 
 def get_player_data():
@@ -161,7 +162,6 @@ def get_player_data():
 
 async def clear_data(db: Prisma):
     print("🧹 Wiping all existing data for a fresh start...")
-    # The order is important to respect foreign key constraints
     await db.userchip.delete_many()
     await db.transfer_log.delete_many()
     await db.usergameweekscore.delete_many()
@@ -205,7 +205,6 @@ async def main() -> None:
         for short_name, players in get_player_data().items():
             team_id = team_map_short.get(short_name)
             if team_id:
-                # Add players
                 await db.player.create_many(data=[{"team_id": team_id, **p} for p in players], skip_duplicates=True)
             else:
                 print(f"⚠️ Warning: Could not find team ID for {short_name}")
@@ -213,33 +212,48 @@ async def main() -> None:
         print("✅ Teams and players seeded.")
 
         
-        # 4. GENERATE SCHEDULE
-        print("⏰ Generating schedule: GW1 @ 5th Mar 2026, 12:00 PM IST. Interval: 30 mins.")
+        # 4. GENERATE SPECIFIC SCHEDULE
+        print("⏰ Generating specific match schedule...")
         
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         
-        # Start Time: 1st March 2026, 14:00 (2:00 PM) IST
-        start_time = datetime(2026, 3, 5, 12, 0, 0, tzinfo=ist_tz)
-        interval = timedelta(minutes=30)
+        # --- DEFINED MATCH DATES (Year 2026 based on your provided list) ---
+        GW_DATES = {
+            1: datetime(2026, 3, 15, tzinfo=ist_tz), # Sunday
+            2: datetime(2026, 3, 22, tzinfo=ist_tz), # Sunday
+            3: datetime(2026, 3, 28, tzinfo=ist_tz), # Saturday
+            4: datetime(2026, 4, 12, tzinfo=ist_tz), # Sunday
+            5: datetime(2026, 4, 19, tzinfo=ist_tz), # Sunday
+            6: datetime(2026, 4, 26, tzinfo=ist_tz), # Sunday
+            7: datetime(2026, 5, 3, tzinfo=ist_tz),  # Sunday
+            8: datetime(2026, 5, 10, tzinfo=ist_tz), # Sunday
+            9: datetime(2026, 5, 17, tzinfo=ist_tz), # Sunday
+            10: datetime(2026, 5, 24, tzinfo=ist_tz), # Sunday
+        }
         
         gameweek_data = []
         fixture_data = []
 
         for gw_num in range(1, 11):
-            # Calculate Deadline
-            deadline = start_time + ((gw_num - 1) * interval)
+            base_date = GW_DATES.get(gw_num)
             
+            if not base_date:
+                continue
+
+            # Transfer deadline is exactly 2 hours before the first kickoff (which is always 16:00 / 4 PM)
+            # Therefore, deadline is always 14:00 (2:00 PM) on the match day.
+            deadline = base_date.replace(hour=14, minute=0, second=0)
+
             gameweek_data.append({
                 "gw_number": gw_num, 
                 "deadline": deadline, 
                 "status": "UPCOMING"
             })
-            print(f"  - Gameweek {gw_num} Deadline: {deadline.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            print(f"  - Gameweek {gw_num} Deadline: {deadline.strftime('%a %d %b %Y, %I:%M %p %Z')}")
 
-            # Get Pairings for this GW
             pairings = FIXTURE_PAIRINGS.get(gw_num, [])
             
-            for i, (home_raw, away_raw) in enumerate(pairings):
+            for home_raw, away_raw, start_hour in pairings:
                 home_real_name = NAME_MAP.get(home_raw)
                 away_real_name = NAME_MAP.get(away_raw)
 
@@ -250,9 +264,8 @@ async def main() -> None:
                 home_id = team_map_name.get(home_real_name)
                 away_id = team_map_name.get(away_real_name)
                 
-                # Kickoff Staggering: 2, 4, 6, 8, 10, 12 minutes after deadline
-                # This fits comfortably within the 45-minute gameweek window
-                kickoff_time = deadline + timedelta(minutes=2 + (i * 2))
+                # Kickoff applies the specific hour provided in the list (e.g. 16 = 4:00 PM)
+                kickoff_time = base_date.replace(hour=start_hour, minute=0, second=0)
 
                 if home_id and away_id:
                     fixture_data.append({
@@ -266,18 +279,15 @@ async def main() -> None:
         await db.gameweek.create_many(data=gameweek_data, skip_duplicates=True)
         print("✅ All gameweeks created.")
 
-        # Map gameweek numbers to their new database IDs
         all_gws = await db.gameweek.find_many()
         gameweek_map = {gw.gw_number: gw.id for gw in all_gws}
         
-        # Add the correct gameweek_id to each fixture
         for fixture in fixture_data:
             fixture["gameweek_id"] = gameweek_map[fixture["gw_number"]]
-            del fixture["gw_number"] # Remove the temporary key
+            del fixture["gw_number"]
 
-        # Create fixtures in DB
         await db.fixture.create_many(data=fixture_data, skip_duplicates=True)
-        print("✅ All fixtures created with 45-min interval Schedule.")
+        print("✅ All fixtures created with Specific Dates and Kickoff Times.")
 
     except Exception as e:
         print(f"❌ An error occurred during seeding: {e}")

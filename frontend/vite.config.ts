@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 3000,
   },
+  build: {
+    assetsInlineLimit: 40960, // 40kb - Inlines all jerseys and logos automatically!
+  },
   plugins: [
     react(),
     mode === 'development' &&

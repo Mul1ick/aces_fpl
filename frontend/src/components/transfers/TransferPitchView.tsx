@@ -40,9 +40,9 @@ export const TransferPitchView = ({ squad, onSlotClick, onPlayerRemove, onStartT
             <main
                 className="relative flex flex-col justify-around py-4"
                 style={{
-                 backgroundImage: `url(${pitchBackground})`,
-                backgroundSize: 'cover',
-                 backgroundPosition: 'center top',
+                    backgroundImage: `url('/pitch.png')`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center top',
                 }}
             >
                 {Object.keys(squad).map((pos) => (

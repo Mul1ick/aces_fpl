@@ -34,7 +34,7 @@ const TeamPageSkeleton = () => (
             </div>
              <main 
                 className="flex-1 relative flex flex-col justify-around py-4"
-                style={{ backgroundImage: `url(${pitchBackground})`, backgroundSize: 'cover', backgroundPosition: 'center top' }}
+                style={{ backgroundImage: `url(${pitchBackground})` , backgroundSize: 'cover', backgroundPosition: 'center top' }}
             >
                 <div className="flex justify-center"><Skeleton className="h-28 w-20 rounded-md" /></div>
                 <div className="flex justify-center gap-8"><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /><Skeleton className="h-28 w-20 rounded-md" /></div>

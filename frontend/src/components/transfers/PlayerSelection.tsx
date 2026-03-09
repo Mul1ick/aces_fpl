@@ -387,7 +387,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                         <X className="w-5 h-5" />
                      </Button>
                 </div>
-                <p className="text-sm text-gray-500">Select a maximum of 3 players from a single team.</p>
+                <p className="text-sm text-gray-500">Select a maximum of 2 players from a single team.</p>
                 <div className="pt-4">
                      <Label className="text-sm font-bold">Find a player</Label>
                     <div className="relative mt-1">
