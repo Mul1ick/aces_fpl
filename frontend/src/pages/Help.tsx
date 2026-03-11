@@ -5,20 +5,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // --- UPDATED: New data structure with scoring table ---
 const scoringData = [
-    { action: "For entering field of play", points: 1 },
     { action: "Goal scored by a goalkeeper", points: 10 },
     { action: "Goal scored by a defender", points: 6 },
     { action: "Goal scored by a midfielder", points: 5 },
     { action: "Goal scored by a forward", points: 4 },
     { action: "For each assist for a goal", points: 3 },
-    { action: "Clean sheet by a GK or defender (min 25 mins)", points: 4 },
-    { action: "Clean sheet by a midfielder (min 25 mins)", points: 1 },
+    { action: "Clean sheet by a GK or defender", points: 4 },
+    { action: "Clean sheet by a midfielder", points: 1 },
     { action: "Bonus points for best players", points: "1 to 3" },
+    { action: "For each penalty save by a GK", points: 5 },
     { action: "For every 2 goals conceded by a GK or defender", points: -1 },
     { action: "For each penalty miss", points: -2 },
     { action: "For each yellow card", points: -1 },
     { action: "For each red card", points: -3 },
     { action: "For each own goal", points: -2 },
+    
 ];
 
 const helpSections = [
@@ -27,7 +28,7 @@ const helpSections = [
         questions: [
             {
                 question: "How many transfers do I get?",
-                answer: "Before the first gameweek, you have unlimited free transfers. After the season begins, you get 1 free transfer per gameweek. If you don’t use your free transfer, it will be carried over, but you can only have a maximum of 2 free transfers at any time. Any additional transfers beyond your available free ones will cost -4 points each."
+                answer: "Before the first gameweek, you have unlimited free transfers. After the season begins, you get 2 free transfer per gameweek. If you don’t use your free transfer, it will not be carried over to next gameweek. Any additional transfers beyond your available free ones will cost -4 points each."
             }
         ]
     },
@@ -45,14 +46,41 @@ const helpSections = [
         ]
     },
     {
-        title: "Chips",
-        questions: [
-            {
-                question: "What chips are available and how do they work?",
-                answer: "You have two chips, each can be used once per season: Wildcard (unlimited free transfers for one gameweek) and Triple Captain (triples your captain's points). Only one chip can be active in a single gameweek."
-            }
-        ]
-    },
+    title: "Chips",
+    questions: [
+        {
+            question: "What chips are available and how do they work?",
+            answer: (
+                <div className="space-y-4 text-pl-white/80">
+                    
+                    <ul className="list-disc pl-5 space-y-2">
+                        <li>
+                            <span className="font-semibold text-pl-white">Wildcard:</span> Lets you make unlimited transfers in a gameweek with no points deduction and your new team stays for future weeks.
+                        </li>
+                        <li>
+                            <span className="font-semibold text-pl-white">Bench Boost:</span> All points scored by your bench players are added to your total for that gameweek.
+                        </li>
+                        <li>
+                            <span className="font-semibold text-pl-white">Free Hit:</span> Allows unlimited transfers for one gameweek only, after which your team automatically reverts back to the earlier version.
+                        </li>
+                        <li>
+                            <span className="font-semibold text-pl-white">Triple Captain:</span> Your captain earns triple points instead of double for that gameweek.
+                        </li>
+                    </ul>
+
+                    <div className="rounded-lg border border-pl-border bg-pl-white/5 p-4 text-sm">
+                        <p className="font-semibold text-pl-white mb-1">Important Rules</p>
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li>Each chip can only be used <span className="font-semibold">once per season</span>.</li>
+                            <li>Once a chip is activated, it <span className="font-semibold">cannot be cancelled</span>.</li>
+                        </ul>
+                    </div>
+
+                </div>
+            )
+        }
+    ]
+},
     {
         title: "Scoring & Updates",
         questions: [
