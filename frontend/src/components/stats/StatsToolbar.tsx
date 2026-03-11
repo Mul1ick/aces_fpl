@@ -21,7 +21,7 @@ const Teams = [
     { name: 'Matero Power 8s', shortName: 'MAT' },
     { name: 'Wolfpack FC', shortName: 'WOLF' },
     { name: 'Youngblood FC', shortName: 'YBFC' },
-    { name: 'Majithia Reality FC', shortName: 'MRFC' },
+    { name: 'Majithia Realty FC', shortName: 'MRFC' },
 ];
 
 interface FilterSelection {

@@ -36,11 +36,35 @@ async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: 
         if len(player_ids) != 11:
             raise HTTPException(status_code=400, detail="A full squad of 11 players is required.")
 
-        # 3. FIX: Pass the LIST of IDs, not the dictionary
         player_objects = await db.player.find_many(where={'id': {'in': player_ids}})
 
         if len(player_objects) != 11:
              raise HTTPException(status_code=400, detail="Invalid player IDs provided.")
+
+        # ========================================================
+        # STRICT 8+3 VALIDATION LOGIC (2 GK, 3 DEF, 3 MID, 3 FWD)
+        # ========================================================
+        position_counts = {"GK": 0, "DEF": 0, "MID": 0, "FWD": 0}
+        
+        for p in player_objects:
+            pos = str(p.position).upper()
+            if pos in position_counts:
+                position_counts[pos] += 1
+            else:
+                raise HTTPException(status_code=400, detail=f"Unknown player position detected: {pos}")
+
+        if position_counts["GK"] != 2:
+            raise HTTPException(status_code=400, detail=f"Invalid squad: You must have exactly 2 Goalkeepers. You selected {position_counts['GK']}.")
+        
+        if position_counts["DEF"] != 3:
+            raise HTTPException(status_code=400, detail=f"Invalid squad: You must have exactly 3 Defenders. You selected {position_counts['DEF']}.")
+        
+        if position_counts["MID"] != 3:
+            raise HTTPException(status_code=400, detail=f"Invalid squad: You must have exactly 3 Midfielders. You selected {position_counts['MID']}.")
+        
+        if position_counts["FWD"] != 3:
+            raise HTTPException(status_code=400, detail=f"Invalid squad: You must have exactly 3 Forwards. You selected {position_counts['FWD']}.")
+        # ========================================================
 
         team_to_create = []
         for p_obj in player_objects:
@@ -52,8 +76,6 @@ async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: 
                 'player_id': p_obj.id,
                 'is_captain': p_input.get('is_captain', False),
                 'is_vice_captain': p_input.get('is_vice_captain', False),
-                
-                # ✅ TRUST THE INPUT (which comes from auto_correct)
                 'is_benched': p_input.get('is_benched', False) 
             })
         
