@@ -145,6 +145,7 @@ class GetTeamResponse(BaseModel):
 
 class LeaderboardEntry(BaseModel):
     rank: int
+    previous_rank: Optional[int] = None
     team_name: str
     total_points: int
     manager_email: str

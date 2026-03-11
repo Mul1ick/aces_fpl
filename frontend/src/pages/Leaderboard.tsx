@@ -1,24 +1,23 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { Search, Trophy, ChevronLeft, ChevronRight, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Search, Trophy, ChevronLeft, ChevronRight, ArrowUpCircle, ArrowDownCircle, Minus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/fpl-button";
 import { Card, CardContent } from "@/components/ui/fpl-card";
 import { Input } from "@/components/ui/input";
-import acesLogo from "@/assets/aces-logo.png";
+import acesLogo from "@/assets/aces-logo-black.png";
 import { useNavigate } from "react-router-dom";
 import { API } from "@/lib/api";
 
-
-
 interface LeaderboardEntry {
   rank: number;
+  previous_rank?: number | null; 
   team_name: string;
   manager_email: string;
   total_points: number;
   gwPoints?: number;
-  user_id: string;            // ← needed to open TeamView
+  user_id: string;            
 }
 
 interface GameweekInfo {
@@ -26,34 +25,52 @@ interface GameweekInfo {
   deadline_time: string;
 }
 
+// --- RANK INDICATOR COMPONENT ---
+const RankIndicator = ({ currentRank, previousRank }: { currentRank: number, previousRank?: number | null }) => {
+  if (previousRank === null || previousRank === undefined) {
+    return <Minus className="size-4 text-pl-white/40 shrink-0" />;
+  }
+  if (currentRank < previousRank) {
+    return <ArrowUpCircle className="size-4 text-green-500 shrink-0" />;
+  }
+  if (currentRank > previousRank) {
+    return <ArrowDownCircle className="size-4 text-red-500 shrink-0" />;
+  }
+  return <Minus className="size-4 text-pl-white/40 shrink-0" />;
+};
 
 // --- MOBILE CARD COMPONENT ---
-const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean }> = ({ entry, isCurrentUser }) => (
+const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean; isSeasonStarted: boolean }> = ({ entry, isCurrentUser, isSeasonStarted }) => (
   <motion.div
     variants={{
       hidden: { opacity: 0, y: 20 },
       visible: { opacity: 1, y: 0 },
     }}
-    className={`p-4 border-b border-pl-border last:border-b-0 ${isCurrentUser ? "bg-pl-green/10" : ""}`}
+    className={`p-3 sm:p-4 border-b border-pl-border last:border-b-0 ${isCurrentUser ? "bg-pl-green/10" : ""}`}
   >
-    <div className="flex justify-between items-start">
-      <div className="flex items-center space-x-4">
-        <span className={`text-xl font-bold w-8 text-center ${isCurrentUser ? "text-pl-green" : "text-pl-white/80"}`}>
-          {entry.rank}
-        </span>
-        <div>
-          <p className="font-bold text-pl-white">{entry.team_name}</p>
-          <p className="text-caption text-pl-white/60">{entry.manager_email}</p>
+    <div className="flex justify-between items-center w-full gap-2 sm:gap-4">
+      <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
+        <div className={`flex items-center justify-center gap-1 sm:gap-1.5 w-10 sm:w-14 text-center shrink-0 ${isCurrentUser ? "text-pl-green" : "text-pl-white/80"}`}>
+          {isSeasonStarted ? (
+            <>
+              <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} />
+              <span className="text-base sm:text-xl font-bold tabular-nums">{entry.rank}</span>
+            </>
+          ) : (
+            <span className="text-base sm:text-xl font-bold tabular-nums">-</span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-sm sm:text-base text-pl-white truncate">{entry.team_name}</p>
+          <p className="text-[10px] sm:text-xs text-pl-white/60 truncate">{entry.manager_email}</p>
         </div>
       </div>
-      <div className="text-right">
-        <p className="text-xl font-bold text-pl-white">{entry.total_points}</p>
-        {/* <p className="text-caption text-pl-white/60">{entry.gwPoints} (GW)</p> */}
+      <div className="text-right shrink-0 pl-1 sm:pl-2">
+        <p className="text-base sm:text-xl font-bold text-pl-white tabular-nums">{entry.total_points}</p>
       </div>
     </div>
   </motion.div>
 );
-
 
 const Leaderboard: React.FC = () => {
   const { user } = useAuth();
@@ -65,13 +82,18 @@ const Leaderboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const navigate = useNavigate();
-const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null);
-
+  const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null);
 
   const deadlineHasPassed = useMemo(() => {
     if (!currentGameweek?.deadline_time) return false;
     return new Date() > new Date(currentGameweek.deadline_time);
   }, [currentGameweek]);
+
+  // Use this single source of truth for both mobile and desktop
+  const isSeasonStarted = useMemo(() => {
+    if (leaderboardData.length === 0) return false;
+    return leaderboardData.some(entry => entry.total_points > 0);
+  }, [leaderboardData]);
 
   useEffect(() => {
   const token = localStorage.getItem("access_token");
@@ -89,7 +111,6 @@ const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null
       try {
         const res = await fetch(`${API.BASE_URL}${p}`, { headers });
         if (!res.ok) {
-          // surface server detail for debugging
           console.warn(`GW fetch ${p} -> ${res.status}`, await res.text().catch(() => ""));
           continue;
         }
@@ -119,10 +140,10 @@ const [currentGameweek, setCurrentGameweek] = useState<GameweekInfo | null>(null
       const rawLb: any[] = await lbRes.json();
       const lbData: LeaderboardEntry[] = (rawLb ?? []).map((r: any) => ({
         rank: Number(r.rank ?? 0),
+        previous_rank: r.previous_rank !== null && r.previous_rank !== undefined ? Number(r.previous_rank) : null,
         team_name: String(r.team_name ?? ""),
         manager_email: String(r.manager_email ?? ""),
         total_points: Number(r.total_points ?? 0),
-        // gwPoints: Math.floor(Math.random() * 40) + 30,
         user_id: String(r.user_id ?? r.userId ?? r.id ?? r.user?.id ?? ""),
       }));
 
@@ -147,20 +168,16 @@ const handleRowClick = (entry: LeaderboardEntry) => {
   const userKey = entry.user_id || entry.manager_email;
   if (!userKey) return;
 
-  // Rule 1: It's Gameweek 1 and the deadline has NOT passed.
   if (currentGwNumber === 1 && !deadlineHasPassed) {
     toast({ title: "Team Hidden", description: "You can view other managers' teams after the first gameweek deadline." });
     return;
   }
 
-  // Rule 2 & 3: If deadline has passed, show current GW. If not, show previous GW.
   const targetGwNumber = deadlineHasPassed ? currentGwNumber : currentGwNumber - 1;
 
-  // Navigate to the team view page with the correctly determined gameweek number.
   navigate(`/team-view/${encodeURIComponent(userKey)}/${targetGwNumber}`);
 
 };
-
 
   const filteredData = useMemo(() =>
     leaderboardData.filter(
@@ -187,7 +204,7 @@ const handleRowClick = (entry: LeaderboardEntry) => {
           
           {/* Header Section */}
           <motion.div variants={containerVariants} className="mb-6 text-center">
-            <img src={acesLogo} alt="Aces FPL Logo" className="w-16 h-16 mx-auto mb-2" />
+            <img src={acesLogo} alt="Aces FPL Logo" className="w-26 h-16 mx-auto mb-2" />
             <h1 className="text-4xl md:text-5xl font-extrabold text-pl-white">
               FANTASY PREMIER LEAGUE
             </h1>
@@ -234,32 +251,35 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                       <table className="w-full text-left">
                         <thead className="border-b border-pl-border">
                           <tr>
-                            <th className="p-4 text-caption font-semibold text-pl-white/60 w-16 text-center">Rank</th>
+                            <th className="p-4 text-caption font-semibold text-pl-white/60 w-24 text-center">Rank</th>
                             <th className="p-4 text-caption font-semibold text-pl-white/60">Team & Manager</th>
-                            {/* <th className="p-4 text-caption font-semibold text-pl-white/60 text-center">GW</th> */}
                             <th className="p-4 text-caption font-semibold text-pl-white/60 text-center">Total</th>
                           </tr>
                         </thead>
                         <motion.tbody initial="hidden" animate="visible" variants={containerVariants}>
-                          {paginatedData.map((entry, index) => (
+                          {paginatedData.map((entry) => (
                             <motion.tr
-  key={entry.user_id || `${entry.manager_email}-${entry.rank}`}
-  variants={containerVariants}
-  className={`border-b border-pl-border last:border-b-0 transition-colors cursor-pointer ${entry.manager_email === user?.email ? "bg-pl-green/10 hover:bg-pl-green/20" : "hover:bg-pl-white/5"}`}
-  onClick={() => handleRowClick(entry)}
->
+                              key={entry.user_id || `${entry.manager_email}-${entry.rank}`}
+                              variants={containerVariants}
+                              className={`border-b border-pl-border last:border-b-0 transition-colors cursor-pointer ${entry.manager_email === user?.email ? "bg-pl-green/10 hover:bg-pl-green/20" : "hover:bg-pl-white/5"}`}
+                              onClick={() => handleRowClick(entry)}
+                            >
                               <td className="p-4 text-center">
-                                <span className={`font-semibold tabular-nums flex items-center justify-center gap-2 ${entry.manager_email === user?.email ? "text-pl-green" : "text-pl-white"}`}>
-                                  {index % 3 === 1 && <ArrowUpCircle className="size-4 text-green-500" />}
-                                  {index % 4 === 1 && <ArrowDownCircle className="size-4 text-red-500" />}
-                                  {entry.rank}
-                                </span>
+                                {isSeasonStarted ? (
+                                  <span className={`font-semibold tabular-nums flex items-center justify-center gap-2 ${entry.manager_email === user?.email ? "text-pl-green" : "text-pl-white"}`}>
+                                    <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} />
+                                    {entry.rank}
+                                  </span>
+                                ) : (
+                                  <span className={`font-bold text-lg tabular-nums text-center ${entry.manager_email === user?.email ? "text-pl-green" : "text-pl-white/80"}`}>
+                                    -
+                                  </span>
+                                )}
                               </td>
                               <td className="p-4">
                                 <p className="font-semibold text-pl-white">{entry.team_name}</p>
                                 <p className="text-caption text-pl-white/60">{entry.manager_email}</p>
                               </td>
-                              {/* <td className="p-4 text-center text-body text-pl-white tabular-nums">{entry.gwPoints}</td> */}
                               <td className="p-4 text-center text-body font-bold text-pl-white tabular-nums">{entry.total_points}</td>
                             </motion.tr>
                           ))}
@@ -271,10 +291,10 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                     <div className="md:hidden">
                         <motion.div initial="hidden" animate="visible" variants={containerVariants}>
                            {paginatedData.map(entry => (
-  <div key={entry.user_id || `${entry.manager_email}-${entry.rank}`} onClick={() => handleRowClick(entry)}>
-    <LeaderboardCard entry={entry} isCurrentUser={entry.manager_email === user?.email} />
-  </div>
-))}
+                            <div key={entry.user_id || `${entry.manager_email}-${entry.rank}`} onClick={() => handleRowClick(entry)}>
+                              <LeaderboardCard entry={entry} isCurrentUser={entry.manager_email === user?.email} isSeasonStarted={isSeasonStarted} />
+                            </div>
+                           ))}
                         </motion.div>
                     </div>
                   </>

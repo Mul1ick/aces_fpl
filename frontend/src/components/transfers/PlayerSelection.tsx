@@ -199,7 +199,7 @@ const PlayerFilterControls = ({ filters, setFilters, resetFilters, allTeamNames 
             </FilterModal>
              <FilterModal isOpen={isPriceOpen} onClose={() => setIsPriceOpen(false)} title="Filter by Price">
                 <div className="p-4">
-                     <Slider defaultValue={[1.0, 25.0]} min={1.0} max={25.0} step={0.1} value={priceRange} onValueChange={setPriceRange} />
+                     <Slider defaultValue={[1.0, 40.0]} min={1.0} max={40.0} step={0.1} value={priceRange} onValueChange={setPriceRange} />
                     <div className="flex justify-between mt-2 text-sm font-bold">
                         <span>£{priceRange[0].toFixed(1)}m</span>
                         <span>£{priceRange[1].toFixed(1)}m</span>
@@ -219,7 +219,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
     const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
     const [selectedClubs, setSelectedClubs] = useState<string[]>([]);
     const [sortBy, setSortBy] = useState('points');
-    const [priceRange, setPriceRange] = useState([1.0, 25.0]);
+    const [priceRange, setPriceRange] = useState([1.0, 40.0]);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 
@@ -327,7 +327,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
         setSelectedPositions(positionFilter ? [positionFilter] : []);
         setSelectedClubs([]);
         setSortBy('points');
-        setPriceRange([1.0, 25.0]);
+        setPriceRange([1.0, 40.0]);
     };
 
     const isFiltered = useMemo(() => {
@@ -336,7 +336,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
             selectedPositions.length > 0 ||
             selectedClubs.length > 0 ||
             priceRange[0] !== 1.0 ||
-            priceRange[1] !== 25.0
+            priceRange[1] !== 40.0
         );
     }, [searchQuery, selectedPositions, selectedClubs, priceRange]);
     

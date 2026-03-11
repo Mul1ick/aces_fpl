@@ -1,9 +1,9 @@
+// FILE: frontend/src/components/fixtures/FixtureRow.tsx
 import React from 'react';
 
-// Define the structure of the props the component expects.
-// This should match the structure in Fixtures.tsx
 interface Team {
   name: string;
+  shortName: string;
   logo: string;
 }
 
@@ -11,8 +11,8 @@ interface Match {
   homeTeam: Team;
   awayTeam: Team;
   time?: string;
-  homeScore?: number;
-  awayScore?: number;
+  homeScore?: number | null;
+  awayScore?: number | null;
 }
 
 interface FixtureRowProps {
@@ -26,32 +26,49 @@ export const FixtureRow: React.FC<FixtureRowProps> = ({ match }) => {
   const hasScore = typeof homeScore === 'number' && typeof awayScore === 'number';
 
   return (
-    // Use a 5-column grid for precise alignment.
-    // [Home Name] [Home Logo] [Time/Score] [Away Logo] [Away Name]
-    <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-x-3 py-3">
-      {/* Home Team Name */}
-      <span className="font-semibold text-text text-right hidden sm:block truncate">{homeTeam.name}</span>
+    <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors px-1 sm:px-4 rounded-lg">
       
-      {/* Home Team Logo */}
-      <img src={homeTeam.logo} alt={`${homeTeam.name} logo`} className="w-12 h-12 object-contain justify-self-end" />
+      {/* Home Team */}
+      <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3 min-w-0">
+        <span className="font-bold text-text text-xs sm:text-base text-right truncate">
+          {/* Show short name on mobile, full name on larger screens */}
+          <span className="sm:hidden">{homeTeam.shortName}</span>
+          <span className="hidden sm:inline">{homeTeam.name}</span>
+        </span>
+        <img 
+          src={homeTeam.logo} 
+          alt={`${homeTeam.name} logo`} 
+          className="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0" 
+        />
+      </div>
 
       {/* Time or Score in the middle */}
-      <div className="text-center">
+      <div className="w-16 sm:w-24 text-center shrink-0 mx-1 sm:mx-2">
         {hasScore ? (
-          <span className="text-sm font-bold bg-gray-200 text-text px-2 py-1 rounded-md tabular-nums">
+          <span className="text-xs sm:text-sm font-bold bg-black text-white px-2 py-1 rounded tabular-nums">
             {homeScore} - {awayScore}
           </span>
         ) : (
-          <span className="text-sm font-semibold text-text-muted tabular-nums">{time}</span>
+          <span className="text-xs sm:text-sm font-semibold text-gray-600 bg-gray-100 px-2 py-1 rounded tabular-nums">
+            {time}
+          </span>
         )}
       </div>
 
-      {/* Away Team Logo */}
-      <img src={awayTeam.logo} alt={`${awayTeam.name} logo`} className="w-12 h-12 object-contain justify-self-start" />
-      
-      {/* Away Team Name */}
-      <span className="font-semibold text-text text-left hidden sm:block truncate">{awayTeam.name}</span>
+      {/* Away Team */}
+      <div className="flex flex-1 items-center justify-start gap-2 sm:gap-3 min-w-0">
+        <img 
+          src={awayTeam.logo} 
+          alt={`${awayTeam.name} logo`} 
+          className="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0" 
+        />
+        <span className="font-bold text-text text-xs sm:text-base text-left truncate">
+          {/* Show short name on mobile, full name on larger screens */}
+          <span className="sm:hidden">{awayTeam.shortName}</span>
+          <span className="hidden sm:inline">{awayTeam.name}</span>
+        </span>
+      </div>
+
     </div>
   );
 };
-

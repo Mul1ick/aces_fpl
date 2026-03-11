@@ -4,6 +4,7 @@ import { FixtureList } from '@/components/fixtures/FixtureList';
 import { GameweekNavigator } from '@/components/fixtures/GameweekNavigator';
 import { API } from '@/lib/api';
 import { getTeamLogo } from '@/lib/player-utils';
+import { format, isValid } from 'date-fns';
 
 // --- Types used by this page ---
 interface TeamUI {
@@ -181,23 +182,29 @@ const Fixtures: React.FC = () => {
     return <div className="p-6">No fixtures found.</div>;
   }
 
+ // ADD THIS BLOCK: Format the deadline date nicely for mobile
+  const deadlineDate = currentData.deadline ? new Date(currentData.deadline) : null;
+  const deadlineText = deadlineDate && isValid(deadlineDate)
+    ? format(deadlineDate, "E dd MMM, HH:mm")
+    : 'TBC';
+
   return (
     <div className="bg-white min-h-screen">
       <div className="container mx-auto px-4 sm:px-6 py-8 max-w-4xl">
-        <h1 className="text-3xl font-bold text-text mb-4">Fixtures & Results</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-text mb-4">Fixtures & Results</h1>
 
-        <Card className="border-border shadow-card">
-          <CardHeader className="p-0 border-b border-border">
+        <Card className="border-border shadow-card overflow-hidden">
+          <CardHeader className="p-0 border-b border-border bg-gray-50/50">
             <GameweekNavigator
               gameweekTitle={currentData.title}
-              gameweekDeadline={currentData.deadline ? new Date(currentData.deadline).toLocaleString() : 'TBC'}
+              gameweekDeadline={deadlineText} // <--- USE THE NEW FORMATTED TEXT HERE
               onPrevious={handlePrevious}
               onNext={handleNext}
               isFirst={currentGwIndex === 0}
               isLast={currentGwIndex === gwKeys.length - 1}
             />
           </CardHeader>
-          <CardContent className="p-4 md:p-6">
+          <CardContent className="p-2 sm:p-4 md:p-6">
             <FixtureList matches={currentData.matches} />
           </CardContent>
         </Card>

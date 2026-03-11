@@ -90,11 +90,9 @@ export const GameweekChips: React.FC<{
     fetchStatus();
   }, [token]);
 
-  // --- NEW HANDLER: Intercept click to show Warning if Locked ---
   const handleChipClick = (chip: ChipItem, isUsed: boolean, isDisabled: boolean) => {
-    if (isUsed) return; // Completely dead if used
+    if (isUsed) return;
 
-    // If locked, show the error toast
     if (isLocked) {
         toast({
             variant: "destructive",
@@ -104,10 +102,8 @@ export const GameweekChips: React.FC<{
         return;
     }
 
-    // If otherwise disabled (e.g., restricted GW1 or another chip active), do nothing
     if (isDisabled) return;
 
-    // Open Slider
     setSelectedChip(chip);
   };
 
@@ -134,14 +130,12 @@ export const GameweekChips: React.FC<{
     }
   };
 
-  // --- MODIFIED: Priority Logic ---
   const getButtonText = (chipId: string, isActive: boolean, isUsed: boolean, isAnyActive: boolean, isRestricted: boolean) => {
     if (isActive) return "Active";
-    if (isUsed) return "Used"; // "Used" now takes priority over "Locked"
-    if (isRestricted) return "Unavailable for GW 1";
+    if (isUsed) return "Used";
+    if (isRestricted) return "Locked GW 1"; // Shortened for mobile fit
     if (isAnyActive && !isActive) return "Unavailable";
     
-    // If simply locked but available otherwise, show Play (so they click it and get the error)
     return "Play";
   };
 
@@ -153,10 +147,10 @@ export const GameweekChips: React.FC<{
 
   return (
     <>
-      <div className="bg-gradient-to-br from-[#37003C] to-[#23003F] rounded-xl p-4 mb-6 shadow-md text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#37003C] to-[#23003F] rounded-xl p-3 sm:p-4 mb-6 shadow-md text-white relative overflow-hidden">
         
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* CHANGED: grid-cols-4 enforces a single row on all screen sizes. Reduced gap on mobile. */}
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-4">
           {chips.map((chip) => {
             const isActive = status.active === chip.id;
             const isUsed = status.used.includes(chip.id) && !isActive;
@@ -166,15 +160,13 @@ export const GameweekChips: React.FC<{
                 (!user?.played_first_gameweek) && 
                 (chip.id === 'WILDCARD' || chip.id === 'FREE_HIT');
 
-            // --- LOGIC CHANGE: isLocked is NOT included in isDisabled anymore ---
-            // This allows the click event to fire so we can show the toast.
             const isDisabled = isUsed || (isAnyActive && !isActive) || isRestricted;
 
             return (
               <div
                 key={chip.id}
                 className={cn(
-                  "group flex flex-col items-center justify-between p-3 rounded-lg transition-all duration-300 min-h-[140px]",
+                  "group flex flex-col items-center justify-between p-1.5 sm:p-3 rounded-lg transition-all duration-300 min-h-[120px] sm:min-h-[140px]",
                   isActive ? "bg-white/10 shadow-lg scale-105" : "bg-transparent",
                   !isDisabled && !isActive ? "hover:bg-white/5 hover:-translate-y-1" : ""
                 )}
@@ -192,24 +184,24 @@ export const GameweekChips: React.FC<{
                       src={chip.icon} 
                       alt={chip.name}
                       className={cn(
-                          "w-12 h-12 object-contain mb-2 transition-transform duration-300",
+                          // CHANGED: Slightly smaller image on mobile so it fits in 4 columns
+                          "w-8 h-8 sm:w-12 sm:h-12 object-contain mb-1.5 sm:mb-2 transition-transform duration-300",
                           "brightness-0 invert",
                           !isDisabled && !isActive && !isLocked && "group-hover:scale-110"
                       )}
                     />
-                    <h4 className="text-[10px] sm:text-xs font-bold tracking-wide text-center leading-tight">
+                    <h4 className="text-[9px] sm:text-xs font-bold tracking-tight sm:tracking-wide text-center leading-tight">
                       {chip.name}
                     </h4>
                 </div>
 
                 <button
                     type="button"
-                    // Only disable HTML button if Used or Restricted. 
-                    // If Locked, keep enabled to capture click.
                     disabled={isUsed || (isAnyActive && !isActive) || isRestricted} 
                     onClick={() => handleChipClick(chip, isUsed, isDisabled)}
                     className={cn(
-                        "w-full mt-3 py-1.5 px-2 rounded text-[10px] font-bold  tracking-wider transition-all duration-300",
+                        // CHANGED: Adjusted padding, margin, and text sizes for mobile fit
+                        "w-full mt-2 sm:mt-3 py-1 sm:py-1.5 px-0.5 sm:px-2 rounded text-[8px] sm:text-[10px] font-bold tracking-tighter sm:tracking-wider transition-all duration-300 leading-tight line-clamp-1",
                         isActive 
                             ? "bg-gradient-to-r from-cyan-300 via-blue-600 to-purple-700 text-white shadow-md border-none opacity-100 cursor-default"
                             : "",
@@ -221,7 +213,6 @@ export const GameweekChips: React.FC<{
                             ? "bg-transparent text-gray-500 border border-gray-700 cursor-not-allowed"
                             : "",
                         
-                        // Play State (Includes Locked state visually)
                         !isActive && !isAnyActive && !isUsed && !isRestricted
                             ? "bg-transparent border border-white text-white hover:bg-white hover:text-[#38003c] shadow-sm"
                             : ""
