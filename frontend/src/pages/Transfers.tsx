@@ -215,39 +215,62 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
     // Transform the base player data
     const newPlayer = transformApiPlayer(playerData);
     
-    // --- THE FIX: EXPLICITLY CARRY FORWARD STATUS DATA ---
-    // This ensures that even if transformApiPlayer drops the injury data, 
-    // we force it directly into the new player object before they hit the pitch.
+    // EXPLICITLY CARRY FORWARD STATUS DATA
     newPlayer.status = playerData.status || 'ACTIVE';
     newPlayer.chance_of_playing = playerData.chance_of_playing ?? null;
     newPlayer.news = playerData.news || null;
 
-    const posKey = newPlayer.pos;
-
+    const actualPos = newPlayer.pos; // e.g. "FWD"
     let targetSlot = positionToFill;
 
+    // STEP 1: Mismatch Check
+    // If user clicked a specific slot (e.g. DEF), but picked a player of a DIFFERENT position (e.g. FWD)
+    if (targetSlot && targetSlot.position !== actualPos) {
+        // We ignore the clicked slot to prevent placing a FWD in a DEF slot
+        targetSlot = null; 
+    }
+
+    // STEP 2: Auto-Routing & Full Slot Check
+    // If targetSlot is null (either they didn't click a slot, or we nullified a mismatched slot)
     if (!targetSlot) {
-        const positionArray = squad[posKey];
+        // Look for any empty slot in the player's ACTUAL position array
+        const positionArray = squad[actualPos as keyof typeof squad];
         const emptyIndex = positionArray.findIndex(p => p === null);
 
         if (emptyIndex !== -1) {
-            targetSlot = { position: posKey, index: emptyIndex };
+            // Success: Found an empty slot in the correct position! Auto-route here.
+            targetSlot = { position: actualPos, index: emptyIndex };
         } else {
-            toast({
-                variant: "destructive",
-                title: "Position Full",
-                description: `All ${posKey} slots in your squad are already filled. Please transfer a player out first.`,
-            });
-            return;
+            // Failure: All slots for this player's position are full.
+            
+            // Show dynamic error based on how they got here
+            if (positionToFill && positionToFill.position !== actualPos) {
+                toast({
+                    variant: "destructive",
+                    title: "Invalid Position",
+                    description: `All ${actualPos} slots are full. Please select a ${positionToFill.position} for the slot you clicked.`,
+                });
+            } else {
+                toast({
+                    variant: "destructive",
+                    title: "Position Full",
+                    description: `All ${actualPos} slots in your squad are already filled. Please transfer a ${actualPos} out first.`,
+                });
+            }
+            
+            // Clear the focused slot so they can try again smoothly
+            setPositionToFill(null);
+            return; // Abort adding the player
         }
     }
     
+    // STEP 3: Assign Player to the Target Slot
     if (targetSlot) {
         setSquad((current) => {
             const newSquad = { ...current };
-            const newPositionArray = [...newSquad[targetSlot.position]];
-            newPositionArray[targetSlot.index] = newPlayer;
-            newSquad[targetSlot.position] = newPositionArray;
+            const newPositionArray = [...newSquad[targetSlot!.position as keyof typeof squad]];
+            newPositionArray[targetSlot!.index] = newPlayer;
+            newSquad[targetSlot!.position as keyof typeof squad] = newPositionArray;
             return newSquad;
         });
         setPositionToFill(null);
