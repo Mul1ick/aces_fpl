@@ -46,11 +46,15 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
       hidden: { opacity: 0, y: 20 },
       visible: { opacity: 1, y: 0 },
     }}
-    className={`p-3 sm:p-4 border-b border-pl-border last:border-b-0 ${isCurrentUser ? "bg-pl-green/10" : ""}`}
+    className={`p-3 sm:p-4 border-b last:border-b-0 ${
+      isCurrentUser 
+        ? "bg-gradient-to-r from-[#2eb1d5] via-[#3f80db] to-[#6461e1] border-transparent rounded-md my-1" 
+        : "border-gray-200"
+    }`}
   >
     <div className="flex justify-between items-center w-full gap-2 sm:gap-4">
       <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
-        <div className={`flex items-center justify-center gap-1 sm:gap-1.5 w-10 sm:w-14 text-center shrink-0 ${isCurrentUser ? "text-pl-green" : "text-pl-white/80"}`}>
+        <div className={`flex items-center justify-center gap-1 sm:gap-1.5 w-10 sm:w-14 text-center shrink-0 ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
           {isSeasonStarted ? (
             <>
               <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} />
@@ -61,12 +65,20 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-bold text-sm sm:text-base text-pl-white truncate">{entry.team_name}</p>
-          <p className="text-[10px] sm:text-xs text-pl-white/60 truncate">{entry.manager_email}</p>
+          {/* 👇 Conditional Text Colors */}
+          <p className={`font-bold text-sm sm:text-base truncate ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
+            {entry.team_name}
+          </p>
+          <p className={`text-[10px] sm:text-xs truncate ${isCurrentUser ? "text-white/90" : "text-gray-500"}`}>
+            {entry.manager_email}
+          </p>
         </div>
       </div>
       <div className="text-right shrink-0 pl-1 sm:pl-2">
-        <p className="text-base sm:text-xl font-bold text-pl-white tabular-nums">{entry.total_points}</p>
+        {/* 👇 Conditional Text Color */}
+        <p className={`text-base sm:text-xl font-bold tabular-nums ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
+          {entry.total_points}
+        </p>
       </div>
     </div>
   </motion.div>
@@ -257,32 +269,48 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                           </tr>
                         </thead>
                         <motion.tbody initial="hidden" animate="visible" variants={containerVariants}>
-                          {paginatedData.map((entry) => (
+                          {paginatedData.map((entry) => {
+                          const isCurrentUser = entry.manager_email === user?.email;
+                          
+                          return (
                             <motion.tr
                               key={entry.user_id || `${entry.manager_email}-${entry.rank}`}
                               variants={containerVariants}
-                              className={`border-b border-pl-border last:border-b-0 transition-colors cursor-pointer ${entry.manager_email === user?.email ? "bg-pl-green/10 hover:bg-pl-green/20" : "hover:bg-pl-white/5"}`}
+                              className={`border-b last:border-b-0 transition-colors cursor-pointer ${
+                                isCurrentUser 
+                                  ? "bg-gradient-to-r from-[#2eb1d5] via-[#3f80db] to-[#6461e1] border-transparent" 
+                                  : "border-gray-200 hover:bg-gray-50"
+                              }`}
                               onClick={() => handleRowClick(entry)}
                             >
                               <td className="p-4 text-center">
                                 {isSeasonStarted ? (
-                                  <span className={`font-semibold tabular-nums flex items-center justify-center gap-2 ${entry.manager_email === user?.email ? "text-pl-green" : "text-pl-white"}`}>
+                                  <span className={`font-semibold tabular-nums flex items-center justify-center gap-2 ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
                                     <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} />
                                     {entry.rank}
                                   </span>
                                 ) : (
-                                  <span className={`font-bold text-lg tabular-nums text-center ${entry.manager_email === user?.email ? "text-pl-green" : "text-pl-white/80"}`}>
+                                  <span className={`font-bold text-lg tabular-nums text-center ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
                                     -
                                   </span>
                                 )}
                               </td>
                               <td className="p-4">
-                                <p className="font-semibold text-pl-white">{entry.team_name}</p>
-                                <p className="text-caption text-pl-white/60">{entry.manager_email}</p>
+                                {/* 👇 Conditional Text Colors */}
+                                <p className={`font-semibold ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
+                                  {entry.team_name}
+                                </p>
+                                <p className={`text-caption ${isCurrentUser ? "text-white/90" : "text-gray-500"}`}>
+                                  {entry.manager_email}
+                                </p>
                               </td>
-                              <td className="p-4 text-center text-body font-bold text-pl-white tabular-nums">{entry.total_points}</td>
+                              <td className={`p-4 text-center text-body font-bold tabular-nums ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
+                                {/* 👇 Conditional Text Color */}
+                                {entry.total_points}
+                              </td>
                             </motion.tr>
-                          ))}
+                          );
+                        })}
                         </motion.tbody>
                       </table>
                     </div>
