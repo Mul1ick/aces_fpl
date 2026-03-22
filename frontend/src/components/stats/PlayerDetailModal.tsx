@@ -15,18 +15,18 @@ const StatBox = ({ label, value }: { label: string; value: string | number }) =>
 );
 
 const PastFixtureBox = ({ gw, opponentShort, opponentLong, isHome, points }: any) => (
-  <div className="flex flex-col items-center justify-between p-2 bg-white border border-gray-200 rounded-lg shadow-sm h-full w-full">
+  <div className="flex flex-col items-center justify-between p-1 lg:p-2 bg-white border border-gray-200 rounded-lg shadow-sm h-full w-full">
     <div className="flex flex-col items-center w-full">
-        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">GW{gw}</p>
-        <div className="w-8 h-8 flex items-center justify-center mb-1">
+        <p className="text-[8px] lg:text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">GW{gw}</p>
+        <div className="w-6 h-6 lg:w-8 lg:h-8 flex items-center justify-center mb-1">
           <img src={getTeamLogo(opponentShort)} alt={opponentLong} className="w-full h-full object-contain" />
         </div>
-        <p className="text-[10px] font-bold text-gray-800 truncate w-full text-center" title={opponentLong}>
+        <p className="text-[9px] lg:text-[10px] font-bold text-gray-800 truncate w-full text-center" title={opponentLong}>
           {opponentShort}
         </p>
-        <p className="text-[9px] font-bold text-gray-500">{isHome ? '(H)' : '(A)'}</p>
+        <p className="text-[8px] lg:text-[9px] font-bold text-gray-500">{isHome ? '(H)' : '(A)'}</p>
     </div>
-    <div className="mt-2 w-full bg-black text-white text-[10px] font-bold text-center py-1 rounded">
+    <div className="mt-1 lg:mt-2 w-full bg-black text-white text-[9px] lg:text-[10px] font-bold text-center py-0.5 lg:py-1 rounded">
        {points}pts
     </div>
   </div>
@@ -42,18 +42,18 @@ const getFdrColor = (fdr?: number) => {
 };
 
 const FutureFixtureBox = ({ gw, opponentShort, opponentLong, isHome, fdr }: any) => (
-  <div className="flex flex-col items-center justify-between p-2 bg-white border border-gray-200 rounded-lg shadow-sm h-full w-full">
+  <div className="flex flex-col items-center justify-between p-1 lg:p-2 bg-white border border-gray-200 rounded-lg shadow-sm h-full w-full">
     <div className="flex flex-col items-center w-full">
-        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">GW{gw}</p>
-        <div className="w-8 h-8 flex items-center justify-center mb-1">
+        <p className="text-[8px] lg:text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">GW{gw}</p>
+        <div className="w-6 h-6 lg:w-8 lg:h-8 flex items-center justify-center mb-1">
           <img src={getTeamLogo(opponentShort)} alt={opponentLong} className="w-full h-full object-contain" />
         </div>
-        <p className="text-[10px] font-bold text-gray-800 truncate w-full text-center" title={opponentLong}>
+        <p className="text-[9px] lg:text-[10px] font-bold text-gray-800 truncate w-full text-center" title={opponentLong}>
           {opponentShort}
         </p>
-        <p className="text-[9px] font-bold text-gray-500">{isHome ? '(H)' : '(A)'}</p>
+        <p className="text-[8px] lg:text-[9px] font-bold text-gray-500">{isHome ? '(H)' : '(A)'}</p>
     </div>
-    <div className={`mt-2 w-full text-[10px] font-bold text-center py-1 rounded ${getFdrColor(fdr)}`}>
+    <div className={`mt-1 lg:mt-2 w-full text-[9px] lg:text-[10px] font-bold text-center py-0.5 lg:py-1 rounded ${getFdrColor(fdr)}`}>
        {fdr || '-'}
     </div>
   </div>
@@ -94,16 +94,16 @@ const HistoryRow = ({ gw, opp, result, score, pts, ...stats }: any) => {
 const ModalSkeleton = () => (
   <div className="space-y-6">
     <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-      <div className="grid grid-cols-3 lg:grid-cols-7 gap-2">
-        {[...Array(7)].map((_, i) => <Skeleton key={i} className="h-[60px] w-full rounded-lg" />)}
+      <div className="flex lg:grid lg:grid-cols-7 gap-2 overflow-hidden">
+        {[...Array(7)].map((_, i) => <Skeleton key={i} className="h-[60px] min-w-[90px] lg:min-w-0 w-full rounded-lg shrink-0" />)}
       </div>
     </div>
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-2 gap-2 lg:gap-4">
         {[...Array(2)].map((_, i) => (
-            <div key={i} className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-4">
-            <Skeleton className="h-5 w-1/4" />
-            <div className="grid grid-cols-4 gap-2">
-                {[...Array(4)].map((_, j) => <Skeleton key={j} className="h-[110px] w-full rounded-lg" />)}
+            <div key={i} className="bg-gray-50 rounded-xl border border-gray-200 p-2 lg:p-4 space-y-4">
+            <Skeleton className="h-5 w-1/2 lg:w-1/4" />
+            <div className="grid grid-cols-3 gap-1 lg:gap-2">
+                {[...Array(3)].map((_, j) => <Skeleton key={j} className="h-[110px] w-full rounded-lg" />)}
             </div>
             </div>
         ))}
@@ -223,7 +223,7 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ player, is
                 <img 
                   src={getTeamJersey(details?.team_name || player.team)} 
                   alt="Jersey" 
-                  className="w-10 h-12 object-contain" 
+                  className="w-14 h-16 object-contain" 
                 />
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
@@ -264,25 +264,30 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ player, is
                   
                   {/* Top 7 Stats Grid */}
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                    <div className="grid grid-cols-3 lg:grid-cols-7 gap-2">
-                      <StatBox label="Price" value={`£${details.price?.toFixed(1) || '0.0'}m`} />
-                      <StatBox label="Form" value={formVal} />
-                      <StatBox label="Pts / Match" value={details.history?.length > 0 ? (details.total_points / details.history.length).toFixed(1) : '0.0'} />
-                      <StatBox label={`GW${currentGwNumber} Pts`} value={currentGwPts} />
-                      <StatBox label="Total Pts" value={details.total_points} />
-                      <StatBox label="Total Bonus" value={totalBonus} />
-                      <StatBox label="TSB %" value={selectedPct} />
+                    {/* MODIFIED: flex overflow-x-auto on mobile, grid on desktop */}
+                    <div 
+                      className="flex lg:grid lg:grid-cols-7 gap-2 overflow-x-auto pb-2 snap-x [&::-webkit-scrollbar]:hidden" 
+                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
+                      <div className="min-w-[90px] shrink-0 snap-center lg:min-w-0"><StatBox label="Price" value={`£${details.price?.toFixed(1) || '0.0'}m`} /></div>
+                      <div className="min-w-[90px] shrink-0 snap-center lg:min-w-0"><StatBox label="Form" value={formVal} /></div>
+                      <div className="min-w-[90px] shrink-0 snap-center lg:min-w-0"><StatBox label="Pts / Match" value={details.history?.length > 0 ? (details.total_points / details.history.length).toFixed(1) : '0.0'} /></div>
+                      <div className="min-w-[90px] shrink-0 snap-center lg:min-w-0"><StatBox label={`GW${currentGwNumber} Pts`} value={currentGwPts} /></div>
+                      <div className="min-w-[90px] shrink-0 snap-center lg:min-w-0"><StatBox label="Total Pts" value={details.total_points} /></div>
+                      <div className="min-w-[90px] shrink-0 snap-center lg:min-w-0"><StatBox label="Total Bonus" value={totalBonus} /></div>
+                      <div className="min-w-[90px] shrink-0 snap-center lg:min-w-0"><StatBox label="TSB %" value={selectedPct} /></div>
                     </div>
                   </div>
 
                   {/* Form & Fixtures Split */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* MODIFIED: grid-cols-2 always enforces 50/50 split, reduced gap on mobile */}
+                  <div className="grid grid-cols-2 gap-2 lg:gap-4">
                     {/* Form Section */}
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                      <h3 className="text-sm font-bold text-black mb-4">Form</h3>
-                      {/* Changed to 4 columns and removed broken h-[100px] limit */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {details.history?.slice(0, 4).reverse().map((fx: any) => 
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2 lg:p-4">
+                      <h3 className="text-xs lg:text-sm font-bold text-black mb-2 lg:mb-4">Form</h3>
+                      {/* MODIFIED: grid-cols-3 and slice(0, 3) */}
+                      <div className="grid grid-cols-3 gap-1 lg:gap-2">
+                        {details.history?.slice(0, 3).reverse().map((fx: any) => 
                           <PastFixtureBox 
                             key={`past-${fx.gw}`} 
                             gw={fx.gw} 
@@ -293,19 +298,19 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ player, is
                           />
                         )}
                         {(!details.history || details.history.length === 0) && (
-                          <div className="col-span-4 flex items-center justify-center p-4">
-                            <p className="text-sm text-gray-500 font-semibold">No recent form.</p>
+                          <div className="col-span-3 flex items-center justify-center p-2 lg:p-4">
+                            <p className="text-[10px] lg:text-sm text-gray-500 font-semibold text-center">No recent form.</p>
                           </div>
                         )}
                       </div>
                     </div>
 
                     {/* Fixtures Section */}
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                      <h3 className="text-sm font-bold text-black mb-4">Fixtures</h3>
-                      {/* Changed to 4 columns and removed broken h-[100px] limit */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {details.upcoming_fixtures?.slice(0, 4).map((fx: any) => 
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-2 lg:p-4">
+                      <h3 className="text-xs lg:text-sm font-bold text-black mb-2 lg:mb-4">Fixtures</h3>
+                      {/* MODIFIED: grid-cols-3 and slice(0, 3) */}
+                      <div className="grid grid-cols-3 gap-1 lg:gap-2">
+                        {details.upcoming_fixtures?.slice(0, 3).map((fx: any) => 
                           <FutureFixtureBox 
                             key={`future-${fx.gw}`} 
                             gw={fx.gw} 
@@ -316,8 +321,8 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ player, is
                           />
                         )}
                         {(!details.upcoming_fixtures || details.upcoming_fixtures.length === 0) && (
-                           <div className="col-span-4 flex items-center justify-center p-4">
-                            <p className="text-sm text-gray-500 font-semibold">No upcoming fixtures.</p>
+                           <div className="col-span-3 flex items-center justify-center p-2 lg:p-4">
+                            <p className="text-[10px] lg:text-sm text-gray-500 font-semibold text-center">No upcoming fixtures.</p>
                           </div>
                         )}
                       </div>
