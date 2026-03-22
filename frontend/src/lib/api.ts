@@ -43,6 +43,7 @@ teamOfTheWeekByGameweek: (gw: number) => `${API.BASE_URL}/gameweeks/team-of-the-
     },
     teamOfTheSeason: `${API_BASE_URL}/gameweeks/team-of-the-season`,
     fixtures: `${API_BASE_URL}/fixtures`,
+    fixtureDetails: (id: number) => `${API_BASE_URL}/fixtures/${id}/details`,
     transferStats: `${API_BASE_URL}/transfers/stats`,
   },
 };

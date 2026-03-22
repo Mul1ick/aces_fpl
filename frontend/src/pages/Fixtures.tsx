@@ -14,6 +14,7 @@ interface TeamUI {
 }
 
 interface MatchUI {
+  id: number;
   date: string;
   homeTeam: TeamUI;
   awayTeam: TeamUI;
@@ -123,6 +124,7 @@ const Fixtures: React.FC = () => {
               const finished = typeof f.home_score === 'number' && typeof f.away_score === 'number';
 
               return {
+                id: f.id,
                 date: dateStr,
                 homeTeam,
                 awayTeam,

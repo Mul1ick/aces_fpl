@@ -10,6 +10,7 @@ interface Team {
 }
 
 interface Match {
+  id: number,
   date: string;
   homeTeam: Team;
   awayTeam: Team;
