@@ -23,7 +23,8 @@ async def create_user(db: Prisma, user: schemas.UserCreate):
         data={
             'email': user.email, 
             'hashed_password': hashed_pw,
-            'full_name': user.email.split('@')[0]
+            'full_name': user.email.split('@')[0],
+            'is_active': True # <--- CHANGED: Now active by default
         }
     )
     logger.info(f"User created successfully: {user.email}")
@@ -36,7 +37,6 @@ async def get_pending_users(db: Prisma):
 async def get_all_users(db: Prisma, page: int, per_page: int, search: Optional[str] = None, role: Optional[str] = None):
     skip = (page - 1) * per_page
     
-    # --- UPDATED --- Build the where clause dynamically
     where_clause = {}
     if search:
         where_clause['OR'] = [
@@ -79,20 +79,17 @@ async def bulk_approve_users(db: Prisma, user_ids: List[UUID]):
 
 
 async def user_has_team(db: Prisma, user_id: str) -> bool:
-    # OPTION A: if your fantasy team model is named "FantasyTeam"
     team = await db.fantasyteam.find_first(where={"user_id": user_id})
-    # OPTION B: if it’s named "Team" and represents the user’s fantasy team
-    # team = await db.team.find_first(where={"user_id": user_id})
     return team is not None
 
 async def create_google_user(db: Prisma, email: str, full_name: str):
-    """Creates a pending user from Google OAuth details."""
+    """Creates a user from Google OAuth details. They are now automatically active."""
     return await db.user.create(
         data={
             "email": email,
             "full_name": full_name,
             "hashed_password": "",  # No password for OAuth users
-            "is_active": False,     # Pending approval
+            "is_active": True,      # <--- CHANGED: Immediately active
             "role": "user",
         }
     )

@@ -21,9 +21,7 @@ import {
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
-  PaginationLink,
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
@@ -36,10 +34,8 @@ interface UserTableProps {
   users: User[];
   selectedUserIds: Set<string>;
   onUserSelect: (userId: string) => void;
-  onSelectAll: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onApprove: (userId: string) => void;
+  onSelectAll: (isChecked: boolean) => void; // <--- CHANGED: Now expects a boolean
   onUpdateRole: (userId: string, role: 'admin' | 'user') => void;
-  // Pagination Props
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -50,7 +46,6 @@ export function UserTable({
   selectedUserIds,
   onUserSelect,
   onSelectAll,
-  onApprove,
   onUpdateRole,
   currentPage,
   totalPages,
@@ -108,7 +103,7 @@ export function UserTable({
             <TableHead className="w-[50px]">
               <Checkbox
                 aria-label="Select all rows"
-                onChange={onSelectAll}
+                onCheckedChange={(checked) => onSelectAll(!!checked)} // <--- CHANGED: Used onCheckedChange
                 checked={users.length > 0 && selectedUserIds.size === users.length}
               />
             </TableHead>
@@ -130,7 +125,7 @@ export function UserTable({
                 />
               </TableCell>
               <TableCell>
-                <StatusBadge status={user.is_active ? 'active' : 'pending'} />
+                <StatusBadge status={user.is_active ? 'active' : 'banned'} />
               </TableCell>
                <TableCell>
                 <StatusBadge status={user.role} />
@@ -141,32 +136,26 @@ export function UserTable({
               </TableCell>
               <TableCell>{formatDate(user.created_at)}</TableCell>
               <TableCell className="text-right">
-                {!user.is_active ? (
-                  <Button variant="default" size="sm" onClick={() => onApprove(user.id)}>
-                    Approve
-                  </Button>
-                ) : (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => onUpdateRole(user.id, user.role === 'admin' ? 'user' : 'admin')}>
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>{user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
-                        <UserX className="mr-2 h-4 w-4" />
-                        <span>Ban User</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => onUpdateRole(user.id, user.role === 'admin' ? 'user' : 'admin')}>
+                      <Shield className="mr-2 h-4 w-4" />
+                      <span>{user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive">
+                      <UserX className="mr-2 h-4 w-4" />
+                      <span>{user.is_active ? 'Ban User' : 'Unban User'}</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </TableCell>
             </TableRow>
           ))}
@@ -178,4 +167,3 @@ export function UserTable({
     </>
   );
 }
-

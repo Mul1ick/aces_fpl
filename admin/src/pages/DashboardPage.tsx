@@ -8,7 +8,7 @@ import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import type { DashboardStats } from '@/types';
-import { Users, UserCheck, Database, Calendar } from 'lucide-react';
+import { Users, Database, Calendar } from 'lucide-react';
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -18,33 +18,31 @@ export function DashboardPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-  const fetchDashboardStats = async () => {
-    const t = token || localStorage.getItem("admin_token");  // ✅ fallback to saved admin token
-    if (!t) {
-      console.warn("[DashboardPage] No admin token found");
-      setIsLoading(false);
-      return;
-    }
+    const fetchDashboardStats = async () => {
+      const t = token || localStorage.getItem("admin_token");
+      if (!t) {
+        setIsLoading(false);
+        return;
+      }
 
-    try {
-      setIsLoading(true);
-      const data = await dashboardAPI.getStats(t);
-      setStats(data);
-    } catch (error) {
-      console.error("[DashboardPage] Failed to fetch dashboard stats:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load dashboard data. Using sample data for demo.",
-      });
-      // ... keep your sample fallback
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      try {
+        setIsLoading(true);
+        const data = await dashboardAPI.getStats(t);
+        setStats(data);
+      } catch (error) {
+        console.error("[DashboardPage] Failed to fetch dashboard stats:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load dashboard data.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  fetchDashboardStats();
-}, [token, toast]);
+    fetchDashboardStats();
+  }, [token, toast]);
 
   if (isLoading) {
     return (
@@ -73,21 +71,13 @@ export function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="Pending Users"
-          value={stats.pending_users}
-          description="Awaiting approval"
-          icon={UserCheck}
-          onClick={() => navigate('/users/pending')}
-          className={stats.pending_users > 0 ? 'border-warning/50 bg-warning/5' : ''}
-        />
+      <div className="grid gap-4 md:grid-cols-3">
         <StatsCard
           title="Total Users"
           value={stats.total_users.toLocaleString()}
           description="Registered users"
           icon={Users}
-          trend={{ value: 12.5, isPositive: true }}
+          onClick={() => navigate('/users')}
         />
         <StatsCard
           title="Players"

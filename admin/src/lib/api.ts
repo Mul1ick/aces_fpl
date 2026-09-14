@@ -108,9 +108,11 @@ export const userAPI = {
   async getPendingUsers(token: string): Promise<User[]> {
     return apiRequest('/admin/users/pending', { method: 'GET' }, token);
   },
-  async getAllUsers(token: string, page = 1, search = ''): Promise<PaginatedResponse<User>> {
+  // --- CHANGED: Added role as an optional parameter ---
+  async getAllUsers(token: string, page = 1, search = '', role = ''): Promise<PaginatedResponse<User>> {
     const params = new URLSearchParams({ page: page.toString() });
     if (search) params.append('search', search);
+    if (role) params.append('role', role); // <--- Added to params
     return apiRequest(`/admin/users?${params}`, { method: 'GET' }, token);
   },
   async approveUser(userId: string, token: string): Promise<APIResponse<User>> {

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { API } from "@/lib/api"; // Correct the import path
+import { API } from "@/lib/api"; 
 
 interface User {
   id: string;
@@ -9,7 +9,6 @@ interface User {
   has_team?: boolean;
   free_transfers: number;
   played_first_gameweek: boolean;
-
 }
 
 interface AuthResult {
@@ -24,9 +23,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<AuthResult>;
   signup: (name: string, email: string, password: string) => Promise<AuthResult>;
   logout: () => void;
-  pendingApproval: boolean;
-  setPendingApproval: (isPending: boolean) => void;
-  refreshUserStatus: () => Promise<void>; // Add the missing function
+  refreshUserStatus: () => Promise<void>; 
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,7 +41,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [pendingApproval, setPendingApproval] = useState(false);
 
   const fetchAndSetUser = async (token: string) => {
     try {
@@ -77,7 +73,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   const login = async (email: string, password: string): Promise<AuthResult> => {
     setIsLoading(true);
-    setPendingApproval(false);
     try {
       const body = new URLSearchParams();
       body.append('username', email);
@@ -92,8 +87,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
       if (!response.ok) {
         if (response.status === 403) {
-          setPendingApproval(true);
-          return { success: false, message: data.detail || "Account pending approval." };
+          return { success: false, message: data.detail || "Account is banned or inactive." };
         }
         throw new Error(data.detail || "Login failed");
       }
@@ -124,7 +118,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         throw new Error(errorData.detail || "Signup failed");
       }
       
-      setPendingApproval(true);
       return { success: true };
 
     } catch (error) {
@@ -136,7 +129,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   const logout = () => {
     setUser(null);
-    setPendingApproval(false);
     localStorage.removeItem("aces_fpl_user");
     localStorage.removeItem("access_token");
   };
@@ -155,8 +147,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     login,
     signup,
     logout,
-    pendingApproval,
-    setPendingApproval,
     refreshUserStatus,
   };
 

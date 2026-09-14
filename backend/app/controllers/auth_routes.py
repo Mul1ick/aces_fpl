@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from app import schemas, auth
 from app.database import get_db
 
-# --- IMPORT REPOS & SERVICES ---
 from app.repositories.user_repo import (
     get_user_by_email, 
     create_user, 
@@ -16,7 +15,6 @@ from app.repositories.user_repo import (
 )
 from app.services.auth_service import verify_google_token_service
 
-# Setup Logger
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -36,7 +34,7 @@ async def signup(user: schemas.UserCreate, db: Prisma = Depends(get_db)):
         "email": u.email,
         "full_name": u.full_name,
         "role": u.role,
-        "has_team": False,   # new users have no team yet
+        "has_team": False,   
         "is_active": bool(u.is_active),
         "free_transfers": u.free_transfers,
         "played_first_gameweek": u.played_first_gameweek
@@ -44,8 +42,6 @@ async def signup(user: schemas.UserCreate, db: Prisma = Depends(get_db)):
 
 @router.post("/login", response_model=schemas.LoginResponse)
 async def login(form: OAuth2PasswordRequestForm = Depends(), db: Prisma = Depends(get_db)):
-    # auth.authenticate_user is a core helper, likely in app/auth.py. 
-    # It is fine to keep it there or move to auth_service if you prefer strictly service layer.
     user = await auth.authenticate_user(db, form.username, form.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -53,7 +49,7 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: Prisma = Depend
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive or pending approval."
+            detail="Account is banned or inactive." # <--- CHANGED
         )
 
     access_token = auth.create_access_token({"sub": str(user.id), "role": user.role})
@@ -100,11 +96,11 @@ async def auth_with_google(token: GoogleToken, db: Prisma = Depends(get_db)):
         # 3. Create via Repo if not exists
         user = await create_google_user(db, user_email, user_name)
 
-    # 4. Enforce Inactive Check
+    # 4. Enforce Banned Check
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Account is inactive or pending approval."
+            detail="Account is banned or inactive." # <--- CHANGED
         )
     
     # 5. Generate Token

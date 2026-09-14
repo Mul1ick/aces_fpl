@@ -20,8 +20,8 @@ model User {
   id              String        @id @default(uuid())
   email           String        @unique
   hashed_password String
-  role            String        @default("user") // --- UPDATED --- Added this role field
-  is_active       Boolean       @default(false)
+  role            String        @default("user") 
+  is_active       Boolean       @default(true) // <--- CHANGED: Default is now true
   full_name       String?
   fantasy_team    FantasyTeam?
 
@@ -123,14 +123,12 @@ model GameweekPlayerStats {
   gameweek_id   Int
   player_id     Int
 
-  // granular stats
-  // played          Boolean @default(false)     // NEW
   goals_scored  Int     @default(0)
   assists       Int     @default(0)
-  clean_sheets    Boolean @default(false)     // NEW
-  goals_conceded  Int     @default(0)         // NEW
-  own_goals       Int     @default(0)         // NEW
-  penalties_missed Int    @default(0)         // NEW
+  clean_sheets    Boolean @default(false)     
+  goals_conceded  Int     @default(0)         
+  own_goals       Int     @default(0)         
+  penalties_missed Int    @default(0)         
   penalties_saved Int     @default(0)
   yellow_cards  Int     @default(0)
   red_cards     Int     @default(0)
@@ -186,14 +184,13 @@ model Fixture {
 model transfer_log {
   id          Int      @id @default(autoincrement())
   user_id     String
-  out_player  Int?     // can be null if it's only an inbound transfer
-  in_player   Int?     // can be null if it's only an outbound transfer
+  out_player  Int?     
+  in_player   Int?     
   gameweek_id Int
   created_at  DateTime @default(now())
 
   user      User      @relation(fields: [user_id], references: [id])
 
-  // make these OPTIONAL because the FK scalars are optional
   out_rel   Player?   @relation("TransfersOut", fields: [out_player], references: [id])
   in_rel    Player?   @relation("TransfersIn",  fields: [in_player],  references: [id])
   
@@ -222,7 +219,6 @@ model UserChip {
   user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   gameweek Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
 
-  // one chip per GW, and a chip can be used only once per user
   @@unique([user_id, gameweek_id])
   @@unique([user_id, chip])
   @@index([gameweek_id])

@@ -14,12 +14,10 @@ import {
 import { 
   LayoutDashboard, 
   Users, 
-  UserCheck, 
   Shield, 
   Calendar,
   Database,
-  Trophy,
-  Settings
+  Trophy
 } from 'lucide-react';
 
 const navigationItems = [
@@ -33,7 +31,6 @@ const navigationItems = [
     title: 'User Management',
     items: [
       { title: 'All Users', url: '/users', icon: Users },
-      { title: 'Pending Approval', url: '/users/pending', icon: UserCheck },
       { title: 'Admin Users', url: '/users/admins', icon: Shield },
     ],
   },
