@@ -84,8 +84,7 @@ const Gameweek: React.FC = () => {
   }, [toast, gw, user]);
 
   // --- UPDATED LOGIC: Determine Effective Captain ---
-  // This logic now reliably checks if the Captain actually played
-const effectiveCaptainId = useMemo(() => {
+  const effectiveCaptainId = useMemo(() => {
     if (!squad) return null;
     const allPlayers = [...squad.starting, ...squad.bench];
     
@@ -95,22 +94,9 @@ const effectiveCaptainId = useMemo(() => {
     if (!captain) return viceCaptain?.id;
 
     const stats = (captain as any).raw_stats || (captain as any).stats || {};
-    const points = (captain as any).points || 0;
     
-    // NEW MATCHING LOGIC: Check if they have ANY stats entered
-    const hasStats = 
-        (stats.goals_scored > 0) || 
-        (stats.assists > 0) || 
-        (stats.yellow_cards > 0) || 
-        (stats.red_cards > 0) || 
-        (stats.bonus_points > 0) || 
-        (stats.goals_conceded > 0) || 
-        (stats.own_goals > 0) || 
-        (stats.penalties_missed > 0) || 
-        (stats.penalties_saved > 0) || 
-        (stats.clean_sheets === true || stats.clean_sheets === 1);
-    
-    const captainPlayed = (points !== 0) || hasStats;
+    // <--- CHANGED: Strict Boolean Check --->
+    const captainPlayed = stats.played === true;
     
     return captainPlayed ? captain.id : viceCaptain?.id;
   }, [squad]);
@@ -183,7 +169,6 @@ const effectiveCaptainId = useMemo(() => {
                   bench={squad.bench} 
                   onPlayerClick={setDetailedPlayer} 
                   activeChip={chipStatus?.active}
-                  // --- FIX: Pass the calculated effective ID down ---
                   effectiveCaptainId={effectiveCaptainId}
                 />
             ) : (
@@ -214,7 +199,6 @@ const effectiveCaptainId = useMemo(() => {
             player={detailedPlayer} 
             onClose={() => setDetailedPlayer(null)} 
             activeChip={chipStatus?.active}
-            // --- FIX: Pass the check to the modal ---
             isEffectiveCaptain={detailedPlayer.id === effectiveCaptainId} 
           />
         )}

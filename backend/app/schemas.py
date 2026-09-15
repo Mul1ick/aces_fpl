@@ -1,6 +1,6 @@
-from pydantic import BaseModel, EmailStr, ConfigDict,Field,field_validator
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
 from uuid import UUID
-from typing import List, Optional, TypeVar, Generic,Literal,Dict,Any
+from typing import List, Optional, TypeVar, Generic, Literal, Dict, Any
 from datetime import datetime
 
 # --- Generic Type for Paginated Response ---
@@ -101,7 +101,6 @@ class PlayerUpdate(BaseModel):
     chance_of_playing: Optional[int] = None
     return_date: Optional[datetime] = None
     
-
 # --- FPL Specific Schemas ---
 class PlayerSelection(BaseModel):
     id: int
@@ -111,7 +110,7 @@ class PlayerSelection(BaseModel):
     bench_priority: Optional[int] = None
 
 class SubmitTeamRequest(BaseModel):
-    team_name:str
+    team_name: str
     players: List[PlayerSelection]
 
 class SaveTeamPayload(BaseModel):
@@ -125,7 +124,7 @@ class PlayerDisplay(BaseModel):
     is_captain: bool
     is_vice_captain: bool
     team: TeamOut
-    is_benched:bool
+    is_benched: bool
     points: int
     status: Optional[str] = None 
     news: Optional[str] = None
@@ -133,7 +132,8 @@ class PlayerDisplay(BaseModel):
     return_date: Optional[datetime] = None
     fixture_str: Optional[str] = None
     recent_fixtures: Optional[List[Dict[str, Any]]] = None
-    raw_stats: Optional[Dict[str, int]] = None
+    # <--- WARNING 2 FIXED: Dict[str, Any] safely accepts the 'played' boolean
+    raw_stats: Optional[Dict[str, Any]] = None
     breakdown: Optional[List[Dict[str, int | str]]] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -198,7 +198,7 @@ class GameweekOutWithFixtures(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 # --- Stats Schemas ---
-class   PlayerStatIn(BaseModel):
+class PlayerStatIn(BaseModel):
     player_id: int
     played: bool = False
     goals_scored: int = 0
@@ -219,19 +219,25 @@ class SubmitFixtureStats(BaseModel):
     away_score: int = Field(ge=0)
     player_stats: List[PlayerStatIn]
 
+# <--- WARNING 3 FIXED: Synced with the current DB structure
 class PlayerStatOut(BaseModel):
     player_id: int
+    played: bool
     goals_scored: int
     assists: int
+    clean_sheets: bool
+    goals_conceded: int
+    own_goals: int
+    penalties_missed: int
+    penalties_saved: int
     yellow_cards: int
     red_cards: int
     bonus_points: int
-    minutes: int
 
 class FixtureStatsOut(BaseModel):
     home_score: int | None = None
     away_score: int | None = None
-    player_stats: list[PlayerStatIn] # Use PlayerStatIn to match what the frontend expects
+    player_stats: list[PlayerStatIn] 
 
 class GameweekStatsOut(BaseModel):
     user_points: int
@@ -285,9 +291,6 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     user: UserOut
 
-
-# Add these classes to backend/app/schemas.py
-
 class PlayerHistoryItem(BaseModel):
     gw: int
     opp: str
@@ -299,12 +302,11 @@ class PlayerHistoryItem(BaseModel):
     gc: int
     yc: int
     rc: int
-
     
 class UpcomingFixtureItem(BaseModel):
     gw: int
-    opp_short: str  # e.g., "SOU"
-    opp_long: str   # e.g., "Southside"
+    opp_short: str  
+    opp_long: str   
     is_home: bool    
 
 class PlayerDetailResponse(BaseModel):
@@ -314,9 +316,9 @@ class PlayerDetailResponse(BaseModel):
     team_name: str
     price: float
     total_points: int
-    status: Optional[str] = None           # ADD THIS
-    news: Optional[str] = None             # ADD THIS
-    chance_of_playing: Optional[int] = None # ADD THIS
+    status: Optional[str] = None           
+    news: Optional[str] = None             
+    chance_of_playing: Optional[int] = None 
     return_date: Optional[datetime] = None
     history: List[PlayerHistoryItem]
     upcoming_fixtures: List[UpcomingFixtureItem]
@@ -324,16 +326,14 @@ class PlayerDetailResponse(BaseModel):
 class UpdatePlayerStatsRequest(BaseModel):
     player_id: int
     gameweek_id: int
+    played: Optional[bool] = None
     goals: Optional[int] = None
     assists: Optional[int] = None
     clean_sheets: Optional[bool] = None
     goals_conceded: Optional[int] = None
     own_goals: Optional[int] = None
     penalties_missed: Optional[int] = None
-    
-    # ✅ ADD THESE
     penalties_saved: Optional[int] = None
-    
     yellow_cards: Optional[int] = None
     red_cards: Optional[int] = None
     bonus_points: Optional[int] = None

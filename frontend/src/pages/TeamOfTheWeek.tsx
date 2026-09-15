@@ -10,7 +10,6 @@ import { API, ChipName } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// --- TYPESCRIPT FIXES ---
 type PlayerView = {
   id: number;
   full_name: string;
@@ -81,9 +80,8 @@ const TeamOfTheWeek: React.FC = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || `Team of the Week for GW${gw} not found.`);
 
-        // --- FIXED: Explicitly requires isBenched to satisfy your Type ---
         const mapPlayer = (p: any, isBenched: boolean): PlayerView => {
-            const statsObj = p.raw_stats || p.stats || p;
+            const statsObj = p.raw_stats || p.stats || {};
             
             return {
                 ...p,
@@ -94,14 +92,15 @@ const TeamOfTheWeek: React.FC = () => {
                 team: p.team?.name || p.team_name || p.team || '',
                 is_captain: p.is_captain || p.isCaptain || false,
                 is_vice_captain: p.is_vice_captain || p.isVice || false,
-                is_benched: isBenched, // Satisfies strict type
+                is_benched: isBenched,
                 status: p.status ?? 'ACTIVE',
                 news: p.news ?? null,
                 chance_of_playing: p.chance_of_playing ?? null,
                 return_date: p.return_date ?? null,
+                // <--- FIXED: Strict boolean check --->
                 raw_stats: {
                     ...statsObj,
-                    played: statsObj.played === true || statsObj.played === 1 || statsObj.played === "true" || (p.points !== 0)
+                    played: statsObj.played === true
                 },
                 points: Number(p.points || 0)
             };
@@ -126,14 +125,9 @@ const TeamOfTheWeek: React.FC = () => {
     return () => controller.abort();
   }, [gw, toast]);
 
-  // --- FIXED: Safer Captain Fallback Logic ---
- // --- FIXED: Safer Captain Fallback Logic ---
-  // --- FIXED: Mathematical Deduction for Effective Captain ---
+  // <--- FIXED: Completely purged the score-math logic and replaced with strict boolean --->
   const effectiveCaptainId = useMemo(() => {
     if (!teamData) return null;
-    // Note: We only sum starting players for the raw total comparison
-    const rawTotal = teamData.starting.reduce((sum, p) => sum + Number(p.points || 0), 0);
-    const bonusPortion = Number(teamData.points) - rawTotal;
 
     const allPlayers = [...teamData.starting, ...teamData.bench];
     const captain = allPlayers.find(p => p.is_captain);
@@ -141,45 +135,13 @@ const TeamOfTheWeek: React.FC = () => {
 
     if (!captain) return viceCaptain?.id ?? null;
 
-    // 1. If the bonus portion is 0, it implies the Multiplier was applied to a player with 0 points.
-    // Since the Captain has priority, if the backend calculated 0 bonus, the Captain kept the armband.
-    if (bonusPortion === 0) {
-        return captain.id;
-    }
-
-    const capPoints = Number(captain.points || 0);
-    const vicePoints = Number(viceCaptain?.points || 0);
-
-    // 2. Did the Captain provide the bonus? (Matches Standard 2x or Triple 3x)
-    if (bonusPortion === capPoints || bonusPortion === capPoints * 2) {
-        return captain.id;
-    }
-
-    // 3. Did the Vice Captain provide the bonus?
-    if (viceCaptain && (bonusPortion === vicePoints || bonusPortion === vicePoints * 2)) {
-        return viceCaptain.id;
-    }
-
-    // 4. Fallback: Stat-based check (Only runs if math above is ambiguous)
     const stats = captain.raw_stats || {};
-    const hasStats = 
-        (Number(stats.goals_scored) > 0) || 
-        (Number(stats.assists) > 0) || 
-        (Number(stats.yellow_cards) > 0) || 
-        (Number(stats.red_cards) > 0) || 
-        (Number(stats.bonus_points) > 0) || 
-        (Number(stats.goals_conceded) > 0) || 
-        (Number(stats.own_goals) > 0) || 
-        (Number(stats.penalties_missed) > 0) || 
-        (Number(stats.penalties_saved) > 0) || 
-        (stats.clean_sheets === true || stats.clean_sheets === 1 || stats.clean_sheets === "true") ||
-        (stats.played === true || stats.played === 1 || stats.played === "true");
-
-    const captainPlayed = (capPoints !== 0) || hasStats;
+    const captainPlayed = stats.played === true; 
     
     return (captainPlayed ? captain.id : viceCaptain?.id) ?? null;
   }, [teamData]);
 
+  // We keep derivedActiveChip logic intact, because it safely detects if TC was used by verifying the total score math
   const derivedActiveChip = useMemo<ChipName | null>(() => {
     if (!teamData || !teamData.starting || !effectiveCaptainId) return null;
 
@@ -199,7 +161,7 @@ const TeamOfTheWeek: React.FC = () => {
     const currentGw = parseInt(gw || '1', 10);
     const newGw = direction === 'next' ? currentGw + 1 : currentGw - 1;
     if (newGw > 0) {
-      navigate(`/dream-team/${newGw}`);
+      navigate(`/team-of-the-week/${newGw}`);
     }
   };
 

@@ -7,14 +7,19 @@ import { StatsEntryModal } from '../components/gameweek/StatsEntryModal';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { ChevronLeft, ChevronRight, Check, ShieldQuestion, Loader2, PlayCircle, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, ShieldQuestion, Loader2, PlayCircle } from 'lucide-react';
 import type { Player, PlayerGameweekStats, Gameweek } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { gameweekAPI, playerAPI, statsAPI, API_BASE_URL } from '../lib/api';
+import { gameweekAPI, statsAPI, API_BASE_URL } from '../lib/api';
+
+type ExtendedPlayerGameweekStats = PlayerGameweekStats & {
+  suspension_duration?: number;
+  penalties_saved?: number;
+};
 
 // A new component for navigation
-const GameweekNavigator = ({ allGameweeks, selectedId, onNavigate, onSelect }) => {
-  const currentIndex = allGameweeks.findIndex(gw => gw.id === selectedId);
+const GameweekNavigator = ({ allGameweeks, selectedId, onNavigate, onSelect }: any) => {
+  const currentIndex = allGameweeks.findIndex((gw: any) => gw.id === selectedId);
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === allGameweeks.length - 1;
 
@@ -29,7 +34,7 @@ const GameweekNavigator = ({ allGameweeks, selectedId, onNavigate, onSelect }) =
             <SelectValue placeholder="Select a Gameweek" />
           </SelectTrigger>
           <SelectContent>
-            {allGameweeks.map(gw => (
+            {allGameweeks.map((gw: any) => (
               <SelectItem key={gw.id} value={String(gw.id)}>
                 {`Gameweek ${gw.gw_number}`}
               </SelectItem>
@@ -135,15 +140,14 @@ export function GameweekPage() {
     const fx = fixtures.find(f => f.id === fixtureId);
     if (!t || !fx) return;
 
-    // Logic to determine mode if not explicitly passed (backward compatibility)
     let targetMode = mode;
     if (mode === 'view' && !fx.stats_entered && gameweek?.status === 'LIVE') {
-        targetMode = 'entry'; // Auto-switch to entry if live and not entered
+        targetMode = 'entry'; 
     }
 
     try {
       setModalLoading(true);
-      setModalMode(targetMode); // Set the mode state
+      setModalMode(targetMode); 
       setSelectedFixture(fx);
 
       const [players, savedStats] = await Promise.all([
@@ -167,14 +171,14 @@ export function GameweekPage() {
     }
   };
 
-  const handleSaveStats = async (fixtureId: number, scores: {home_score: number, away_score: number}, statsMap: {[playerId: number]: PlayerGameweekStats}) => {
+  const handleSaveStats = async (fixtureId: number, scores: {home_score: number, away_score: number}, statsMap: {[playerId: number]: ExtendedPlayerGameweekStats}) => {
     const t = token || localStorage.getItem("admin_token");
     if (!t || !gameweek) return;
     const player_stats = Object.entries(statsMap).map(([pid, s]) => ({
       player_id: Number(pid), played: s.played ?? false, goals_scored: s.goals_scored ?? 0,
       assists: s.assists ?? 0, clean_sheets: s.clean_sheets ?? false, goals_conceded: s.goals_conceded ?? 0,
-      own_goals: s.own_goals ?? 0, penalties_missed: s.penalties_missed ?? 0, yellow_cards: s.yellow_cards ?? 0,
-      red_cards: s.red_cards ?? 0, bonus_points: s.bonus_points ?? 0,
+      own_goals: s.own_goals ?? 0, penalties_missed: s.penalties_missed ?? 0, penalties_saved: s.penalties_saved ?? 0,
+      yellow_cards: s.yellow_cards ?? 0, red_cards: s.red_cards ?? 0, bonus_points: s.bonus_points ?? 0,
     }));
     try {
       await gameweekAPI.submitPlayerStats(gameweek.id, fixtureId, { home_score: scores.home_score, away_score: scores.away_score, player_stats }, t);
@@ -192,48 +196,45 @@ export function GameweekPage() {
 
     setModalLoading(true);
     
-    // We store promises here
     const updatePromises: Promise<any>[] = [];
     let updateCount = 0;
 
-    // 1. Define strictly what we check and save (Exclude 'played', 'minutes', 'id')
+    // --- CHANGED: Added 'played' and 'penalties_saved' to the check list ---
     const fieldsToCheck = [
-        'goals_scored', 'assists', 'clean_sheets', 
-        'goals_conceded', 'own_goals', 'penalties_missed', 
+        'played', 'goals_scored', 'assists', 'clean_sheets', 
+        'goals_conceded', 'own_goals', 'penalties_missed', 'penalties_saved',
         'yellow_cards', 'red_cards', 'bonus_points'
     ] as const;
 
     try {
         for (const [playerIdStr, newStat] of Object.entries(statsMap)) {
             const playerId = Number(playerIdStr);
-            const oldStat = initialModalStats[playerId];
+            const oldStat = (initialModalStats as any)[playerId];
 
             if (!oldStat) continue;
 
-            // 2. Diffing: Check if any relevant field changed
             const hasChanged = fieldsToCheck.some(field => {
-                 // Force comparison as numbers/booleans to avoid "1" vs 1 issues
                  return newStat[field] !== oldStat[field];
             });
 
             if (hasChanged) {
-                // 3. Prepare CLEAN payload (No 'played', no extra UI fields)
-                // We manually map to ensure no garbage gets sent to the API
+                // --- CHANGED: Added played to the payload ---
                 const payload = {
                     player_id: playerId,
                     gameweek_id: gameweek.id,
-                    goals: Number(newStat.goals_scored), // Map to API alias 'goals' if needed, or use 'goals_scored' depending on your backend schema aliases
+                    played: Boolean(newStat.played), 
+                    goals: Number(newStat.goals_scored), 
                     assists: Number(newStat.assists),
                     clean_sheets: Boolean(newStat.clean_sheets),
                     goals_conceded: Number(newStat.goals_conceded),
                     own_goals: Number(newStat.own_goals),
                     penalties_missed: Number(newStat.penalties_missed),
+                    penalties_saved: Number(newStat.penalties_saved || 0),
                     yellow_cards: Number(newStat.yellow_cards),
                     red_cards: Number(newStat.red_cards),
                     bonus_points: Number(newStat.bonus_points)
                 };
 
-                // 4. Push the API call promise to our array
                 updatePromises.push(statsAPI.updatePlayerStats(t, payload));
                 updateCount++;
             }
@@ -245,14 +246,11 @@ export function GameweekPage() {
             return;
         }
 
-        // 5. Execute all updates in parallel
         await Promise.all(updatePromises);
         
         toast({ title: "Corrections Saved", description: `Updated stats for ${updateCount} players. Scores recalculated.` });
         
-        // Refresh data
         setSelectedFixture(null);
-        // await fetchGameweekData(); // If you have a refresh function
         
     } catch (e: any) {
         console.error(e);
@@ -261,6 +259,7 @@ export function GameweekPage() {
         setModalLoading(false);
     }
 };
+
   const handleStartSeason = useCallback(async () => {
     const t = token || localStorage.getItem("admin_token");
     if (!t) return;
@@ -286,12 +285,12 @@ export function GameweekPage() {
     setConfirming(null);
     toast({ title: "Processing...", description: "Calculating points for all users. This may take a moment." });
     try {
-      setGameweek(gw => ({ ...gw, status: 'Calculating' }));
+      setGameweek((gw: any) => ({ ...gw, status: 'Calculating' }));
       const response = await gameweekAPI.calculatePoints(gameweek.id, t);
-      setGameweek(gw => ({ ...gw, status: 'Points Calculated' }));
+      setGameweek((gw: any) => ({ ...gw, status: 'Points Calculated' }));
       toast({ title: "Success!", description: response.message || "Points calculation complete." });
     } catch (error: any) {
-      setGameweek(gw => ({ ...gw, status: 'LIVE' }));
+      setGameweek((gw: any) => ({ ...gw, status: 'LIVE' }));
       toast({ variant: "destructive", title: "Calculation Failed", description: error.message || "An error occurred." });
     }
   }, [token, gameweek, toast]);
@@ -402,8 +401,8 @@ export function GameweekPage() {
           <FixturesList 
             fixtures={fixtures} 
             gameweekStatus={gameweek.status} 
-            onOpenStatsModal={(id) => handleOpenStatsModal(id, 'entry')} // Standard Entry
-            onOpenCorrectionModal={(id) => handleOpenStatsModal(id, 'correction')} // New Correction Action
+            onOpenStatsModal={(id) => handleOpenStatsModal(id, 'entry')} 
+            onOpenCorrectionModal={(id) => handleOpenStatsModal(id, 'correction')} 
           />
           {gameweek.status !== 'FINISHED' && (
             <Card className="admin-card-shadow">
@@ -421,19 +420,10 @@ export function GameweekPage() {
             fixture={selectedFixture}
             players={modalPlayers}
             loading={modalLoading}
-            
-            // 1. Pass the standard Entry handler to onSave
             onSave={(fixtureId, scores, stats) => handleSaveStats(fixtureId, scores, stats)}
-            
-            // 2. Pass the Correction handler to new prop
             onCorrectionSave={handleSaveCorrections}
-            
-            // 3. Pass mode
             mode={modalMode}
-            
-            // 4. isReadOnly is true ONLY if in view mode
             isReadOnly={modalMode === 'view'}
-            
             initialStats={initialModalStats}
           />
 
@@ -449,4 +439,3 @@ export function GameweekPage() {
     </div>
   );
 }
-

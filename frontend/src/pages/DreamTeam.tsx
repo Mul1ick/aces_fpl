@@ -10,17 +10,16 @@ import { API } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { transformApiPlayer, getTeamJersey } from '@/lib/player-utils';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// --- COMPACT HEADER ---
 interface DreamTeamHeaderProps {
   gw: string | undefined;
   view: string;
   setView: (view: string) => void;
   totalPoints?: number;
   onNavigate: (direction: 'prev' | 'next') => void;
-  playerOfTheWeek: any; // The highest scoring player object
+  playerOfTheWeek: any;
 }
 
 const DreamTeamHeader: React.FC<DreamTeamHeaderProps> = ({
@@ -34,7 +33,6 @@ const DreamTeamHeader: React.FC<DreamTeamHeaderProps> = ({
   const currentGw = parseInt(gw || '1', 10);
   return (
     <header className="p-3 text-white">
-      {/* Top Row: Title & View Toggles */}
       <div className="flex justify-between items-center mb-2">
         <h1 className="font-bold text-xl text-white">Team of the Week</h1>
         <div className="bg-black/20 rounded-full p-1 flex">
@@ -43,7 +41,6 @@ const DreamTeamHeader: React.FC<DreamTeamHeaderProps> = ({
         </div>
       </div>
 
-      {/* Middle Row: Gameweek Navigation */}
       <div className="flex justify-center items-center gap-3 mb-3">
         {currentGw > 1 ? (
           <Button variant="ghost" size="icon" className="bg-black/20 hover:bg-black/40 rounded-full w-7 h-7" onClick={() => onNavigate('prev')}>
@@ -58,21 +55,16 @@ const DreamTeamHeader: React.FC<DreamTeamHeaderProps> = ({
         </Button>
       </div>
 
-      {/* Bottom Row: Stats Section (Now Centered) */}
       <div className="flex justify-center items-start gap-12 md:gap-24">
-        {/* Total Points */}
         <div className="flex flex-col items-center text-center">
             <p className="text-xs font-semibold text-white/80 mb-1">Total Points</p>
             <div className="bg-gradient-to-br from-[#00d2ff] to-[#3a47d5] rounded-xl shadow-md p-2 w-24 text-center">
                 <p className="font-black text-3xl text-white tracking-tighter">{totalPoints ?? '...'}</p>
             </div>
-            
         </div>
         
-        {/* Vertical Divider */}
         <div className="h-16 w-px bg-white/20"></div>
 
-        {/* Player of the Week */}
         {playerOfTheWeek && (
             <div className="flex flex-col items-center text-center">
                 <p className="text-xs font-semibold text-white/80 mb-1">Player of the Week</p>
@@ -88,7 +80,6 @@ const DreamTeamHeader: React.FC<DreamTeamHeaderProps> = ({
   );
 };
 
-// --- MAIN PAGE COMPONENT ---
 const DreamTeam: React.FC = () => {
   const { gw } = useParams();
   const navigate = useNavigate();
@@ -101,7 +92,6 @@ const DreamTeam: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentGameweek, setCurrentGameweek] = useState<number | null>(null);
 
-  // States for ManagerInfoCard
   const [hubStats, setHubStats] = useState<any>({
     overall_points: 0, gameweek_points: 0, total_players: 0, squad_value: 0.0, in_the_bank: 0.0, gameweek_transfers: 0, total_transfers: 0,
   });
@@ -137,7 +127,7 @@ const DreamTeam: React.FC = () => {
         
         const mapDreamTeamPlayer = (p: any) => {
             const transformed = transformApiPlayer(p);
-            const statsObj = p.raw_stats || p.stats || p; // Safe extraction
+            const statsObj = p.raw_stats || p.stats || {};
 
             return {
                 ...p, ...transformed,
@@ -149,10 +139,10 @@ const DreamTeam: React.FC = () => {
                 news: p.news ?? null,
                 chance_of_playing: p.chance_of_playing ?? null,
                 return_date: p.return_date ?? null,
-                // 👇 EXPLICITLY CAPTURE BREAKDOWN AND RAW STATS
+                // <--- FIXED: Strict boolean check --->
                 raw_stats: {
                     ...statsObj,
-                    played: statsObj.played === true || statsObj.played === 1 || statsObj.played === "true" || (p.points > 0)
+                    played: statsObj.played === true 
                 },
                 breakdown: p.breakdown || [],
             };
@@ -200,8 +190,6 @@ const DreamTeam: React.FC = () => {
 
   return (
     <div className="w-full min-h-screen bg-white flex flex-col lg:flex-row font-sans">
-      
-      {/* LEFT SIDE: Manager Info Card */}
       <div className="hidden lg:block lg:w-2/5 p-4 text-black">
         <div className="lg:sticky lg:top-4">
             <ManagerInfoCard
@@ -216,7 +204,6 @@ const DreamTeam: React.FC = () => {
         </div>
       </div>
 
-      {/* RIGHT SIDE: Pitch and Header */}
       <div className="flex flex-col flex-1 lg:w-3/5">
         <div className="lg:m-4 lg:border-2 lg:border-gray-300 lg:rounded-lg flex flex-col flex-grow">
             <div className="bg-gradient-to-b from-[#37003C] to-[#23003F] lg:rounded-t-lg">
@@ -235,7 +222,6 @@ const DreamTeam: React.FC = () => {
                     playersByPos={playersByPos} 
                     bench={data.bench} 
                     onPlayerClick={setDetailedPlayer} 
-                    // 👇 FORCE THE MATH TO STAY 1x
                     effectiveCaptainId={null} 
                 />
             ) : (
@@ -244,7 +230,6 @@ const DreamTeam: React.FC = () => {
         </div>
       </div>
 
-      {/* BOTTOM SIDE: Mobile Manager Info Card */}
       <div className="block lg:hidden p-4">
           <ManagerInfoCard
               isLoading={isExtraDataLoading}
@@ -262,7 +247,6 @@ const DreamTeam: React.FC = () => {
             <PlayerDetailCard 
                 player={detailedPlayer} 
                 onClose={() => setDetailedPlayer(null)} 
-                // 👇 FORCE THE MODAL TO NOT DOUBLE THE BREAKDOWN
                 isEffectiveCaptain={false}
             />
         )}

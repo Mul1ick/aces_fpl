@@ -15,7 +15,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -28,13 +27,13 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { User } from '@/types';
 import { format, isValid } from 'date-fns';
-import { MoreHorizontal, Shield, UserX } from 'lucide-react';
+import { MoreHorizontal, Shield } from 'lucide-react';
 
 interface UserTableProps {
   users: User[];
   selectedUserIds: Set<string>;
   onUserSelect: (userId: string) => void;
-  onSelectAll: (isChecked: boolean) => void; // <--- CHANGED: Now expects a boolean
+  onSelectAll: (isChecked: boolean) => void; 
   onUpdateRole: (userId: string, role: 'admin' | 'user') => void;
   currentPage: number;
   totalPages: number;
@@ -103,7 +102,7 @@ export function UserTable({
             <TableHead className="w-[50px]">
               <Checkbox
                 aria-label="Select all rows"
-                onCheckedChange={(checked) => onSelectAll(!!checked)} // <--- CHANGED: Used onCheckedChange
+                onCheckedChange={(checked) => onSelectAll(!!checked)} 
                 checked={users.length > 0 && selectedUserIds.size === users.length}
               />
             </TableHead>
@@ -149,11 +148,7 @@ export function UserTable({
                       <Shield className="mr-2 h-4 w-4" />
                       <span>{user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}</span>
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">
-                      <UserX className="mr-2 h-4 w-4" />
-                      <span>{user.is_active ? 'Ban User' : 'Unban User'}</span>
-                    </DropdownMenuItem>
+                    {/* <--- FIXED: Removed the dummy Ban User button ---> */}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

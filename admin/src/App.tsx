@@ -53,7 +53,6 @@ const App = () => (
             >
               <Route index element={<DashboardPage />} />
               <Route path="users" element={<UsersPage />} />
-              <Route path="users/pending" element={<UsersPage />} />
               <Route path="users/admins" element={<UsersPage />} />
               <Route path="data/players" element={<PlayersPage />} />
               <Route path="data/teams" element={<TeamsPage />} />
@@ -69,4 +68,3 @@ const App = () => (
 );
 
 export default App;
-

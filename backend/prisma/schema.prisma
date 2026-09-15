@@ -7,7 +7,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL") // <-- ADD THIS LINE
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 enum GameweekStatus {
@@ -21,11 +21,11 @@ model User {
   email           String        @unique
   hashed_password String
   role            String        @default("user") 
-  is_active       Boolean       @default(true) // <--- CHANGED: Default is now true
+  is_active       Boolean       @default(true) 
   full_name       String?
   fantasy_team    FantasyTeam?
 
-  free_transfers        Int      @default(0) // Users start with 1 free transfer
+  free_transfers        Int      @default(0)
   played_first_gameweek Boolean  @default(false)
 
   user_teams      UserTeam[]
@@ -61,9 +61,9 @@ model Player {
   price       Decimal  @db.Decimal(5, 2)
   status    PlayerStatus @default(ACTIVE)
 
-  news              String?    // The reason (e.g., "Hamstring Injury", "Suspended")
-  chance_of_playing Int?       // 0, 25, 50, 75. (Used for flag color)
-  return_date       DateTime?  @db.Timestamptz(6) // Specific date eligible to return. Null = Unknown.
+  news              String?    
+  chance_of_playing Int?       
+  return_date       DateTime?  @db.Timestamptz(6) 
   
   team_id     Int
   team        Team     @relation(fields: [team_id], references: [id], onDelete: Cascade)
@@ -81,7 +81,6 @@ model Gameweek {
   deadline    DateTime @db.Timestamptz(6)
   status      GameweekStatus @default(UPCOMING)
 
-  
   user_teams  UserTeam[]
   fixtures   Fixture[]
   gameweek_player_stats GameweekPlayerStats[]
@@ -123,6 +122,7 @@ model GameweekPlayerStats {
   gameweek_id   Int
   player_id     Int
 
+  played          Boolean @default(false) // <--- RE-ADDED: Core mechanism for participation
   goals_scored  Int     @default(0)
   assists       Int     @default(0)
   clean_sheets    Boolean @default(false)     
@@ -134,7 +134,6 @@ model GameweekPlayerStats {
   red_cards     Int     @default(0)
   bonus_points  Int     @default(0)
 
-  // denormalized total for fast reads
   points        Int     @default(0)
 
   gameweek      Gameweek @relation(fields: [gameweek_id], references: [id], onDelete: Cascade)
@@ -157,7 +156,6 @@ model UserGameweekScore {
   @@unique([user_id, gameweek_id])
   @@map("user_gameweek_scores")
 }
-
 
 model Fixture {
   id            Int      @id @default(autoincrement())
@@ -193,7 +191,6 @@ model transfer_log {
 
   out_rel   Player?   @relation("TransfersOut", fields: [out_player], references: [id])
   in_rel    Player?   @relation("TransfersIn",  fields: [in_player],  references: [id])
-  
   
   @@index([gameweek_id])
   @@index([in_player])

@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import type { Team, Player, PlayerGameweekStats } from '@/types';
 import { CompactInput } from '@/components/shared/CompactInput';
-import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, ShieldAlert, Ban, Star, Timer, AlertTriangle } from 'lucide-react';
+import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, ShieldAlert, Ban, Star, Timer, AlertTriangle, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ExtendedPlayerGameweekStats = PlayerGameweekStats & {
@@ -34,7 +34,7 @@ type PlayerStatInputs = {
 };
 
 const DEFAULT_ROW_STATS: ExtendedPlayerGameweekStats = {
-  played: false, // This is now handled implicitly by the backend
+  played: false,
   goals_scored: 0, assists: 0, clean_sheets: false,
   goals_conceded: 0, own_goals: 0, penalties_missed: 0, penalties_saved: 0, yellow_cards: 0,
   red_cards: 0, bonus_points: 0,
@@ -51,7 +51,6 @@ interface Fixture {
   away_score?: number | null;
 }
 
-// --- UPDATED: Props interface to handle modes and different save functions ---
 interface StatsEntryModalProps {
   fixture: Fixture | null;
   players: Player[];
@@ -67,6 +66,7 @@ interface StatsEntryModalProps {
 
 const StatsTableHeader = () => {
     const headers = [
+        { icon: <UserCheck className="h-5 w-5 text-purple-500" />, label: 'Played' },
         { icon: <Goal className="h-5 w-5 text-blue-500" />, label: 'Goals' },
         { icon: <PlusCircle className="h-5 w-5 text-green-500" />, label: 'Assists' },
         { icon: <ShieldCheck className="h-5 w-5 text-green-500" />, label: 'Clean Sheet' },
@@ -80,7 +80,7 @@ const StatsTableHeader = () => {
     ];
 
     return (
-        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(10,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
+        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(11,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
             <div className="text-left font-bold">Player</div>
             {headers.map(h => (
                 <div key={h.label} className="flex flex-col items-center justify-center gap-1.5 h-12">
@@ -96,7 +96,7 @@ const PlayerStatRow = ({
   player,
   stats,
   onStatChange,
-  disabled, // Renamed from isReadOnly for clarity
+  disabled, 
 }: {
   player: Player;
   stats: ExtendedPlayerGameweekStats;
@@ -107,21 +107,30 @@ const PlayerStatRow = ({
 
   return (
     <div className={cn(
-      "grid grid-cols-[minmax(200px,_1.5fr)_repeat(10,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 border-b last:border-b-0",
+      "grid grid-cols-[minmax(200px,_1.5fr)_repeat(11,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 border-b last:border-b-0",
       isUnavailable && "bg-red-50/60 dark:bg-red-950/20"
     )}>
       <div className="flex items-center gap-2">
         {isUnavailable && (
-          <AlertTriangle 
-            className="h-4 w-4 text-red-500 flex-shrink-0" 
-            title={player.news || player.status}
-          />
+          // <--- FIXED: Wrapped the Icon in a span to hold the title attribute
+          <span title={player.news || player.status}>
+             <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+          </span>
         )}
         <div className="min-w-0">
           <p className="font-medium text-sm truncate">{player.full_name}</p>
           <p className="text-xs text-muted-foreground">{player.position}</p>
         </div>
       </div>
+      
+      <div className="flex justify-center">
+        <Switch 
+          checked={stats.played} 
+          onCheckedChange={(val) => onStatChange(player.id, 'played', val)} 
+          disabled={disabled} 
+        />
+      </div>
+
       <CompactInput value={stats.goals_scored} onValueChange={(val) => onStatChange(player.id, 'goals_scored', val)} disabled={disabled} />
       <CompactInput value={stats.assists} onValueChange={(val) => onStatChange(player.id, 'assists', val)} disabled={disabled} />
       <div className="flex justify-center"><Switch checked={stats.clean_sheets} onCheckedChange={(val) => onStatChange(player.id, 'clean_sheets', val)} disabled={disabled} /></div>
@@ -200,7 +209,16 @@ export function StatsEntryModal({
   }, [fixture, homePlayers, awayPlayers, initialStats]);
 
   const handleStatChange = (playerId: number, field: keyof ExtendedPlayerGameweekStats, value: number | boolean) => {
-    setStats(prev => ({ ...prev, [playerId]: { ...prev[playerId], [field]: value } }));
+    setStats(prev => {
+      const currentStats = prev[playerId] || { ...DEFAULT_ROW_STATS };
+      const updatedStats = { ...currentStats, [field]: value };
+      
+      if (field !== 'played' && (value === true || (typeof value === 'number' && value > 0))) {
+          updatedStats.played = true;
+      }
+
+      return { ...prev, [playerId]: updatedStats };
+    });
   };
 
   const handleSave = () => {

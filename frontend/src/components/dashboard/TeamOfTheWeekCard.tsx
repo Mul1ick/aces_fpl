@@ -20,64 +20,37 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
   const canViewTotw = currentGameweekNumber > 0;
   const totwGameweekToShow = currentGameweekNumber;
 
-  // --- NEW ROBUST LOGIC: Deduce Effective Captain and Multiplier ---
-  // --- NEW ROBUST LOGIC: Deduce Effective Captain and Multiplier ---
-// --- NEW ROBUST LOGIC: Mathematical Deduction of Captain ---
+  // --- CRITICAL FIX: Mathematical Deduction of Captain Removed ---
   const { multiplier, effectiveCaptainId } = useMemo(() => {
     if (!team || !team.starting) return { multiplier: 2, effectiveCaptainId: null };
 
     const captain = team.starting.find((p: any) => p.is_captain || p.isCaptain);
     const vice = team.starting.find((p: any) => p.is_vice_captain || p.isVice);
 
-    if (!captain) return { multiplier: 2, effectiveCaptainId: vice?.id };
+    if (!captain) return { multiplier: 2, effectiveCaptainId: vice?.id ?? null };
 
-    // 1. Calculate the exact amount of bonus points added by the multiplier
-    const rawTotal = team.starting.reduce((sum: number, p: any) => sum + Number(p.points || 0), 0);
-    const bonusPortion = Number(team.points) - rawTotal;
+    // 1. Strictly use the boolean to find who actually played
+    const stats = captain.stats || captain.raw_stats || {};
+    const captainPlayed = stats.played === true;
+    
+    const effectiveCaptain = captainPlayed ? captain : vice;
+    const effId = effectiveCaptain?.id ?? null;
 
-    // 2. If the bonus portion is 0, it means the Captain scored 0 and kept the armband
-    // (Or neither played. In both cases, visually keep the armband on the Captain).
-    if (bonusPortion === 0) {
-        return { multiplier: 2, effectiveCaptainId: captain.id };
+    // 2. Only use math to deduce if they played a TRIPLE captain chip (since it's hidden)
+    let deducedMult = 2;
+    if (effectiveCaptain) {
+      const rawTotal = team.starting.reduce((sum: number, p: any) => sum + Number(p.points || 0), 0);
+      const bonusPortion = Number(team.points) - rawTotal;
+      
+      // If the bonus portion is exactly 2x the captain's points, it was a Triple Captain (base + 2x bonus)
+      if (Math.abs(bonusPortion - (Number(effectiveCaptain.points || 0) * 2)) < 0.1) {
+        deducedMult = 3;
+      }
     }
 
-    const capPoints = Number(captain.points || 0);
-    const vicePoints = Number(vice?.points || 0);
-
-    // 3. Did the Captain provide the bonus? (Checks for 2x and 3x)
-    if (bonusPortion === capPoints || bonusPortion === capPoints * 2) {
-        const mult = bonusPortion === capPoints * 2 ? 3 : 2;
-        return { multiplier: mult, effectiveCaptainId: captain.id };
-    }
-
-    // 4. Did the Vice Captain provide the bonus? (Checks for 2x and 3x)
-    if (vice && (bonusPortion === vicePoints || bonusPortion === vicePoints * 2)) {
-        const mult = bonusPortion === vicePoints * 2 ? 3 : 2;
-        return { multiplier: mult, effectiveCaptainId: vice.id };
-    }
-
-    // 5. Absolute Fallback just in case admin manually altered total scores
-    const checkPlayed = (p: any) => {
-        if (!p) return false;
-        if (Number(p.points) !== 0) return true;
-        const stats = p.stats || p.raw_stats || p;
-        return (
-            (Number(stats?.goals_scored) > 0) || (Number(stats?.assists) > 0) ||
-            (Number(stats?.yellow_cards) > 0) || (Number(stats?.red_cards) > 0) ||
-            (Number(stats?.bonus_points) > 0) || (Number(stats?.goals_conceded) > 0) ||
-            (Number(stats?.own_goals) > 0) || (Number(stats?.penalties_missed) > 0) ||
-            (Number(stats?.penalties_saved) > 0) ||
-            (stats?.clean_sheets === true || stats?.clean_sheets === 1 || stats?.clean_sheets === "true") ||
-            (stats?.played === true || stats?.played === 1 || stats?.played === "true")
-        );
-    };
-
-    const capPlayed = checkPlayed(captain);
-    const bonusTarget = capPlayed ? captain : vice;
-    const deducedMult = Math.abs(bonusPortion - (Number(bonusTarget?.points || 0) * 2)) < 0.1 ? 3 : 2;
-
-    return { multiplier: deducedMult, effectiveCaptainId: bonusTarget?.id };
+    return { multiplier: deducedMult, effectiveCaptainId: effId };
   }, [team]);
+
   return (
     <Card className="h-full border-black border-2">
       <CardHeader>
@@ -99,7 +72,6 @@ export const TeamOfTheWeekCard: React.FC<TeamOfTheWeekCardProps> = ({ team, curr
             const isCaptain = player.is_captain || player.isCaptain;
             const isVice = player.is_vice_captain || player.isVice;
             
-            // Apply the deduced multiplier only to the player who actually holds the armband
             const isEffCap = player.id === effectiveCaptainId;
             const displayPoints = (player.points || 0) * (isEffCap ? multiplier : 1);
 

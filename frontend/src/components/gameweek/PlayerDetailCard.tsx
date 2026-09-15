@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { X, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-// --- 1. IMPORT getTeamLogo ---
 import { getTeamJersey, getTeamLogo } from '@/lib/player-utils';
 
 interface PlayerDetailCardProps {
@@ -31,8 +30,7 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
   if (!player) return null;
 
   const determineMultiplier = () => {
-    const stats = player.raw_stats || player.stats || {};
-    const didPlay = (player.points !== 0) || (stats.played === true) || (stats.minutes > 0);
+    // <--- FIXED: Removed the old "didPlay" ghost logic entirely. --->
     const isCap = player.is_captain || player.isCaptain;
     
     let getsBonus = false;
@@ -67,16 +65,13 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
 
   const recentFixture = player.recent_fixtures?.[0] || null;
   
-  // --- 2. LOGIC TO INJECT MISSING BREAKDOWN STATS ---
   const augmentedBreakdown = useMemo(() => {
     let newBreakdown = player.breakdown || [];
-    const stats = player.raw_stats || {};
+    const stats = player.raw_stats || player.stats || {};
     const position = player.position || player.pos;
 
-    // Check if Goals Conceded stat exists in raw stats but not in breakdown
     if (stats.goals_conceded > 0 && !newBreakdown.some((s: any) => s.label === "Goals Conceded")) {
       let points = 0;
-      // Apply scoring rule only for GK and DEF
       if (position === 'GK' || position === 'DEF') {
         points = Math.floor(stats.goals_conceded / 2) * -1;
       }
@@ -90,8 +85,7 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
       }
     }
     return newBreakdown;
-  }, [player.breakdown, player.raw_stats, player.position, player.pos]);
-
+  }, [player.breakdown, player.raw_stats, player.stats, player.position, player.pos]);
 
   return (
     <>
@@ -154,7 +148,6 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
             <h3 className="text-sm font-bold text-gray-800 mb-3 text-center">Current Fixture</h3>
             {recentFixture ? (
-              // --- 3. UPDATED JSX FOR FIXTURE DISPLAY ---
               <div className="flex justify-between items-center gap-2 font-bold text-lg">
                 <div className="flex items-center gap-2 flex-1 justify-end">
                     <span className="text-gray-900 text-right">{player.team?.name || player.team}</span>
@@ -183,7 +176,6 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
             </div>
 
             <div className="space-y-3 mt-3">
-              {/* --- 4. USE THE NEW AUGMENTED ARRAY --- */}
               {augmentedBreakdown.length > 0 ? augmentedBreakdown.map((stat: any, index: number) => {
                 if (stat.value === 0 && stat.points === 0) return null;
                 
@@ -228,3 +220,5 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
     </>
   );
 };
+
+export default PlayerDetailCard;

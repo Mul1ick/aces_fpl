@@ -30,12 +30,11 @@ async def submit_fixture_stats_service(db: Prisma, gameweek_id: int, payload: sc
             total_points = calculate_player_points(player.position, s)
             stat_data = s.model_dump()
             
-            # 1. Safely remove fields that do not exist in the GameweekPlayerStats table
-            keys_to_remove = ['player_id', 'played', 'minutes', 'suspension_duration']
+            # <--- WARNING 1 FIXED: Removed 'minutes' from this list entirely --->
+            keys_to_remove = ['player_id', 'suspension_duration']
             for key in keys_to_remove:
                 stat_data.pop(key, None)
             
-            # 2. Upsert using the flat scalar IDs for gameweek_id and player_id
             await tx.gameweekplayerstats.upsert(
                 where={
                     "gameweek_id_player_id": {
@@ -45,10 +44,8 @@ async def submit_fixture_stats_service(db: Prisma, gameweek_id: int, payload: sc
                 },
                 data={
                     "create": {
-                        # Use connect syntax for relations
                         "gameweek": {"connect": {"id": gameweek_id}},
                         "player": {"connect": {"id": s.player_id}},
-                        # Spread the rest of the data
                         **stat_data, 
                         "points": total_points
                     }, 
@@ -81,7 +78,6 @@ async def get_next_fixture_map_service(db: Prisma):
     fixtures = await get_fixtures_in_gameweek(db, nxt.id)
 
     def fmt(f):
-        # "OPP (H/A) • Sat 13 Sep 14:30"
         dow = f.kickoff.strftime('%a')
         day = f.kickoff.strftime('%d')
         mon = f.kickoff.strftime('%b')

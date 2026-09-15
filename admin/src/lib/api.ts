@@ -7,14 +7,12 @@ import type {
   Fixture,
   Gameweek,
   DashboardStats,
-  PlayerStats,
   APIResponse,
   PaginatedResponse,
   PlayerFormData,
   UserUpdateData
 } from '@/types';
 
-// Configurable API base URL
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 class APIError extends Error {
@@ -24,7 +22,6 @@ class APIError extends Error {
   }
 }
 
-// Generic API request function with authentication
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -77,8 +74,6 @@ async function apiRequest<T>(
   }
 }
 
-// ... (authAPI, dashboardAPI, userAPI, teamAPI, playerAPI remain the same)
-
 export const authAPI = {
   async login(email: string, password: string): Promise<{ access_token: string; token_type: string; user: User }> {
     const body = new URLSearchParams();
@@ -105,25 +100,16 @@ export const dashboardAPI = {
 };
 
 export const userAPI = {
-  async getPendingUsers(token: string): Promise<User[]> {
-    return apiRequest('/admin/users/pending', { method: 'GET' }, token);
-  },
-  // --- CHANGED: Added role as an optional parameter ---
   async getAllUsers(token: string, page = 1, search = '', role = ''): Promise<PaginatedResponse<User>> {
     const params = new URLSearchParams({ page: page.toString() });
     if (search) params.append('search', search);
-    if (role) params.append('role', role); // <--- Added to params
+    if (role) params.append('role', role);
     return apiRequest(`/admin/users?${params}`, { method: 'GET' }, token);
   },
-  async approveUser(userId: string, token: string): Promise<APIResponse<User>> {
-    return apiRequest(`/admin/users/${userId}/approve`, { method: 'POST' }, token);
-  },
+  // <--- FIXED: Corrected the endpoint URL for updating roles
   async updateUserRole(userId: string, data: UserUpdateData, token: string): Promise<APIResponse<User>> {
-    return apiRequest(`/admin/users/${userId}/update-role`, { method: 'POST', body: JSON.stringify(data) }, token);
-  },
-  async bulkApproveUsers(userIds: string[], token: string): Promise<APIResponse<User[]>> {
-    return apiRequest('/admin/users/bulk-approve', { method: 'POST', body: JSON.stringify({ user_ids: userIds }) }, token);
-  },
+    return apiRequest(`/admin/users/${userId}/role`, { method: 'POST', body: JSON.stringify(data) }, token);
+  }
 };
 
 export const teamAPI = {
@@ -160,13 +146,13 @@ export const playerAPI = {
         return apiRequest(`/admin/players/${playerId}`, { method: 'DELETE' }, token);
     },
 };
+
 export const statsAPI = {
   async updatePlayerStats(token: string, payload: any) {
     return apiRequest('/admin/edit-stats', { method: 'PATCH', body: JSON.stringify(payload) }, token);
   }
 };
 
-// Gameweek Management API calls
 export const gameweekAPI = {
   async getGameweeks(token: string): Promise<Gameweek[]> {
     return apiRequest('/gameweeks', { method: 'GET' }, token);
@@ -192,8 +178,6 @@ export const gameweekAPI = {
   async getFixtureStats(fixtureId: string, token: string) {
     return apiRequest(`/admin/fixtures/${fixtureId}/stats`, { method: 'GET' }, token);
   },
-  
-  // --- NEWLY ADDED ---
   async getPlayersForFixture(fixtureId: number, token: string): Promise<Player[]> {
     return apiRequest(`/admin/fixtures/${fixtureId}/players`, { method: 'GET' }, token);
   }

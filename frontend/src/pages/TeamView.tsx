@@ -8,7 +8,6 @@ import { PlayerDetailCard } from '@/components/gameweek/PlayerDetailCard';
 import { TeamViewInfoCard } from '@/components/team/TeamViewInfoCard';
 import { API } from '@/lib/api';
 
-// --- Types ---
 type Position = 'GK' | 'DEF' | 'MID' | 'FWD' | string;
 type PlayerView = {
   id: number | string;
@@ -19,11 +18,9 @@ type PlayerView = {
   is_captain: boolean;
   is_vice_captain: boolean;
   is_benched: boolean;
-  // Stats fields
   breakdown?: any[];
   raw_stats?: any;
   fixture_str?: string;
-  // --- ADDED STATUS TYPES TO FIX TS ERRORS ---
   status?: string;
   news?: string | null;
   chance_of_playing?: number | null;
@@ -50,7 +47,6 @@ type TeamData = {
 const TeamView: React.FC = () => {
   const { gw, userId } = useParams();
   const navigate = useNavigate();
-  // --- TS FIX: Relaxed state to string ---
   const [view, setView] = useState<string>('pitch');
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [detailedPlayer, setDetailedPlayer] = useState<PlayerView | null>(null);
@@ -81,7 +77,7 @@ const TeamView: React.FC = () => {
 
         const rawText = await res.text();
         let data: any = {};
-        try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* keep {} */ }
+        try { data = rawText ? JSON.parse(rawText) : {}; } catch { }
 
         if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
 
@@ -105,15 +101,13 @@ const TeamView: React.FC = () => {
             is_captain: Boolean(p.is_captain ?? p.captain),
             is_vice_captain: Boolean(p.is_vice_captain ?? p.vice_captain),
             is_benched: Boolean(p.is_benched ?? p.bench),
-            
-            // STATUS DATA KEPT SAFE
             status: p.status ?? 'ACTIVE',
             news: p.news ?? null,
             chance_of_playing: p.chance_of_playing ?? null,
             return_date: p.return_date ?? null,
-
             breakdown: p.breakdown || [],
-            raw_stats: p.raw_stats || {},
+            // <--- FIXED: Safely check for stats payload from TOTW response --->
+            raw_stats: p.raw_stats || p.stats || {},
             fixture_str: p.fixture_str || ''
           }));
 
@@ -156,7 +150,6 @@ const TeamView: React.FC = () => {
     return () => controller.abort();
   }, [gw, userId]);
 
-  // --- FIXED: Find Effective Captain ---
   const effectiveCaptainId = useMemo(() => {
     if (!teamData) return null;
     const allPlayers = [...teamData.starting, ...teamData.bench];
@@ -164,23 +157,11 @@ const TeamView: React.FC = () => {
     const viceCaptain = allPlayers.find(p => p.is_vice_captain);
 
     const stats = (captain as any)?.raw_stats || {};
-    const points = captain?.points || 0;
-
-    const hasStats = 
-        (stats.goals_scored > 0) || 
-        (stats.assists > 0) || 
-        (stats.yellow_cards > 0) || 
-        (stats.red_cards > 0) || 
-        (stats.bonus_points > 0) || 
-        (stats.goals_conceded > 0) || 
-        (stats.own_goals > 0) || 
-        (stats.penalties_missed > 0) || 
-        (stats.penalties_saved > 0) || 
-        (stats.clean_sheets === true || stats.clean_sheets === 1);
-
-    const captainPlayed = (points !== 0) || hasStats;
     
-    return (captainPlayed ? captain?.id : viceCaptain?.id) ?? null;
+    const captainPlayed = stats.played === true;
+    
+    const effId = captainPlayed ? captain?.id : viceCaptain?.id;
+    return effId ? Number(effId) : null;
   }, [teamData]);
 
   const handleNavigation = (direction: 'next' | 'prev') => {
@@ -233,7 +214,6 @@ const TeamView: React.FC = () => {
               averagePoints={teamData.average_points ?? 0}
               highestPoints={teamData.highest_points ?? 0}
               gwRank={teamData.gw_rank ?? ''}
-              // --- TS FIX: Force string to number ---
               transfersCount={Number(teamData.transfers || 0)}
               onNavigate={handleNavigation}
               activeChip={teamData.active_chip as any}
@@ -247,7 +227,6 @@ const TeamView: React.FC = () => {
               bench={teamData.bench}
               onPlayerClick={setDetailedPlayer}
               activeChip={teamData.active_chip as any} 
-              // 👇 PASSED DOWN CAPTAIN ID
               effectiveCaptainId={effectiveCaptainId}
             />
           ) : (
@@ -279,8 +258,7 @@ const TeamView: React.FC = () => {
             player={detailedPlayer}
             onClose={() => setDetailedPlayer(null)}
             activeChip={teamData.active_chip as any} 
-            // 👇 PASSED DOWN BOOLEAN TO MODAL
-            isEffectiveCaptain={detailedPlayer.id === effectiveCaptainId}
+            isEffectiveCaptain={Number(detailedPlayer.id) === effectiveCaptainId}
           />
         )}
       </AnimatePresence>

@@ -10,8 +10,6 @@ from app.utils.stats_utils import calculate_breakdown
 
 logger = logging.getLogger(__name__)
 
-# --- REMOVED THE CIRCULAR IMPORT HERE ---
-
 async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: str, players: list[dict]):
     logger.info(f"Saving team for user {user_id}, GW {gameweek_id}")
     try:
@@ -166,18 +164,17 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
 
     # 1) Load current user team entries + player + club
     entries = await db.userteam.find_many(
-    where={'user_id': user_id, 'gameweek_id': gameweek_id},
-    include={'player': {'include': {'team': True}}},
-    # Sort by is_benched (starters first) then by priority
-    order=[
-        {'is_benched': 'asc'}, 
-        {'bench_priority': 'asc'}, 
-        {'player_id': 'asc'}
-    ] 
-)
+        where={'user_id': user_id, 'gameweek_id': gameweek_id},
+        include={'player': {'include': {'team': True}}},
+        # Sort by is_benched (starters first) then by priority
+        order=[
+            {'is_benched': 'asc'}, 
+            {'bench_priority': 'asc'}, 
+            {'player_id': 'asc'}
+        ] 
+    )
     logger.info(f"User team entries fetched: {len(entries)}")
     if not entries:
-        # FIX 2: Add active_chip here (This is where your specific error triggered)
         return {
             "team_name": fantasy_team.name, 
             "starting": [], 
@@ -254,35 +251,6 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     pts_by_player_gw: Dict[tuple[int, int], int] = {
         (s.player_id, s.gameweek_id): int(s.points or 0) for s in recent_stats
     }
-
-    # def _breakdown_for(position: str, st: Any) -> tuple[dict, list[dict]]:
-    #     raw = {
-    #         "played": bool(st.played or False),
-    #         "goals_scored": int(st.goals_scored or 0),
-    #         "assists": int(st.assists or 0),
-    #         "yellow_cards": int(st.yellow_cards or 0),
-    #         "red_cards": int(st.red_cards or 0),
-    #         "bonus_points": int(st.bonus_points or 0),
-    #         "clean_sheets": int(st.clean_sheets or 0),
-    #     }
-    #     pos = (position or "").upper()
-    #     goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
-    #     if pos in ["GK", "DEF"]:
-    #         cs_pts = 4 
-    #     elif pos == "MID":
-    #         cs_pts = 1
-    #     else:
-    #         cs_pts = 0
-    #     breakdown = [
-    #         {"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
-    #         {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
-    #         {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
-    #         {"label": "Clean Sheet",  "value": raw["clean_sheets"],       "points": raw["clean_sheets"] * cs_pts},
-    #         {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
-    #         {"label": "Red cards",    "value": raw["red_cards"],               "points": -3 * raw["red_cards"]},
-    #         {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
-    #     ]
-    #     return raw, breakdown
 
     # 6) Shape response objects
     def to_display(entry):
@@ -367,44 +335,8 @@ async def get_player_card(
         where={'gameweek_id': gameweek_id, 'player_id': player_id}
     )
 
-    def _breakdown_for(position: str, st_row: Any) -> tuple[Dict[str, int], List[Dict[str, int | str]]]:
-        if not st_row:
-            return {}, []
-        raw = {
-            "played": bool(st_row.played or False),
-            "goals_scored": int(st_row.goals_scored or 0),
-            "assists": int(st_row.assists or 0),
-            "yellow_cards": int(st_row.yellow_cards or 0),
-            "red_cards": int(st_row.red_cards or 0),
-            "bonus_points": int(st_row.bonus_points or 0),
-            "goals_conceded": int(st_row.goals_conceded or 0),
-            # 👇 FIX THE SYNTAX BUGS HERE
-            "penalties_missed": int(getattr(st_row, 'penalties_missed', 0)),
-            "own_goals": int(st_row("own_goals")),
-        }
-        pos = (position or "").upper()
-        goal_pts = 10 if pos == "GK" else 6 if pos == "DEF" else 5 if pos == "MID" else 4
-        gc_pts = 0
-        if pos in ["GK", "GKP", "DEF"]:
-            gc_pts = -1 * (raw["goals_conceded"] // 2)
-        breakdown = [
-            {"label": "Appearance",   "value": 1 if raw["played"] else 0, "points": 1 if raw["played"] else 0},
-            {"label": "Goals",        "value": raw["goals_scored"],            "points": raw["goals_scored"] * goal_pts},
-            {"label": "Assists",      "value": raw["assists"],                 "points": raw["assists"] * 3},
-            {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
-            {"label": "Yellow cards", "value": raw["yellow_cards"],            "points": -1 * raw["yellow_cards"]},
-            {"label": "Red cards",    "value": raw["red_cards"],               "points": -3 * raw["red_cards"]},
-            {"label": "Goals Conceded", "value": raw["goals_conceded"],   "points": gc_pts},
-        
-        # ✅ NEW: Penalties Saved
-        {"label": "Penalties Saved", "value": raw["penalties_saved"], "points": raw["penalties_saved"] * 5},
-            {"label": "Penalty Miss", "value": raw["penalties_missed"],   "points": -2 * raw["penalties_missed"]},
-            {"label": "Own Goal",     "value": raw["own_goals"],          "points": -2 * raw["own_goals"]},
-            {"label": "Bonus",        "value": raw["bonus_points"],            "points": raw["bonus_points"]},
-        ]
-        return raw, breakdown
-
-    raw_stats, breakdown = _breakdown_for(player.position, st)
+    # Automatically calculates breakdown perfectly using the shared tool
+    raw_stats, breakdown = calculate_breakdown(player.position, st)
     total_points = int(st.points) if st and st.points is not None else 0
 
     # 2) recent fixtures: last two + current
@@ -564,12 +496,15 @@ async def save_existing_team(
     removed_ids = existing_ids - incoming_set
     added_ids   = incoming_set - existing_ids
 
+    from app.utils.team_algo import _normalize_8p3
     async with db.tx() as tx:
         await tx.userteam.delete_many(
             where={'user_id': user_id, 'gameweek_id': gameweek_id}
         )
 
-        await tx.userteam.create_many(data=to_create)
+        new_snapshot = await _normalize_8p3(tx, to_create)
+
+        await tx.userteam.create_many(data=new_snapshot)
 
         for out_id in removed_ids:
             await tx.transfer_log.create(
@@ -740,7 +675,7 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
     except Exception:
         gw_points = 0
 
-    # 4. --- NEW LOGIC: Calculate Gameweek Average, Highest, and Rank ---
+    # 4. --- Calculate Gameweek Average, Highest, and Rank ---
     all_gw_scores = await db.usergameweekscore.find_many(
         where={"gameweek_id": gw.id}
     )
@@ -750,17 +685,11 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
     gw_rank_str = "-"
 
     if all_gw_scores:
-        # Calculate scores as (total - hits) to be fair, or just total_points based on league rules
-        # Usually GW Rank is based on Total Points (before hits) or Net Points. 
-        # Standard FPL uses Net Points for Head-to-Head but Gross for GW Rank usually? 
-        # Actually, let's stick to Net Points (Total - Hits) as that's what 'gameweek_points' displays above.
-        
         scores_list = []
         for s in all_gw_scores:
             net_score = (s.total_points or 0) - (s.transfer_hits or 0)
             scores_list.append({"uid": s.user_id, "score": net_score})
         
-        # Sort descending
         scores_list.sort(key=lambda x: x["score"], reverse=True)
 
         if scores_list:
@@ -768,8 +697,6 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
             total_sum = sum(item["score"] for item in scores_list)
             avg_points = round(total_sum / len(scores_list))
 
-            # Find rank
-            # Handling ties: if scores are [50, 50, 40], ranks are 1, 1, 3
             current_rank = 0
             prev_score = None
             true_rank = 0
@@ -794,11 +721,8 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
             "gameweek_points": gw_points,
         },
         "overallRank": data.get("overallRank") or overall_rank,
-        
-        # --- Added Fields ---
         "average_points": avg_points,
         "highest_points": max_points,
         "gw_rank": gw_rank_str,
         "transfers": str(user.free_transfers)
     }
-    

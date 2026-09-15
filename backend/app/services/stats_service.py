@@ -206,7 +206,6 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
         where={'user_id': user_id, 'gameweek_id': gameweek_id}
     )
 
-    # If no entries, store 0 and return 0 minus any hits (usually 0)
     if not entries:
         gross = 0
         await db.usergameweekscore.upsert(
@@ -224,47 +223,29 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
 
     # Build points map for the GW
     stats = await db.gameweekplayerstats.find_many(where={'gameweek_id': gameweek_id})
-    pts = {s.player_id: s.points for s in stats}  # missing => 0
+    pts = {s.player_id: s.points for s in stats}
 
+    # <--- CHANGED: Strict Boolean check for Captaincy shifting
     def has_participation(player_id: int) -> bool:
         s = next((item for item in stats if item.player_id == player_id), None)
         if not s: return False
-        # If they have points, they played. 
-        if s.points != 0: return True
-        # If points are 0, check for any non-zero stat (Yellow cards, etc.)
-        return any([
-            s.goals_scored > 0, 
-            s.assists > 0, 
-            s.yellow_cards > 0, 
-            s.red_cards > 0, 
-            s.bonus_points > 0, 
-            s.clean_sheets,
-            s.goals_conceded > 0, 
-            s.own_goals > 0, 
-            s.penalties_missed > 0,
-            s.penalties_saved > 0
-        ])
+        return s.played
+    # ----------------------------------------------------
 
     # --- 1. CHECK CHIPS FIRST ---
-    # We need to know this BEFORE calculating the base points
     triple = await is_triple_captain_active(db, user_id, gameweek_id)
     bench_boost = await is_bench_boost_active(db, user_id, gameweek_id)
 
     # --- 2. DEFINE SCORING PLAYERS ---
-    # If Bench Boost is active, ALL players count.
-    # Otherwise, only non-benched players count.
     if bench_boost:
         scoring_pool = entries
     else:
         scoring_pool = [e for e in entries if not e.is_benched]
 
     # --- 3. CALCULATE BASE POINTS ---
-    # Sum points for everyone in the valid scoring pool (1x multiplier)
     base = sum(pts.get(e.player_id, 0) for e in scoring_pool)
 
     # --- 4. HANDLE CAPTAINCY ---
-    # Get starters specifically to find C/VC (Captain is always a starter in valid teams)
-    # However, searching 'entries' is safe because C/VC are flags on the row.
     cap = next((e for e in entries if e.is_captain), None)
     vice = next((e for e in entries if e.is_vice_captain), None)
 
@@ -276,15 +257,12 @@ async def compute_user_score_for_gw(db: Prisma, user_id: str, gameweek_id: int) 
         bonus_target = vice.player_id
 
     # Add the Bonus Points
-    # Base already includes 1x points for the captain.
-    # Standard Captain = 2x total (Add 1x)
-    # Triple Captain = 3x total (Add 2x)
     if bonus_target is not None:
         bonus_points = pts.get(bonus_target, 0)
         if triple:
-            gross = base + (2 * bonus_points)
+            gross = base + (2 * bonus_points) # Base is already added, add 2 more
         else:
-            gross = base + bonus_points
+            gross = base + bonus_points       # Base is already added, add 1 more
     else:
         gross = base
 
@@ -728,17 +706,14 @@ async def calculate_team_of_the_season(db: Prisma):
 
 
 async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsRequest):
-    # Import the calculator utility
     from app.utils.points_calculator import calculate_player_points
     
-    # 1. Map input fields to actual Prisma database fields
-    # This ensures your 'goals' from Postman becomes 'goals_scored' for the DB
     raw_data = data.model_dump(exclude_unset=True)
     player_id = raw_data.pop("player_id")
     gameweek_id = raw_data.pop("gameweek_id")
     
-    # Map common aliases to schema names
     mapping = {
+        "played": "played", # <--- ADDED: Allows admin to fix appearance logic
         "goals": "goals_scored",
         "goals_scored": "goals_scored",
         "assists": "assists",
@@ -746,13 +721,11 @@ async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsReq
         "goals_conceded": "goals_conceded",
         "own_goals": "own_goals",
         "penalties_missed": "penalties_missed",
+        "penalties_saved": "penalties_saved",
         "yellow_cards": "yellow_cards",
         "red_cards": "red_cards",
         "bonus": "bonus_points",
         "bonus_points": "bonus_points",
-        
-        # ✅ NEW MAPPINGS
-        "penalties_saved": "penalties_saved",
     }
     
     db_update_data = {}
@@ -760,26 +733,20 @@ async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsReq
         db_field = mapping.get(key, key)
         db_update_data[db_field] = value
 
-    # 2. Get the current player's position to recalculate points
     player = await db.player.find_unique(where={"id": player_id})
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
 
-    # 3. Recalculate the 'points' field
-    # We fetch the current record, merge the updates, and calculate a new total
     current_stats = await db.gameweekplayerstats.find_unique(
         where={'gameweek_id_player_id': {'player_id': player_id, 'gameweek_id': gameweek_id}}
     )
     
-    # Merge existing data with the new updates to ensure calculate_player_points has a full object
     full_stats_dict = current_stats.model_dump() if current_stats else {}
     full_stats_dict.update(db_update_data)
     
-    # Use your provided utility function
     new_total_points = calculate_player_points(player.position, schemas.PlayerStatIn(**full_stats_dict))
     db_update_data["points"] = new_total_points
 
-    # 4. Perform the Update
     await db.gameweekplayerstats.update(
         where={
             'gameweek_id_player_id': {
@@ -790,18 +757,12 @@ async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsReq
         data=db_update_data
     )
 
-    # 5. Trigger the ripple effect for affected users
-    # 5. Find ALL users who have this player in their team (Starters OR Bench)
     affected_users = await db.userteam.find_many(
         where={'player_id': player_id, 'gameweek_id': gameweek_id},
         distinct=['user_id']
     )
 
-    # 6. Force Recalculation for every affected user
-    # This updates the UserGameweekScore table (Fixes the Total Points Box)
     for record in affected_users:
         await compute_user_score_for_gw(db, record.user_id, gameweek_id)
-    
-    # --- CRITICAL FIX ENDS HERE ---
     
     return {"message": f"Successfully updated stats for {player.full_name}. New GW points: {new_total_points}"}
