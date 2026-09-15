@@ -1,61 +1,53 @@
-// frontend/src/lib/player-utils.ts
-
-// --- JERSEYS ---
-import aerTitansJersey from '@/assets/images/jerseys/aer-titans.png';
+import bluelockJersey from '@/assets/images/jerseys/bluelock.png';
 import casualsJersey from '@/assets/images/jerseys/casuals.png';
 import cathectJersey from '@/assets/images/jerseys/cathect.png';
 import encoreJersey from '@/assets/images/jerseys/encore.png';
-import materoJersey from '@/assets/images/jerseys/matero.png';
-import mrfcJersey from '@/assets/images/jerseys/mrfc.png';
-import roarersJersey from '@/assets/images/jerseys/roarers.png';
-import satansJersey from '@/assets/images/jerseys/satans.png';
+import falconsJersey from '@/assets/images/jerseys/falcons.png';
+import hydrasJersey from '@/assets/images/jerseys/hydras.png';
+import juggernautsJersey from '@/assets/images/jerseys/juggernauts.png';
 import traanaJersey from '@/assets/images/jerseys/traana.png';
-import umaagJersey from '@/assets/images/jerseys/umang.png';
+import umangJersey from '@/assets/images/jerseys/umang.png';
+import wastedPotentialJersey from '@/assets/images/jerseys/wasted-potential.png';
 import wolfpackJersey from '@/assets/images/jerseys/wolfpack.png';
 import youngbloodJersey from '@/assets/images/jerseys/youngblood.png';
 import tshirtWhite from '@/assets/images/jerseys/tshirt-white.png';
 
-// Legacy jerseys (kept as fallbacks)
 import southsideJersey from '@/assets/images/jerseys/southside.png';
 import titansJersey from '@/assets/images/jerseys/titans.png';
 
-// --- LOGOS ---
-import aerTitansLogo from '@/assets/images/team-logos/aer-titans-logo.png';
+// --- NEW SEASON LOGOS ---
+import bluelockLogo from '@/assets/images/team-logos/bluelock-logo.png';
 import casualsLogo from '@/assets/images/team-logos/casuals-logo.png';
 import cathectLogo from '@/assets/images/team-logos/cathect-logo.png';
 import encoreLogo from '@/assets/images/team-logos/encore-logo.png';
-import materoLogo from '@/assets/images/team-logos/matero-logo.png';
-import mrfcLogo from '@/assets/images/team-logos/mrfc-logo.png';
-import roarersLogo from '@/assets/images/team-logos/roarers-logo.png';
-import satansLogo from '@/assets/images/team-logos/satans-logo.png';
+import falconsLogo from '@/assets/images/team-logos/falcons-logo.png';
+import hydrasLogo from '@/assets/images/team-logos/hydras-logo.png';
+import juggernautsLogo from '@/assets/images/team-logos/juggernauts-logo.png';
 import tranaLogo from '@/assets/images/team-logos/trana-logo.png';
 import umangLogo from '@/assets/images/team-logos/umang-logo.png';
-import wolfpackLogo from '@/assets/images/team-logos/wolfpack-logo.jpeg';
+import wastedPotentialLogo from '@/assets/images/team-logos/wasted-potential-logo.png';
+import wolfpackLogo from '@/assets/images/team-logos/wolfpack-logo.png';
 import youngbloodLogo from '@/assets/images/team-logos/youngblood-logo.png';
 
-// Fallbacks
+// Fallback
 import defaultLogo from '@/assets/images/team-logos/yellow.png';
-
 
 /**
  * Maps the FULL Team Name (from the database) to the jersey image.
  */
 export const TEAM_JERSEYS: Record<string, string> = {
-  'Umang': umaagJersey,
-  'Satans': satansJersey,
-  'Aer Titans': aerTitansJersey,
-  'Trana': traanaJersey,
-  'Roarers': roarersJersey,
-  'Casuals FC': casualsJersey,
-  'Cathect': cathectJersey,
+  'Wolfpack': wolfpackJersey,
+  'Juggernauts': juggernautsJersey,
+  'KT Falcons': falconsJersey,
   'Encore United': encoreJersey,
-  'Matero Power 8s': materoJersey,
-  'Wolfpack FC': wolfpackJersey,
+  'Hybec Hydras': hydrasJersey,
+  'Umang FC': umangJersey,
+  'Wasted Potential': wastedPotentialJersey,
+  'Cathect FC': cathectJersey,
   'Youngblood FC': youngbloodJersey,
-  'Majithia Reality FC': mrfcJersey,
-  // Fallbacks
-  'Southside': southsideJersey,
-  'Titans': titansJersey,
+  'Trana': traanaJersey,
+  'Bluelock': bluelockJersey,
+  'Casuals FC': casualsJersey,
 };
 
 
@@ -63,18 +55,18 @@ export const TEAM_JERSEYS: Record<string, string> = {
  * Maps the SHORT Name (from the database) to the Logo image.
  */
 export const TEAM_LOGOS: Record<string, string> = {
-  'UMA': umangLogo,
-  'SAT': satansLogo,
-  'AER': aerTitansLogo,
-  'TRA': tranaLogo,
-  'ROA': roarersLogo,
-  'CAS': casualsLogo,
-  'CAT': cathectLogo,
-  'ENC': encoreLogo,
-  'MAT': materoLogo,
   'WOLF': wolfpackLogo,
-  'YBFC': youngbloodLogo,
-  'MRFC': mrfcLogo, 
+  'JUG': juggernautsLogo,
+  'FAL': falconsLogo,
+  'ENC': encoreLogo,
+  'HYD': hydrasLogo,
+  'UMG': umangLogo,
+  'WST': wastedPotentialLogo,
+  'CTH': cathectLogo,
+  'YBF': youngbloodLogo,
+  'TRA': tranaLogo,
+  'BLK': bluelockLogo,
+  'CAS': casualsLogo,
 };
 
 export const getTeamLogo = (shortName: string | undefined): string => {
@@ -82,9 +74,6 @@ export const getTeamLogo = (shortName: string | undefined): string => {
   return TEAM_LOGOS[shortName.toUpperCase()] || defaultLogo;
 };
 
-/**
- * A helper function to safely get a jersey, with a default fallback.
- */
 export const getTeamJersey = (teamName: string | undefined): string => {
   if (!teamName) return tshirtWhite;
   return TEAM_JERSEYS[teamName] || tshirtWhite;

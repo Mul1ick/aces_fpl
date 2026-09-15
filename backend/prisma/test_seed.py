@@ -43,7 +43,8 @@ NAME_MAP = {
     "Casuals": "Casuals FC"
 }
 
-# Tuple Structure: (Home, Away, Kickoff_Hour_in_24H_format, Kickoff_Minute)
+# Tuple Structure: (Home, Away, Kickoff_Hour, Kickoff_Minute)
+# Note: For this TEST script, we ignore the Hour/Minute and use dynamic staggering
 FIXTURE_PAIRINGS = {
     1: [("Wolfpack", "Juggernauts", 16, 30), ("KT Falcons", "Encore", 17, 30), ("Hybec Hydras", "Umang FC", 18, 30), ("Wasted Potential", "Cathect", 19, 30), ("Youngblood", "Trana", 20, 30), ("Bluelock", "Casuals", 21, 30)],
     2: [("Casuals", "Cathect", 16, 30), ("Bluelock", "Trana", 17, 30), ("Youngblood", "Wasted Potential", 18, 30), ("Umang FC", "Encore", 19, 30), ("Wolfpack", "KT Falcons", 20, 30), ("Hybec Hydras", "Juggernauts", 21, 30)],
@@ -58,7 +59,6 @@ FIXTURE_PAIRINGS = {
 }
 
 def get_player_data():
-    # Adjusted keys to use new team abbreviations for dummy data seeding
     return {
         "TRA": [
             {"full_name": "Tabish Armar", "price": 5.0, "position": "MID"},
@@ -288,6 +288,7 @@ async def main() -> None:
         for short_name, players in get_player_data().items():
             team_id = team_map_short.get(short_name)
             if team_id:
+                # Add players
                 await db.player.create_many(data=[{"team_id": team_id, **p} for p in players], skip_duplicates=True)
             else:
                 print(f"⚠️ Warning: Could not find team ID for {short_name}")
@@ -295,54 +296,36 @@ async def main() -> None:
         print("✅ Teams and players seeded.")
 
         
-        # 4. GENERATE SPECIFIC SCHEDULE
-        print("⏰ Generating specific match schedule...")
+        # 4. GENERATE TEST SCHEDULE
+        print("⏰ Generating TEST schedule: GW1 in 10 mins. Interval: 10 mins.")
         
         ist_tz = timezone(timedelta(hours=5, minutes=30))
+        now_utc = datetime.now(timezone.utc)
         
-        # --- DEFINED MATCH DATES (Year 2026 based on your provided list) ---
-        GW_DATES = {
-            1: datetime(2026, 9, 26, tzinfo=ist_tz), # Saturday
-            2: datetime(2026, 10, 3, tzinfo=ist_tz), # Saturday
-            3: datetime(2026, 10, 10, tzinfo=ist_tz), # Saturday
-            4: datetime(2026, 10, 17, tzinfo=ist_tz), # Saturday
-            5: datetime(2026, 10, 24, tzinfo=ist_tz), # Saturday
-            6: datetime(2026, 10, 31, tzinfo=ist_tz), # Saturday
-            7: datetime(2026, 11, 15, tzinfo=ist_tz),  # Sunday
-            8: datetime(2026, 11, 22, tzinfo=ist_tz), # Sunday
-            9: datetime(2026, 11, 28, tzinfo=ist_tz), # Saturday
-            10: datetime(2026, 12, 5, tzinfo=ist_tz), # Saturday
-        }
+        # Start Time: 10 minutes from NOW
+        start_time = now_utc + timedelta(minutes=10)
+        interval = timedelta(minutes=10)
         
         gameweek_data = []
         fixture_data = []
 
         for gw_num in range(1, 11):
-            base_date = GW_DATES.get(gw_num)
+            # Calculate Deadline
+            deadline = start_time + ((gw_num - 1) * interval)
+            # Display in IST for debugging clarity
+            deadline_ist = deadline.astimezone(ist_tz)
             
-            if not base_date:
-                continue
-
-            pairings = FIXTURE_PAIRINGS.get(gw_num, [])
-            
-            # Find the earliest kickoff in this Gameweek to calculate the deadline
-            if pairings:
-                # Get the datetime object of the very first match
-                first_kickoff = min([base_date.replace(hour=m[2], minute=m[3], second=0) for m in pairings])
-            else:
-                first_kickoff = base_date.replace(hour=16, minute=30, second=0)
-            
-            # Transfer deadline is exactly 2 hours before the first kickoff
-            deadline = first_kickoff - timedelta(hours=2)
-
             gameweek_data.append({
                 "gw_number": gw_num, 
                 "deadline": deadline, 
                 "status": "UPCOMING"
             })
-            print(f"  - Gameweek {gw_num} Deadline: {deadline.strftime('%a %d %b %Y, %I:%M %p %Z')}")
+            print(f"  - Gameweek {gw_num} Deadline: {deadline_ist.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
-            for home_raw, away_raw, start_hour, start_minute in pairings:
+            # Get Pairings for this GW
+            pairings = FIXTURE_PAIRINGS.get(gw_num, [])
+            
+            for i, (home_raw, away_raw, *_) in enumerate(pairings):
                 home_real_name = NAME_MAP.get(home_raw)
                 away_real_name = NAME_MAP.get(away_raw)
 
@@ -353,8 +336,8 @@ async def main() -> None:
                 home_id = team_map_name.get(home_real_name)
                 away_id = team_map_name.get(away_real_name)
                 
-                # Kickoff applies the specific hour/minute provided in the list
-                kickoff_time = base_date.replace(hour=start_hour, minute=start_minute, second=0)
+                # Kickoff Staggering: 5 minutes after deadline, staggered by 1 minute
+                kickoff_time = deadline + timedelta(minutes=5 + i)
 
                 if home_id and away_id:
                     fixture_data.append({
@@ -368,15 +351,18 @@ async def main() -> None:
         await db.gameweek.create_many(data=gameweek_data, skip_duplicates=True)
         print("✅ All gameweeks created.")
 
+        # Map gameweek numbers to their new database IDs
         all_gws = await db.gameweek.find_many()
         gameweek_map = {gw.gw_number: gw.id for gw in all_gws}
         
+        # Add the correct gameweek_id to each fixture
         for fixture in fixture_data:
             fixture["gameweek_id"] = gameweek_map[fixture["gw_number"]]
-            del fixture["gw_number"]
+            del fixture["gw_number"] # Remove the temporary key
 
+        # Create fixtures in DB
         await db.fixture.create_many(data=fixture_data, skip_duplicates=True)
-        print("✅ All fixtures created with Specific Dates and Kickoff Times.")
+        print("✅ All fixtures created with Fast-Paced Test Schedule.")
 
     except Exception as e:
         print(f"❌ An error occurred during seeding: {e}")
