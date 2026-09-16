@@ -18,7 +18,8 @@ from app.services.admin_task_service import (
 )
 from app.services.stats_service import (
     get_dashboard_stats, 
-    compute_user_score_for_gw
+    compute_user_score_for_gw,
+    update_overall_ranks
 )
 from app.services.fixture_service import (
     submit_fixture_stats_service, 
@@ -183,6 +184,10 @@ async def finalize_gameweek(gameweek_id: int, db: Prisma = Depends(get_db)):
             for user in users:
                 await compute_user_score_for_gw(db, str(user.id), gameweek_id)
         logger.info("Points re-calculation complete.")
+
+        logger.info("Step 3.5: Saving frozen overall ranks for this gameweek...")
+        await update_overall_ranks(db, gameweek_id)
+        logger.info("Overall ranks frozen.")
 
         logger.info("Step 4: Updating Gameweek Status...")
         upcoming_gw = await db.gameweek.find_first(where={'status': 'UPCOMING'}, order={'gw_number': 'asc'})

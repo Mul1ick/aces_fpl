@@ -16,7 +16,6 @@ interface LeaderboardEntry {
   team_name: string;
   manager_email: string;
   total_points: number;
-  gwPoints?: number;
   user_id: string;            
 }
 
@@ -26,15 +25,15 @@ interface GameweekInfo {
 }
 
 // --- RANK INDICATOR COMPONENT ---
-const RankIndicator = ({ currentRank, previousRank }: { currentRank: number, previousRank?: number | null }) => {
-  if (previousRank === null || previousRank === undefined) {
+const RankIndicator = ({ currentRank, previousRank, gwNumber }: { currentRank: number, previousRank?: number | null, gwNumber?: number }) => {
+  // Hide arrows completely if it's Gameweek 1 or there is no previous baseline in DB
+  if (gwNumber === 1 || previousRank === null || previousRank === undefined) {
     return <Minus className="size-4 text-pl-white/40 shrink-0" />;
   }
-  // A numerically smaller rank means a higher position (e.g. going from 5 to 2 is an improvement)
+  // Standard Arrow logic
   if (currentRank < previousRank) {
     return <ArrowUpCircle className="size-4 text-green-500 shrink-0" />;
   }
-  // A numerically larger rank means a lower position (e.g. going from 2 to 5 is a drop)
   if (currentRank > previousRank) {
     return <ArrowDownCircle className="size-4 text-red-500 shrink-0" />;
   }
@@ -42,7 +41,7 @@ const RankIndicator = ({ currentRank, previousRank }: { currentRank: number, pre
 };
 
 // --- MOBILE CARD COMPONENT ---
-const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean }> = ({ entry, isCurrentUser }) => (
+const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean; gwNumber?: number }> = ({ entry, isCurrentUser, gwNumber }) => (
   <motion.div
     variants={{
       hidden: { opacity: 0, y: 20 },
@@ -57,13 +56,10 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
     <div className="flex justify-between items-center w-full gap-2 sm:gap-4">
       <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
         <div className={`flex items-center justify-center gap-1 sm:gap-1.5 w-10 sm:w-14 text-center shrink-0 ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
-            <>
-              <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} />
-              <span className="text-base sm:text-xl font-bold tabular-nums">{entry.rank}</span>
-            </>
+          <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} gwNumber={gwNumber} />
+          <span className="text-base sm:text-xl font-bold tabular-nums">{entry.rank}</span>
         </div>
         <div className="min-w-0 flex-1">
-          {/* 👇 Conditional Text Colors */}
           <p className={`font-bold text-sm sm:text-base truncate ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
             {entry.team_name}
           </p>
@@ -73,7 +69,6 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
         </div>
       </div>
       <div className="text-right shrink-0 pl-1 sm:pl-2">
-        {/* 👇 Conditional Text Color */}
         <p className={`text-base sm:text-xl font-bold tabular-nums ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
           {entry.total_points}
         </p>
@@ -100,88 +95,77 @@ const Leaderboard: React.FC = () => {
   }, [currentGameweek]);
 
   useEffect(() => {
-  const token = localStorage.getItem("access_token");
-  if (!token) { setError("You are not authenticated."); setIsLoading(false); return; }
+    const token = localStorage.getItem("access_token");
+    if (!token) { setError("You are not authenticated."); setIsLoading(false); return; }
 
-  const headers = { Authorization: `Bearer ${token}` };
+    const headers = { Authorization: `Bearer ${token}` };
 
-  const fetchCurrentGw = async (): Promise<GameweekInfo> => {
-    const paths = [
-      "/gameweeks/gameweek/current",
-      "/gameweek/current",
-      "/gameweeks/current",
-    ];
-    for (const p of paths) {
-      try {
-        const res = await fetch(`${API.BASE_URL}${p}`, { headers });
-        if (!res.ok) {
-          console.warn(`GW fetch ${p} -> ${res.status}`, await res.text().catch(() => ""));
-          continue;
-        }
-        const gw = await res.json();
-        return {
-          gw_number: Number(gw.gw_number ?? gw.number ?? gw.gw ?? 0),
-          deadline_time: String(gw.deadline_time ?? gw.deadline ?? gw.deadlineTime ?? ""),
-        };
-      } catch (e) {
-        console.warn(`GW fetch ${p} network error`, e);
+    const fetchCurrentGw = async (): Promise<GameweekInfo> => {
+      const paths = ["/gameweeks/gameweek/current", "/gameweek/current", "/gameweeks/current"];
+      for (const p of paths) {
+        try {
+          const res = await fetch(`${API.BASE_URL}${p}`, { headers });
+          if (!res.ok) continue;
+          const gw = await res.json();
+          return {
+            gw_number: Number(gw.gw_number ?? gw.number ?? gw.gw ?? 0),
+            deadline_time: String(gw.deadline_time ?? gw.deadline ?? gw.deadlineTime ?? ""),
+          };
+        } catch (e) {}
       }
+      throw new Error("Current gameweek endpoint not found");
+    };
+
+    (async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const [lbRes, gwInfo] = await Promise.all([
+          fetch(API.endpoints.leaderboard, { headers }),
+          fetchCurrentGw(),
+        ]);
+        if (!lbRes.ok) throw new Error("Failed to fetch leaderboard.");
+
+        const rawLb: any[] = await lbRes.json();
+        const lbData: LeaderboardEntry[] = (rawLb ?? []).map((r: any) => ({
+          rank: Number(r.rank ?? 0),
+          previous_rank: r.previous_rank !== null && r.previous_rank !== undefined ? Number(r.previous_rank) : null,
+          team_name: String(r.team_name ?? ""),
+          manager_email: String(r.manager_email ?? ""),
+          total_points: Number(r.total_points ?? 0),
+          user_id: String(r.user_id ?? r.userId ?? r.id ?? r.user?.id ?? ""),
+        }));
+
+        setLeaderboardData(lbData);
+        setCurrentGameweek(gwInfo);
+        setCurrentPage(1);
+      } catch (e: any) {
+        setError(e.message || "Failed to fetch gameweek info.");
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleRowClick = (entry: LeaderboardEntry) => {
+    if (!currentGameweek) {
+      toast({ variant: "destructive", title: "Cannot view team", description: "Gameweek data is not available." });
+      return;
     }
-    throw new Error("Current gameweek endpoint not found");
+
+    const currentGwNumber = Number(currentGameweek.gw_number);
+    const userKey = entry.user_id || entry.manager_email;
+    if (!userKey) return;
+
+    if (currentGwNumber === 1 && !deadlineHasPassed) {
+      toast({ title: "Team Hidden", description: "You can view other managers' teams after the first gameweek deadline." });
+      return;
+    }
+
+    const targetGwNumber = deadlineHasPassed ? currentGwNumber : currentGwNumber - 1;
+    navigate(`/team-view/${encodeURIComponent(userKey)}/${targetGwNumber}`);
   };
-
-  (async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const [lbRes, gwInfo] = await Promise.all([
-        fetch(API.endpoints.leaderboard, { headers }),
-        fetchCurrentGw(),
-      ]);
-      if (!lbRes.ok) throw new Error("Failed to fetch leaderboard.");
-
-      const rawLb: any[] = await lbRes.json();
-      const lbData: LeaderboardEntry[] = (rawLb ?? []).map((r: any) => ({
-        rank: Number(r.rank ?? 0),
-        previous_rank: r.previous_rank !== null && r.previous_rank !== undefined ? Number(r.previous_rank) : null,
-        team_name: String(r.team_name ?? ""),
-        manager_email: String(r.manager_email ?? ""),
-        total_points: Number(r.total_points ?? 0),
-        user_id: String(r.user_id ?? r.userId ?? r.id ?? r.user?.id ?? ""),
-      }));
-
-      setLeaderboardData(lbData);
-      setCurrentGameweek(gwInfo);
-      setCurrentPage(1);
-    } catch (e: any) {
-      setError(e.message || "Failed to fetch gameweek info.");
-    } finally {
-      setIsLoading(false);
-    }
-  })();
-}, []);
-
-const handleRowClick = (entry: LeaderboardEntry) => {
-  if (!currentGameweek) {
-    toast({ variant: "destructive", title: "Cannot view team", description: "Gameweek data is not available." });
-    return;
-  }
-
-  const currentGwNumber = Number(currentGameweek.gw_number);
-  const userKey = entry.user_id || entry.manager_email;
-  if (!userKey) return;
-
-  if (currentGwNumber === 1 && !deadlineHasPassed) {
-    toast({ title: "Team Hidden", description: "You can view other managers' teams after the first gameweek deadline." });
-    return;
-  }
-
-  const targetGwNumber = deadlineHasPassed ? currentGwNumber : currentGwNumber - 1;
-
-  navigate(`/team-view/${encodeURIComponent(userKey)}/${targetGwNumber}`);
-
-};
 
   const filteredData = useMemo(() =>
     leaderboardData.filter(
@@ -191,10 +175,7 @@ const handleRowClick = (entry: LeaderboardEntry) => {
     ), [leaderboardData, searchQuery]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -206,7 +187,6 @@ const handleRowClick = (entry: LeaderboardEntry) => {
       <div className="container mx-auto px-4 sm:px-6 py-8 max-w-[1100px]">
         <motion.div initial="hidden" animate="visible" variants={containerVariants}>
           
-          {/* Header Section */}
           <motion.div variants={containerVariants} className="mb-6 text-center">
             <img src={acesLogo} alt="Aces FPL Logo" className="w-26 h-16 mx-auto mb-2" />
             <h1 className="text-4xl md:text-5xl font-extrabold text-pl-white">
@@ -250,7 +230,7 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                   <div className="h-96 flex items-center justify-center text-pl-pink">{error}</div>
                 ) : (
                   <>
-                    {/* --- DESKTOP TABLE (Hidden on mobile) --- */}
+                    {/* DESKTOP TABLE */}
                     <div className="overflow-x-auto hidden md:block">
                       <table className="w-full text-left">
                         <thead className="border-b border-pl-border">
@@ -263,7 +243,6 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                         <motion.tbody initial="hidden" animate="visible" variants={containerVariants}>
                           {paginatedData.map((entry) => {
                           const isCurrentUser = entry.manager_email === user?.email;
-                          
                           return (
                             <motion.tr
                               key={entry.user_id || `${entry.manager_email}-${entry.rank}`}
@@ -277,12 +256,11 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                             >
                               <td className="p-4 text-center">
                                   <span className={`font-semibold tabular-nums flex items-center justify-center gap-2 ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
-                                    <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} />
+                                    <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} gwNumber={currentGameweek?.gw_number} />
                                     {entry.rank}
                                   </span>
                               </td>
                               <td className="p-4">
-                                {/* 👇 Conditional Text Colors */}
                                 <p className={`font-semibold ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
                                   {entry.team_name}
                                 </p>
@@ -291,7 +269,6 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                                 </p>
                               </td>
                               <td className={`p-4 text-center text-body font-bold tabular-nums ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
-                                {/* 👇 Conditional Text Color */}
                                 {entry.total_points}
                               </td>
                             </motion.tr>
@@ -301,12 +278,12 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                       </table>
                     </div>
                     
-                    {/* --- MOBILE CARD LIST (Hidden on desktop) --- */}
+                    {/* MOBILE CARD LIST */}
                     <div className="md:hidden">
                         <motion.div initial="hidden" animate="visible" variants={containerVariants}>
                            {paginatedData.map(entry => (
                             <div key={entry.user_id || `${entry.manager_email}-${entry.rank}`} onClick={() => handleRowClick(entry)}>
-                              <LeaderboardCard entry={entry} isCurrentUser={entry.manager_email === user?.email} />
+                              <LeaderboardCard entry={entry} isCurrentUser={entry.manager_email === user?.email} gwNumber={currentGameweek?.gw_number} />
                             </div>
                            ))}
                         </motion.div>
