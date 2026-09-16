@@ -30,9 +30,11 @@ const RankIndicator = ({ currentRank, previousRank }: { currentRank: number, pre
   if (previousRank === null || previousRank === undefined) {
     return <Minus className="size-4 text-pl-white/40 shrink-0" />;
   }
+  // A numerically smaller rank means a higher position (e.g. going from 5 to 2 is an improvement)
   if (currentRank < previousRank) {
     return <ArrowUpCircle className="size-4 text-green-500 shrink-0" />;
   }
+  // A numerically larger rank means a lower position (e.g. going from 2 to 5 is a drop)
   if (currentRank > previousRank) {
     return <ArrowDownCircle className="size-4 text-red-500 shrink-0" />;
   }
@@ -40,7 +42,7 @@ const RankIndicator = ({ currentRank, previousRank }: { currentRank: number, pre
 };
 
 // --- MOBILE CARD COMPONENT ---
-const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean; isSeasonStarted: boolean }> = ({ entry, isCurrentUser, isSeasonStarted }) => (
+const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolean }> = ({ entry, isCurrentUser }) => (
   <motion.div
     variants={{
       hidden: { opacity: 0, y: 20 },
@@ -55,14 +57,10 @@ const LeaderboardCard: React.FC<{ entry: LeaderboardEntry; isCurrentUser: boolea
     <div className="flex justify-between items-center w-full gap-2 sm:gap-4">
       <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
         <div className={`flex items-center justify-center gap-1 sm:gap-1.5 w-10 sm:w-14 text-center shrink-0 ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
-          {isSeasonStarted ? (
             <>
               <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} />
               <span className="text-base sm:text-xl font-bold tabular-nums">{entry.rank}</span>
             </>
-          ) : (
-            <span className="text-base sm:text-xl font-bold tabular-nums">-</span>
-          )}
         </div>
         <div className="min-w-0 flex-1">
           {/* 👇 Conditional Text Colors */}
@@ -100,12 +98,6 @@ const Leaderboard: React.FC = () => {
     if (!currentGameweek?.deadline_time) return false;
     return new Date() > new Date(currentGameweek.deadline_time);
   }, [currentGameweek]);
-
-  // Use this single source of truth for both mobile and desktop
-  const isSeasonStarted = useMemo(() => {
-    if (leaderboardData.length === 0) return false;
-    return leaderboardData.some(entry => entry.total_points > 0);
-  }, [leaderboardData]);
 
   useEffect(() => {
   const token = localStorage.getItem("access_token");
@@ -284,16 +276,10 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                               onClick={() => handleRowClick(entry)}
                             >
                               <td className="p-4 text-center">
-                                {isSeasonStarted ? (
                                   <span className={`font-semibold tabular-nums flex items-center justify-center gap-2 ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
                                     <RankIndicator currentRank={entry.rank} previousRank={entry.previous_rank} />
                                     {entry.rank}
                                   </span>
-                                ) : (
-                                  <span className={`font-bold text-lg tabular-nums text-center ${isCurrentUser ? "text-white" : "text-gray-900"}`}>
-                                    -
-                                  </span>
-                                )}
                               </td>
                               <td className="p-4">
                                 {/* 👇 Conditional Text Colors */}
@@ -320,7 +306,7 @@ const handleRowClick = (entry: LeaderboardEntry) => {
                         <motion.div initial="hidden" animate="visible" variants={containerVariants}>
                            {paginatedData.map(entry => (
                             <div key={entry.user_id || `${entry.manager_email}-${entry.rank}`} onClick={() => handleRowClick(entry)}>
-                              <LeaderboardCard entry={entry} isCurrentUser={entry.manager_email === user?.email} isSeasonStarted={isSeasonStarted} />
+                              <LeaderboardCard entry={entry} isCurrentUser={entry.manager_email === user?.email} />
                             </div>
                            ))}
                         </motion.div>

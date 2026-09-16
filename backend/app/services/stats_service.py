@@ -48,7 +48,7 @@ async def get_leaderboard(db: Prisma):
     if not latest_started_gw:
         final_rows = [{
             "rank": 1,
-            "previous_rank": None,
+            "previous_rank": 1,
             "team_name": u.fantasy_team.name,
             "manager_email": u.email,
             "user_id": str(u.id),
@@ -117,7 +117,7 @@ async def get_leaderboard(db: Prisma):
     # 5. Construct the Final Output
     final_rows = [{
         "rank": curr_rank_map[str(u.id)],
-        "previous_rank": prev_rank_map[str(u.id)] if latest_started_gw.gw_number > 1 else None,
+        "previous_rank": prev_rank_map[str(u.id)],
         "team_name": u.fantasy_team.name,
         "manager_email": u.email,
         "user_id": str(u.id),
