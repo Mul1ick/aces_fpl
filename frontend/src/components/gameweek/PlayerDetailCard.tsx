@@ -1,3 +1,5 @@
+// (Replace the entire file with this updated code)
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { X, AlertTriangle } from 'lucide-react';
@@ -30,9 +32,7 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
   if (!player) return null;
 
   const determineMultiplier = () => {
-    // <--- FIXED: Removed the old "didPlay" ghost logic entirely. --->
     const isCap = player.is_captain || player.isCaptain;
-    
     let getsBonus = false;
     if (isEffectiveCaptain !== undefined) {
       getsBonus = isEffectiveCaptain;
@@ -63,8 +63,15 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
     ? new Date(player.return_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     : null;
 
+  // --- NEW LOGIC: Clean Fixture Formatting ---
   const recentFixture = player.recent_fixtures?.[0] || null;
+  const playerTeamShort = player.team_short_name || player.team?.short_name || (typeof player.team === 'string' ? player.team.substring(0, 3).toUpperCase() : 'UNK');
   
+  const playerHA = recentFixture?.ha; // 'H' or 'A'
+  const oppShort = recentFixture?.opp; // e.g. 'HYD'
+  const oppHA = playerHA === 'H' ? 'A' : 'H';
+  // -------------------------------------------
+
   const augmentedBreakdown = useMemo(() => {
     let newBreakdown = player.breakdown || [];
     const stats = player.raw_stats || player.stats || {};
@@ -150,15 +157,15 @@ export const PlayerDetailCard: React.FC<PlayerDetailCardProps> = ({
             {recentFixture ? (
               <div className="flex justify-between items-center gap-2 font-bold text-lg">
                 <div className="flex items-center gap-2 flex-1 justify-end">
-                    <span className="text-gray-900 text-right">{player.team?.name || player.team}</span>
-                    <img src={getTeamLogo(player.team?.short_name)} alt={player.team?.name} className="w-8 h-8 object-contain" />
+                    <span className="text-gray-900 text-right">{playerTeamShort} ({playerHA})</span>
+                    <img src={getTeamLogo(playerTeamShort)} alt={playerTeamShort} className="w-8 h-8 object-contain" />
                 </div>
                 <span className="bg-black text-white px-3 py-1 rounded-md text-sm">
                   vs
                 </span>
                 <div className="flex items-center gap-2 flex-1 justify-start">
-                    <img src={getTeamLogo(recentFixture.opp)} alt={recentFixture.opp} className="w-8 h-8 object-contain" />
-                    <span className="text-gray-900 text-left">{recentFixture.opp} ({recentFixture.ha})</span>
+                    <img src={getTeamLogo(oppShort)} alt={oppShort} className="w-8 h-8 object-contain" />
+                    <span className="text-gray-900 text-left">{oppShort} ({oppHA})</span>
                 </div>
               </div>
             ) : (

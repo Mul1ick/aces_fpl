@@ -87,7 +87,10 @@ export const transformApiPlayer = (rawPlayer: any): any => {
   if (!rawPlayer) return null;
 
   const position = String(rawPlayer.pos ?? rawPlayer.position ?? '').toUpperCase();
-  const clubName = rawPlayer.team?.name || rawPlayer.club || 'Unknown';
+  const clubName = rawPlayer.team?.name || rawPlayer.club || rawPlayer.team || 'Unknown';
+  
+  // Safely grab the short name from objects, or slice it from the string
+  const shortName = rawPlayer.team?.short_name || rawPlayer.team_short_name || (typeof clubName === 'string' ? clubName.substring(0,3).toUpperCase() : 'UNK');
 
   return {
     id: rawPlayer.id,
@@ -97,7 +100,8 @@ export const transformApiPlayer = (rawPlayer: any): any => {
     position: position === 'ST' ? 'FWD' : position,
     club: clubName,
     teamName: clubName,
-    team: clubName,
+    team: rawPlayer.team, // Preserve the original team object/string
+    team_short_name: shortName,
     price: rawPlayer.price,
     points: rawPlayer.points,
     tsb: rawPlayer.tsb, // Team Selected By %

@@ -6,15 +6,12 @@ from prisma import Prisma
 from app import schemas
 from app.repositories.gameweek_repo import get_current_gameweek
 from app.services.team_service import carry_forward_team
-from app.services.chip_service import is_triple_captain_active , is_bench_boost_active 
+from app.services.chip_service import is_triple_captain_active, is_bench_boost_active 
 from app.utils.stats_utils import calculate_breakdown
 from app.repositories.team_repo import get_team_by_id
 from app.repositories.player_repo import get_players_by_ids
 
-import logging
-
 logger = logging.getLogger("aces.chips")
-
 
 async def get_dashboard_stats(db: Prisma):
     pending_users_count = await db.user.count(where={'is_active': False})
@@ -32,7 +29,7 @@ async def get_dashboard_stats(db: Prisma):
         recent_activities=recent_activities
     )
 
-
+# 👇 Only ONE get_leaderboard function now, updated with the strict GW logic!
 async def get_leaderboard(db: Prisma):
     users = await db.user.find_many(
         where={'is_active': True, 'role': 'user', 'fantasy_team': {'is_not': None}},
@@ -41,78 +38,61 @@ async def get_leaderboard(db: Prisma):
     if not users:
         return []
 
-    scores_data = await db.usergameweekscore.group_by(
-        by=['user_id'],
-        sum={'total_points': True, 'transfer_hits': True},  # prisma-py expects `sum=...`
-    )
-
-    score_map: dict[str, int] = {}
-    for item in scores_data:
-        agg = item.get('_sum') or item.get('sum') or {}     # handle either result shape
-        total = int(agg.get('total_points') or 0)
-        hits  = int(agg.get('transfer_hits') or 0)
-        score_map[str(item['user_id'])] = total - hits
-
-    rows = [{
-        "rank": 0,
-        "team_name": u.fantasy_team.name,
-        "manager_email": u.email,
-        "user_id": str(u.id),
-        "total_points": int(score_map.get(str(u.id), 0)),
-    } for u in users]
-
-    rows.sort(key=lambda r: r['total_points'], reverse=True)
-    for i, r in enumerate(rows, 1):
-        r["rank"] = i
-    return rows
-
-async def get_leaderboard(db: Prisma):
-    users = await db.user.find_many(
-        where={'is_active': True, 'role': 'user', 'fantasy_team': {'is_not': None}},
-        include={'fantasy_team': True},
-    )
-    if not users:
-        return []
-
-    # 1. Get Current Overall Scores
-    scores_data = await db.usergameweekscore.group_by(
-        by=['user_id'],
-        sum={'total_points': True, 'transfer_hits': True},
-    )
-
-    score_map: dict[str, int] = {}
-    for item in scores_data:
-        agg = item.get('_sum') or item.get('sum') or {}
-        total = int(agg.get('total_points') or 0)
-        hits  = int(agg.get('transfer_hits') or 0)
-        score_map[str(item['user_id'])] = total - hits
-
-    # 2. Get Previous Overall Scores (Before the latest LIVE/FINISHED Gameweek)
-    current_gw = await db.gameweek.find_first(
+    # 1. Find the latest gameweek that has started (LIVE or FINISHED)
+    latest_started_gw = await db.gameweek.find_first(
         where={'status': {'in': ['LIVE', 'FINISHED']}},
         order={'gw_number': 'desc'}
     )
 
+    # If no gameweek has started yet, everyone is on 0 points, rank 1, no previous rank.
+    if not latest_started_gw:
+        final_rows = [{
+            "rank": 1,
+            "previous_rank": None,
+            "team_name": u.fantasy_team.name,
+            "manager_email": u.email,
+            "user_id": str(u.id),
+            "total_points": 0,
+        } for u in users]
+        return final_rows
+
+    # Fetch IDs for all gameweeks up to the latest started one
+    valid_gws = await db.gameweek.find_many(where={'gw_number': {'lte': latest_started_gw.gw_number}})
+    valid_gw_ids = [gw.id for gw in valid_gws]
+
+    # Fetch IDs for all gameweeks prior to the latest started one (for previous rank)
+    prev_gws = await db.gameweek.find_many(where={'gw_number': {'lt': latest_started_gw.gw_number}})
+    prev_gw_ids = [gw.id for gw in prev_gws]
+
+    # 2. Get Current Overall Scores (Only counting gameweeks that have started!)
+    score_map: dict[str, int] = {str(u.id): 0 for u in users}
+    if valid_gw_ids:
+        scores_data = await db.usergameweekscore.group_by(
+            by=['user_id'],
+            where={'gameweek_id': {'in': valid_gw_ids}},
+            sum={'total_points': True, 'transfer_hits': True},
+        )
+        for item in scores_data:
+            agg = item.get('_sum') or item.get('sum') or {}
+            total = int(agg.get('total_points') or 0)
+            hits  = int(agg.get('transfer_hits') or 0)
+            score_map[str(item['user_id'])] = total - hits
+
+    # 3. Get Previous Overall Scores
     prev_score_map: dict[str, int] = {str(u.id): 0 for u in users}
+    if prev_gw_ids:
+        prev_scores_data = await db.usergameweekscore.group_by(
+            by=['user_id'],
+            where={'gameweek_id': {'in': prev_gw_ids}},
+            sum={'total_points': True, 'transfer_hits': True},
+        )
+        for item in prev_scores_data:
+            agg = item.get('_sum') or item.get('sum') or {}
+            total = int(agg.get('total_points') or 0)
+            hits  = int(agg.get('transfer_hits') or 0)
+            prev_score_map[str(item['user_id'])] = total - hits
 
-    if current_gw and current_gw.gw_number > 1:
-        # Fetch IDs for all gameweeks prior to the current one
-        prev_gws = await db.gameweek.find_many(where={'gw_number': {'lt': current_gw.gw_number}})
-        prev_gw_ids = [gw.id for gw in prev_gws]
-
-        if prev_gw_ids:
-            prev_scores_data = await db.usergameweekscore.group_by(
-                by=['user_id'],
-                where={'gameweek_id': {'in': prev_gw_ids}},
-                sum={'total_points': True, 'transfer_hits': True},
-            )
-            for item in prev_scores_data:
-                agg = item.get('_sum') or item.get('sum') or {}
-                total = int(agg.get('total_points') or 0)
-                hits  = int(agg.get('transfer_hits') or 0)
-                prev_score_map[str(item['user_id'])] = total - hits
-
-    # 3. Helper to assign ranks accurately (handling ties)
+    # 4. Helper to assign ranks accurately (handling ties where tied managers get the same rank)
     def assign_ranks(rows_list):
         rank_dict = {}
         current_rank = 1
@@ -134,10 +114,10 @@ async def get_leaderboard(db: Prisma):
     prev_rows.sort(key=lambda r: r['score'], reverse=True)
     prev_rank_map = assign_ranks(prev_rows)
 
-    # 4. Construct the Final Output
+    # 5. Construct the Final Output
     final_rows = [{
         "rank": curr_rank_map[str(u.id)],
-        "previous_rank": prev_rank_map[str(u.id)] if (current_gw and current_gw.gw_number > 1) else None,
+        "previous_rank": prev_rank_map[str(u.id)] if latest_started_gw.gw_number > 1 else None,
         "team_name": u.fantasy_team.name,
         "manager_email": u.email,
         "user_id": str(u.id),
@@ -146,6 +126,7 @@ async def get_leaderboard(db: Prisma):
 
     final_rows.sort(key=lambda r: r['rank'])
     return final_rows
+
 
 
 
