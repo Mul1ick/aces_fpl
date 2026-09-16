@@ -15,11 +15,11 @@ interface EditablePlayerCardProps {
   onViewProfile: () => void;
 }
 
-const FixtureRow = ({ gameweek, opponent, points }: { gameweek: string, opponent: string, points: number }) => (
+const FixtureRow = ({ gameweek, opponent, points }: { gameweek: string, opponent: string, points: number | null }) => (
     <div className="flex justify-between items-center py-2 border-b border-gray-200 text-sm">
         <p className="font-semibold">{gameweek}</p>
         <p className="text-gray-600">{opponent}</p>
-        <p className="font-bold">{points} pts</p>
+        <p className="font-bold">{points !== null && points !== undefined ? `${points} pts` : '-'}</p>
     </div>
 );
 

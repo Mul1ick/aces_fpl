@@ -124,22 +124,28 @@ const Team: React.FC = () => {
                 //     };
                 // };
 
-                const starting = teamData.starting.map((p: any) => ({
-                    ...transformApiPlayer(p),
-                    status: p.status ?? 'ACTIVE',
-                    chance_of_playing: p.chance_of_playing ?? null,
-                    news: p.news ?? null,
-                }));
+                // const starting = teamData.starting.map((p: any) => ({
+                //     ...transformApiPlayer(p),
+                //     status: p.status ?? 'ACTIVE',
+                //     chance_of_playing: p.chance_of_playing ?? null,
+                //     news: p.news ?? null,
+                // }));
 
-                const bench = teamData.bench.map((p: any) => ({
-                    ...transformApiPlayer(p),
-                    status: p.status ?? 'ACTIVE',
-                    chance_of_playing: p.chance_of_playing ?? null,
-                    news: p.news ?? null,
-                }));
+                // const bench = teamData.bench.map((p: any) => ({
+                //     ...transformApiPlayer(p),
+                //     status: p.status ?? 'ACTIVE',
+                //     chance_of_playing: p.chance_of_playing ?? null,
+                //     news: p.news ?? null,
+                // }));
+                // const currentSquad = { starting, bench, team_name: teamData.team_name };
+                // setSquad(currentSquad);
+                // setInitialSquadState(JSON.stringify(currentSquad));
+
+                const starting = teamData.starting.map(transformApiPlayer);
+                const bench = teamData.bench.map(transformApiPlayer);
+                
                 const currentSquad = { starting, bench, team_name: teamData.team_name };
                 setSquad(currentSquad);
-                setInitialSquadState(JSON.stringify(currentSquad));
                 
                 // Process Hub, Leaderboard, Gameweek and Fixture Data
                 if (hubRes.ok) setHubStats(await hubRes.json());

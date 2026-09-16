@@ -289,7 +289,7 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
                 continue
             is_home = (f.home_team_id == club.id)
             opp = f.away.short_name if is_home else f.home.short_name
-            pts = pts_by_player_gw.get((entry.player.id, f.gameweek_id), 0)
+            pts = pts_by_player_gw.get((entry.player.id, f.gameweek_id), 0) if f.stats_entered else None
             rows.append({"gw": gw_num, "opp": opp, "ha": "H" if is_home else "A", "points": pts})
         out["recent_fixtures"] = rows
 

@@ -87,9 +87,7 @@ export const transformApiPlayer = (rawPlayer: any): any => {
   if (!rawPlayer) return null;
 
   const position = String(rawPlayer.pos ?? rawPlayer.position ?? '').toUpperCase();
-  const clubName = rawPlayer.team?.name || rawPlayer.club || rawPlayer.team || 'Unknown';
-  
-  // Safely grab the short name from objects, or slice it from the string
+  const clubName = rawPlayer.team?.name || rawPlayer.club || (typeof rawPlayer.team === 'string' ? rawPlayer.team : 'Unknown');
   const shortName = rawPlayer.team?.short_name || rawPlayer.team_short_name || (typeof clubName === 'string' ? clubName.substring(0,3).toUpperCase() : 'UNK');
 
   return {
@@ -100,11 +98,12 @@ export const transformApiPlayer = (rawPlayer: any): any => {
     position: position === 'ST' ? 'FWD' : position,
     club: clubName,
     teamName: clubName,
-    team: rawPlayer.team, // Preserve the original team object/string
+    team: clubName, // <--- FIXED: Now strictly a string!
+    team_obj: typeof rawPlayer.team === 'object' ? rawPlayer.team : null, // <--- Safe object storage
     team_short_name: shortName,
     price: rawPlayer.price,
     points: rawPlayer.points,
-    tsb: rawPlayer.tsb, // Team Selected By %
+    tsb: rawPlayer.tsb,
     fixture: rawPlayer.fixture_str,
     isCaptain: rawPlayer.is_captain ?? rawPlayer.isCaptain ?? false,
     isVice: rawPlayer.is_vice_captain ?? rawPlayer.isVice ?? false,
@@ -115,7 +114,6 @@ export const transformApiPlayer = (rawPlayer: any): any => {
     chance_of_playing: rawPlayer.chance_of_playing ?? null,
     return_date: rawPlayer.return_date ?? null,
     
-    // Add the detailed stats from the API response
     recent_fixtures: rawPlayer.recent_fixtures ?? [],
     raw_stats: rawPlayer.raw_stats ?? {},
     breakdown: rawPlayer.breakdown ?? [],

@@ -36,6 +36,9 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
   const isYellowWarning = chance !== undefined && chance !== null && chance > 0 && chance <= 75;
   const bannerBgClass = isYellowWarning ? 'bg-yellow-100 text-yellow-900 border-yellow-400' : 'bg-[#B2002D] text-white border-[#B2002D]';
   const iconColor = isYellowWarning ? 'text-yellow-600' : 'text-white';
+  
+  // 👇 FIXED: Added optional chaining (?) to prevent "Cannot read properties of null"
+  const safeTeamName = player?.club || player?.teamName || (typeof player?.team === 'string' ? player?.team : player?.team?.name) || 'Unknown';
 
   const returnDateStr = player?.return_date
     ? new Date(player.return_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -77,15 +80,16 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                 <X className="w-5 h-5 text-gray-500" />
               </button>
               
+              
               <div className="flex items-center gap-4 mb-2">
                 <img 
-                    src={getTeamJersey(player.club || player.teamName || player.team)} 
+                    src={getTeamJersey(safeTeamName)} 
                     alt="Jersey" 
                     className="w-10 h-12 object-contain" 
                 />
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
-                    {player.pos} • {player.club || player.teamName || player.team}
+                    {player.pos} • {safeTeamName}
                   </p>
                   <h2 className="text-2xl font-black text-black leading-tight">
                     {player.name || player.full_name}
