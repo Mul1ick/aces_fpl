@@ -21,12 +21,13 @@ import {
 } from '@/components/ui/select';
 import type { Team, Player, PlayerGameweekStats } from '@/types';
 import { CompactInput } from '@/components/shared/CompactInput';
-import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, ShieldAlert, Ban, Star, Timer, AlertTriangle, UserCheck } from 'lucide-react';
+import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, ShieldAlert, Ban, Star, Timer, AlertTriangle, UserCheck, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ExtendedPlayerGameweekStats = PlayerGameweekStats & {
   suspension_duration?: number;
   penalties_saved?: number;
+  played_majority?: boolean;
 };
 
 type PlayerStatInputs = {
@@ -35,6 +36,7 @@ type PlayerStatInputs = {
 
 const DEFAULT_ROW_STATS: ExtendedPlayerGameweekStats = {
   played: false,
+  played_majority: false,
   goals_scored: 0, assists: 0, clean_sheets: false,
   goals_conceded: 0, own_goals: 0, penalties_missed: 0, penalties_saved: 0, yellow_cards: 0,
   red_cards: 0, bonus_points: 0,
@@ -67,6 +69,7 @@ interface StatsEntryModalProps {
 const StatsTableHeader = () => {
     const headers = [
         { icon: <UserCheck className="h-5 w-5 text-purple-500" />, label: 'Played' },
+        { icon: <Clock className="h-5 w-5 text-blue-400" />, label: 'Played Majority' },
         { icon: <Goal className="h-5 w-5 text-blue-500" />, label: 'Goals' },
         { icon: <PlusCircle className="h-5 w-5 text-green-500" />, label: 'Assists' },
         { icon: <ShieldCheck className="h-5 w-5 text-green-500" />, label: 'Clean Sheet' },
@@ -80,7 +83,7 @@ const StatsTableHeader = () => {
     ];
 
     return (
-        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(11,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
+        <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(12,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
             <div className="text-left font-bold">Player</div>
             {headers.map(h => (
                 <div key={h.label} className="flex flex-col items-center justify-center gap-1.5 h-12">
@@ -107,12 +110,11 @@ const PlayerStatRow = ({
 
   return (
     <div className={cn(
-      "grid grid-cols-[minmax(200px,_1.5fr)_repeat(11,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 border-b last:border-b-0",
+      "grid grid-cols-[minmax(200px,_1.5fr)_repeat(12,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 border-b last:border-b-0",
       isUnavailable && "bg-red-50/60 dark:bg-red-950/20"
     )}>
       <div className="flex items-center gap-2">
         {isUnavailable && (
-          // <--- FIXED: Wrapped the Icon in a span to hold the title attribute
           <span title={player.news || player.status}>
              <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
           </span>
@@ -127,6 +129,14 @@ const PlayerStatRow = ({
         <Switch 
           checked={stats.played} 
           onCheckedChange={(val) => onStatChange(player.id, 'played', val)} 
+          disabled={disabled} 
+        />
+      </div>
+
+      <div className="flex justify-center">
+        <Switch 
+          checked={stats.played_majority || false} 
+          onCheckedChange={(val) => onStatChange(player.id, 'played_majority', val)} 
           disabled={disabled} 
         />
       </div>
@@ -213,8 +223,17 @@ export function StatsEntryModal({
       const currentStats = prev[playerId] || { ...DEFAULT_ROW_STATS };
       const updatedStats = { ...currentStats, [field]: value };
       
-      if (field !== 'played' && (value === true || (typeof value === 'number' && value > 0))) {
+      // Auto-toggle 'Played' ON if any positive stat is entered (excluding played_majority)
+      if (field !== 'played' && field !== 'played_majority' && (value === true || (typeof value === 'number' && value > 0))) {
           updatedStats.played = true;
+      }
+
+      // Auto-toggle logic for Played Majority
+      if (field === 'played_majority' && value === true) {
+          updatedStats.played = true; // If played majority is true, played MUST be true
+      }
+      if (field === 'played' && value === false) {
+          updatedStats.played_majority = false; // If played is false, played majority MUST be false
       }
 
       return { ...prev, [playerId]: updatedStats };
@@ -237,7 +256,7 @@ export function StatsEntryModal({
   const isReadOnly = mode === 'view';
 
   const renderPlayerTable = (teamPlayers: Player[]) => (
-    <div className="border rounded-lg bg-card">
+    <div className="border rounded-lg bg-card min-w-[1100px]">
       <StatsTableHeader />
       <div className="flex flex-col">
         {teamPlayers.map(player => (
@@ -283,7 +302,7 @@ export function StatsEntryModal({
         </DialogHeader>
         
         <div className="p-6 overflow-x-auto">
-          <ScrollArea className="h-[55vh] w-full pr-4 min-w-[1000px]">
+          <ScrollArea className="h-[55vh] w-full pr-4">
             {loading ? (
               <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading players…</div>
             ) : (

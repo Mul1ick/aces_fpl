@@ -201,6 +201,7 @@ class GameweekOutWithFixtures(BaseModel):
 class PlayerStatIn(BaseModel):
     player_id: int
     played: bool = False
+    played_majority: bool = False # <--- ADD THIS
     goals_scored: int = 0
     assists: int = 0
     clean_sheets: bool = False
@@ -223,6 +224,7 @@ class SubmitFixtureStats(BaseModel):
 class PlayerStatOut(BaseModel):
     player_id: int
     played: bool
+    played_majority: bool # <--- ADD THIS
     goals_scored: int
     assists: int
     clean_sheets: bool
@@ -327,6 +329,7 @@ class UpdatePlayerStatsRequest(BaseModel):
     player_id: int
     gameweek_id: int
     played: Optional[bool] = None
+    played_majority: Optional[bool] = None # <--- ADD THIS
     goals: Optional[int] = None
     assists: Optional[int] = None
     clean_sheets: Optional[bool] = None

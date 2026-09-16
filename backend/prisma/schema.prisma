@@ -123,6 +123,7 @@ model GameweekPlayerStats {
   player_id     Int
 
   played          Boolean @default(false) // <--- RE-ADDED: Core mechanism for participation
+  played_majority Boolean @default(false)
   goals_scored  Int     @default(0)
   assists       Int     @default(0)
   clean_sheets    Boolean @default(false)     

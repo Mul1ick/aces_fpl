@@ -89,6 +89,7 @@ export interface PlayerStats {
   player_id: string;
   fixture_id: string;
   played: boolean; 
+  played_majority: boolean; // <--- ADD THIS
   goals_scored: number;
   assists: number;
   clean_sheets: number;
@@ -104,6 +105,7 @@ export interface PlayerStats {
 
 export interface PlayerGameweekStats {
   played: boolean;
+  played_majority: boolean;
   goals_scored: number;
   assists: number;
   clean_sheets: boolean;

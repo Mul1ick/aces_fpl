@@ -4,6 +4,7 @@ def calculate_player_points(position: str, stats: schemas.PlayerStatIn) -> int:
     points = 0
     
     if stats.played: points += 1 # <--- UNCOMMENTED: Automatically give 1 pt for appearance
+    if stats.played_majority: points += 1 # <--- ADD THIS LINE
     
     if stats.goals_scored > 0:
         if position == "GK": points += stats.goals_scored * 10

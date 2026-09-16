@@ -717,6 +717,7 @@ async def update_historical_stats(db: Prisma, data: schemas.UpdatePlayerStatsReq
     
     mapping = {
         "played": "played", # <--- ADDED: Allows admin to fix appearance logic
+        "played_majority": "played_majority", # <--- ADD THIS
         "goals": "goals_scored",
         "goals_scored": "goals_scored",
         "assists": "assists",
