@@ -10,18 +10,18 @@ import { Label } from '@/components/ui/label';
 import { getTeamLogo } from '@/lib/player-utils';
 
 const Teams = [
-    { name: 'Umang', shortName: 'UMA' },
-    { name: 'Satans', shortName: 'SAT' },
-    { name: 'Aer Titans', shortName: 'AER' },
-    { name: 'Trana', shortName: 'TRA' },
-    { name: 'Roarers', shortName: 'ROA' },
+    { name: 'Bluelock', shortName: 'BLK' },
     { name: 'Casuals FC', shortName: 'CAS' },
-    { name: 'Cathect', shortName: 'CAT' },
+    { name: 'Cathect FC', shortName: 'CTH' },
     { name: 'Encore United', shortName: 'ENC' },
-    { name: 'Matero Power 8s', shortName: 'MAT' },
-    { name: 'Wolfpack FC', shortName: 'WOLF' },
-    { name: 'Youngblood FC', shortName: 'YBFC' },
-    { name: 'Majithia Realty FC', shortName: 'MRFC' },
+    { name: 'Hybec Hydras', shortName: 'HYD' },
+    { name: 'Juggernauts', shortName: 'JUG' },
+    { name: 'KT Falcons', shortName: 'FAL' },
+    { name: 'Trana', shortName: 'TRA' },
+    { name: 'Umang FC', shortName: 'UMG' },
+    { name: 'Wasted Potential', shortName: 'WST' },
+    { name: 'Wolfpack', shortName: 'WOLF' },
+    { name: 'Youngblood FC', shortName: 'YBF' },
 ];
 
 interface FilterSelection {

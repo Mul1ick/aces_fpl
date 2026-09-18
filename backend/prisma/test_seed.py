@@ -303,8 +303,8 @@ async def main() -> None:
         now_utc = datetime.now(timezone.utc)
         
         # Start Time: 10 minutes from NOW
-        start_time = now_utc + timedelta(minutes=10)
-        interval = timedelta(minutes=10)
+        start_time = now_utc + timedelta(minutes=5)
+        interval = timedelta(minutes=15)
         
         gameweek_data = []
         fixture_data = []
