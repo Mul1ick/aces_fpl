@@ -49,18 +49,18 @@ const Transfers: React.FC = () => {
 
   // --- STATE MANAGEMENT ---
   const [squad, setSquad] = useState(initialSquad);
-const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
-  // --- MODIFIED --- Added state to store the existing team name
+  const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
   const [existingTeamName, setExistingTeamName] = useState<string>('');
-  const [gameweek, setGameweek] = useState(null);
+  
+  // This now explicitly tracks the UPCOMING gameweek based on the clock
+  const [gameweek, setGameweek] = useState<any>(null);
+  
   const [isPlayerSelectionOpen, setIsPlayerSelectionOpen] = useState(false);
   const [isEnterSquadModalOpen, setIsEnterSquadModalOpen] = useState(false);
   const [positionToFill, setPositionToFill] = useState<{ position: string; index: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [view, setView] = useState<'pitch' | 'list'>('pitch');
-
-
 
   const hasTeam = user?.has_team;
 
@@ -80,8 +80,6 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
     }
     return newSquad;
   };
-
-  const serializeSquad = (squadToSerialize: any) => JSON.stringify(Object.values(squadToSerialize).flat().map(p => (p as any)?.id || null).sort());
 
   // --- DATA FETCHING ---
   const fetchAndSetTeam = useCallback(async () => {
@@ -117,23 +115,37 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
   }, [hasTeam, token, toast]);
 
   useEffect(() => {
-    if (!isAuthLoading) {
+    if (!isAuthLoading && token) {
       fetchAndSetTeam();
       
-      fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      // 1. Clock-Based Gameweek Resolution
+      fetch(API.endpoints.gameweek, { headers: { Authorization: `Bearer ${token}` } })
         .then(res => res.json())
-        .then(setGameweek)
+        .then(allGws => {
+            const now = new Date();
+            const upcomingGws = allGws.filter((gw: any) => new Date(gw.deadline) > now);
+            upcomingGws.sort((a: any, b: any) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+            
+            if (upcomingGws.length > 0) {
+                setGameweek(upcomingGws[0]);
+            } else if (allGws.length > 0) {
+                // Season is over, default to the last one
+                setGameweek(allGws[allGws.length - 1]);
+            }
+        })
         .catch(() => console.error("Failed to fetch gameweek data"));
-    }
-    fetch(`${API.BASE_URL}/chips/status`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+
+      // 2. Fetch Chip Status
+      fetch(`${API.BASE_URL}/chips/status`, { headers: { Authorization: `Bearer ${token}` } })
         .then(res => res.json())
         .then(setChipStatus)
         .catch(() => console.error("Failed to fetch chip status"));
+    }
   }, [hasTeam, isAuthLoading, fetchAndSetTeam, token]);
 
   const isLocked = useMemo(() => {
     if (!gameweek) return false;
-    // Lock if the deadline is in the past (implies LIVE or FINISHED but not rolled over)
+    // Lock if the deadline is in the past (only happens if season is fully over due to clock-based logic)
     if (gameweek.deadline) {
         return new Date(gameweek.deadline) < new Date();
     }
@@ -153,7 +165,7 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
 
     const totalCost = currentPlayers.reduce((acc, p) => acc + (p?.price || 0), 0);
     const remainingBank = 100.0 - totalCost;
-    const isWildcardActive = chipStatus?.active === 'WILDCARD';
+    const isWildcardActive = chipStatus?.active === 'WILDCARD' || chipStatus?.active === 'FREE_HIT';
     const freeTransfers = user?.free_transfers ?? 1;
     const numTransfers = out.length;
     const paidTransfers = (isWildcardActive || user?.played_first_gameweek === false) 
@@ -169,7 +181,7 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
       transferCost: cost,
       playersSelected: currentPlayers.length
     };
-  }, [squad, initialSquadObject, user,chipStatus]);
+  }, [squad, initialSquadObject, user, chipStatus]);
 
   const squadValidation = useMemo(() => {
     const allPlayers = Object.values(squad).flat().filter(p => p !== null);
@@ -195,7 +207,7 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
     } else {
       setNotification(null);
     }
-  }, [squadValidation]);
+  }, [squadValidation, bank]);
 
   // --- HANDLERS ---
   const handleSlotClick = (position: string, index: number) => {
@@ -204,46 +216,34 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
   };
 
   const handleStartTransfer = (player: any, pos: string, index: number) => {
-  setPositionToFill({ position: pos, index: index });
-  handlePlayerRemove(pos, index);
-  if (window.innerWidth < 1024) setIsPlayerSelectionOpen(true);
-};
+    setPositionToFill({ position: pos, index: index });
+    handlePlayerRemove(pos, index);
+    if (window.innerWidth < 1024) setIsPlayerSelectionOpen(true);
+  };
   
   const handlePlayerSelect = (playerData: any) => {
     setIsPlayerSelectionOpen(false);
     
-    // Transform the base player data
     const newPlayer = transformApiPlayer(playerData);
     
-    // EXPLICITLY CARRY FORWARD STATUS DATA
     newPlayer.status = playerData.status || 'ACTIVE';
     newPlayer.chance_of_playing = playerData.chance_of_playing ?? null;
     newPlayer.news = playerData.news || null;
 
-    const actualPos = newPlayer.pos; // e.g. "FWD"
+    const actualPos = newPlayer.pos; 
     let targetSlot = positionToFill;
 
-    // STEP 1: Mismatch Check
-    // If user clicked a specific slot (e.g. DEF), but picked a player of a DIFFERENT position (e.g. FWD)
     if (targetSlot && targetSlot.position !== actualPos) {
-        // We ignore the clicked slot to prevent placing a FWD in a DEF slot
         targetSlot = null; 
     }
 
-    // STEP 2: Auto-Routing & Full Slot Check
-    // If targetSlot is null (either they didn't click a slot, or we nullified a mismatched slot)
     if (!targetSlot) {
-        // Look for any empty slot in the player's ACTUAL position array
         const positionArray = squad[actualPos as keyof typeof squad];
         const emptyIndex = positionArray.findIndex(p => p === null);
 
         if (emptyIndex !== -1) {
-            // Success: Found an empty slot in the correct position! Auto-route here.
             targetSlot = { position: actualPos, index: emptyIndex };
         } else {
-            // Failure: All slots for this player's position are full.
-            
-            // Show dynamic error based on how they got here
             if (positionToFill && positionToFill.position !== actualPos) {
                 toast({
                     variant: "destructive",
@@ -257,14 +257,11 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
                     description: `All ${actualPos} slots in your squad are already filled. Please transfer a ${actualPos} out first.`,
                 });
             }
-            
-            // Clear the focused slot so they can try again smoothly
             setPositionToFill(null);
-            return; // Abort adding the player
+            return; 
         }
     }
     
-    // STEP 3: Assign Player to the Target Slot
     if (targetSlot) {
         setSquad((current) => {
             const newSquad = { ...current };
@@ -277,7 +274,7 @@ const [initialSquadObject, setInitialSquadObject] = useState(initialSquad);
     }
   };
   
-const handlePlayerRemove = (position: string, index: number) => {
+  const handlePlayerRemove = (position: string, index: number) => {
     setPositionToFill({ position, index });
     setSquad(current => {
       const newSquad = { ...current };
@@ -286,24 +283,19 @@ const handlePlayerRemove = (position: string, index: number) => {
       newSquad[position] = positionArray;
       return newSquad;
     });
-    // For mobile, automatically open the selection list
     if (window.innerWidth < 1024) {
       setIsPlayerSelectionOpen(true);
     }
   };
 
-
   const handleReset = () => {
     setIsLoading(true);
     fetchAndSetTeam();
   };
-  
-  const handleAutoFill = () => toast({ title: 'Coming Soon!', description: 'Autofill feature is on the way.'});
 
   const handleConfirmTransfers = async (teamNameFromModal?: string) => {
     if (!token) return;
 
-    // Logic for submitting a brand new team
     if (!hasTeam) {
         if (playersSelected !== 11) {
             toast({ variant: "destructive", title: "Incomplete Squad", description: "You must select 11 players to save your team." });
@@ -330,7 +322,6 @@ const handlePlayerRemove = (position: string, index: number) => {
         return;
     }
     
-    // Logic for confirming transfers for an existing team
     if (playersIn.length === 0 && playersOut.length === 0) {
       toast({ variant: "destructive", title: "No Changes", description: "You haven't made any transfers." });
       return;
@@ -351,7 +342,7 @@ const handlePlayerRemove = (position: string, index: number) => {
         });
         if (!res.ok) throw new Error((await res.json()).detail || "Transfer failed");
 
-        await fetchAndSetTeam(); // Refresh squad from backend to get new initial state
+        await fetchAndSetTeam(); 
         await refreshUserStatus();
         toast({ title: "Transfers Confirmed!", description: "Your changes have been saved." });
 
@@ -360,7 +351,6 @@ const handlePlayerRemove = (position: string, index: number) => {
     }
   };
 
-  // --- RENDER LOGIC ---
   if (isLoading || isAuthLoading) {
     return <LoadingIndicator />;
   }
@@ -382,7 +372,6 @@ const handlePlayerRemove = (position: string, index: number) => {
         animate="visible"
         variants={containerVariants}
       >
-          {/* --- MODIFIED: Added z-20 to raise this column's stacking context --- */}
         <motion.div 
           variants={itemVariants} 
           className="hidden lg:block lg:col-span-4 h-screen overflow-y-auto p-4 border-r sticky top-0 z-20"
@@ -407,8 +396,8 @@ const handlePlayerRemove = (position: string, index: number) => {
               gameweek={gameweek}
               transferCount={playersOut.length}
               transferCost={transferCost}
-              activeChip={chipStatus?.active}
-
+              chipStatus={chipStatus as any}
+              isLocked={isLocked}
             />
           </div>
           
@@ -428,19 +417,18 @@ const handlePlayerRemove = (position: string, index: number) => {
           </div>
 
           <div className="p-4 grid grid-cols-3 gap-4 border-t bg-white sticky bottom-0">
-            {/* <Button variant="outline" onClick={handleAutoFill}>Autofill</Button> */}
             <Button variant="destructive" onClick={handleReset}>Reset</Button>
             {hasTeam ? (
                <Button
                   onClick={() => handleConfirmTransfers()}
-                  disabled={!squadValidation.isValid || playersOut.length === 0 || bank <0}
+                  disabled={!squadValidation.isValid || playersOut.length === 0 || bank < 0}
                 >
                   Make Transfers
                 </Button>
             ) : (
               <Button
                 onClick={() => setIsEnterSquadModalOpen(true)}
-                disabled={playersSelected !== 11 || !squadValidation.isValid || bank<0}
+                disabled={playersSelected !== 11 || !squadValidation.isValid || bank < 0}
               >
                 Enter Squad
               </Button>

@@ -1,5 +1,3 @@
-// frontend/src/components/transfers/PlayerSelection.tsx
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -123,7 +121,6 @@ const PlayerTable = ({ players, onPlayerSelect, onInfoClick }: { players: any[],
                  <img src={getTeamJersey(player.club)} alt="jersey" className="w-8 h-10 object-contain ml-1" />
                 <div>
                     <p className="font-bold text-sm">{player.name}</p>
-                    {/* REMOVED: The fixture pill <span> and the flex/gap classes */}
                     <p className="text-xs text-gray-500">
                         {player.pos} · {player.club}
                     </p>
@@ -136,7 +133,6 @@ const PlayerTable = ({ players, onPlayerSelect, onInfoClick }: { players: any[],
         </tbody>
     </table>
 );
-
 
 // ============================================================================
 // SUB-COMPONENT: PlayerFilterControls
@@ -225,40 +221,28 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
 
     const [infoPlayer, setInfoPlayer] = useState<any | null>(null);
 
-    // --- UPDATED: Fetch players AND fixtures to map the fixture string ---
     useEffect(() => {
         const fetchData = async () => {
           try {
             const token = localStorage.getItem('access_token');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-            // 1. Fetch Players, Fixtures, and Current Gameweek in parallel
-            const [playerRes, fixtureRes, gameweekRes] = await Promise.all([
+            // 1. Fetch Players and Fixtures (gameweek is no longer needed here)
+            const [playerRes, fixtureRes] = await Promise.all([
                 fetch(API.endpoints.playerStats),
-                fetch(API.endpoints.fixtures, { headers }),
-                fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers })
+                fetch(API.endpoints.fixtures, { headers })
             ]);
 
             if (!playerRes.ok) throw new Error('API failed to fetch player stats');
             
             const playerData = await playerRes.json();
             const fixtureData = fixtureRes.ok ? await fixtureRes.json() : [];
-            const gameweekData = gameweekRes.ok ? await gameweekRes.json() : null;
-
-            // 2. Logic to determine the "Next" gameweek for transfers
-            // If current GW is upcoming, that's the one. If live/finished, it's the next one.
-            // A simple approximation is to find the first deadline in the future.
-            // Since we have all fixtures, we can just find fixtures where gameweek_id matches our target.
-            
-            // NOTE: The `fixtureData` contains gameweek_id.
-            // `gameweekData` gives us current status. 
-            // We need to map TeamID -> FixtureString.
             
             const teamFixtureMap: Record<string, string> = {};
 
             if (fixtureData.length > 0) {
                 const now = new Date();
-                // Filter for upcoming fixtures only
+                // Filter for upcoming fixtures only (this naturally aligns with the clock-based logic)
                 const upcomingFixtures = fixtureData.filter((f: any) => new Date(f.kickoff) > now);
                 
                 // Sort by time to get the very next one
@@ -269,7 +253,6 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                     const homeName = f.home.name;
                     const awayName = f.away.name;
                     
-                    // Only set if not already set (ensures we get the nearest one)
                     if (!teamFixtureMap[homeName]) {
                         teamFixtureMap[homeName] = `${f.away.short_name} (H)`;
                     }
@@ -279,7 +262,6 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                 });
             }
 
-            // 3. Map players and inject fixture string
             const mapped = playerData.map((player: any) => {
                 const teamName = player.team?.name || 'Unknown';
                 return {
@@ -293,7 +275,6 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                     status: player.status ?? 'ACTIVE',
                     news: player.news ?? null,
                     chance_of_playing: player.chance_of_playing ?? null,
-                    // --- INJECTED FIXTURE ---
                     fixture_str: teamFixtureMap[teamName] || '-' 
                 };
             });
@@ -436,7 +417,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
              </div>
 
              {/* Modals rendered on top */}
-                        <PlayerDetailModal
+             <PlayerDetailModal
                 player={infoPlayer}
                 onClose={() => setInfoPlayer(null)}
             />

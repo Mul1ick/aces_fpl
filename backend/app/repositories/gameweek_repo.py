@@ -6,99 +6,80 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-async def get_current_gameweek(db: Prisma):
-    try:
-        now_utc = datetime.now(timezone.utc)
+async def get_open_gameweek_for_transfers(db: Prisma):
+    """
+    Finds the gameweek where the deadline is strictly in the future.
+    This is the UPCOMING gameweek that users should be editing/transferring for.
+    """
+    now_utc = datetime.now(timezone.utc)
+    target = await db.gameweek.find_first(
+        where={'deadline': {'gt': now_utc}},
+        order={'deadline': 'asc'}
+    )
+    return target
 
-        # try next upcoming (future deadline)
+async def determine_active_gameweek(db: Prisma):
+    """
+    Finds the LIVE gameweek based on the clock.
+    This is the gameweek whose deadline has passed, but hasn't been finalized.
+    """
+    now_utc = datetime.now(timezone.utc)
+    
+    # 1. Try to find the LIVE one (deadline passed, but not finalized)
+    gw = await db.gameweek.find_first(
+        where={'deadline': {'lte': now_utc}, 'status': {'not': 'FINISHED'}},
+        order={'deadline': 'asc'}
+    )
+    # 2. If no LIVE gameweek (e.g., pre-season), get the next UPCOMING
+    if not gw:
         gw = await db.gameweek.find_first(
             where={'deadline': {'gt': now_utc}},
             order={'deadline': 'asc'}
         )
-        if not gw:
-            # fallback: most recent past
-            gw = await db.gameweek.find_first(order={'deadline': 'desc'})
-            if not gw:
-                logger.critical("No gameweeks found in database!")
-                raise HTTPException(status_code=404, detail="No gameweeks configured in the database.")
-
-        # 🔑 build the API schema your frontend expects
-        return schemas.Gameweek(
-            id=gw.id,
-            gw_number=gw.gw_number,
-            deadline=gw.deadline,
-            name=f"Gameweek {gw.gw_number}",
-            finished=gw.deadline < now_utc,
-            is_current=gw.deadline > now_utc,  # adjust if you track `is_current` in DB
-            is_next=False,                     # adjust if you track `is_next` in DB
-            data_checked=False,                # placeholder, update if stored in DB
+    # 3. If still no gameweek (end of season), get the last FINISHED
+    if not gw:
+        gw = await db.gameweek.find_first(
+            where={'status': 'FINISHED'},
+            order={'deadline': 'desc'}
         )
-    except HTTPException:
-            raise
-    except Exception as e:
-        logger.error("Error determining current gameweek", exc_info=True)
-        raise e
+    return gw
 
+async def get_current_gameweek(db: Prisma):
+    """
+    Wrapper around determine_active_gameweek that returns the Pydantic schema
+    used by the dashboard and points calculations.
+    """
+    gw = await determine_active_gameweek(db)
+    
+    if not gw:
+        logger.critical("No gameweeks found in database!")
+        raise HTTPException(status_code=404, detail="No gameweeks configured in the database.")
+        
+    now_utc = datetime.now(timezone.utc)
+    
+    return schemas.Gameweek(
+        id=gw.id,
+        gw_number=gw.gw_number,
+        deadline=gw.deadline,
+        name=f"Gameweek {gw.gw_number}",
+        finished=gw.status == 'FINISHED',
+        is_current=gw.deadline <= now_utc and gw.status != 'FINISHED',
+        is_next=gw.deadline > now_utc,
+        data_checked=False, 
+    )
 
 async def _resolve_gw(db: Prisma, gameweek_id: int | None):
     if gameweek_id is not None:
         gw = await db.gameweek.find_unique(where={'id': gameweek_id})
         if not gw: raise HTTPException(404, "Gameweek not found")
         return gw
-    return await get_current_gameweek(db)  # returns schemas.Gameweek
+    # Defaults to the open GW (for chip validation, transfers, etc.)
+    target_gw = await get_open_gameweek_for_transfers(db)
+    if not target_gw: raise HTTPException(400, "No open gameweek available.")
+    return target_gw
 
 async def get_all_gameweeks_list(db: Prisma):
     return await db.gameweek.find_many(order={'gw_number': 'asc'})
 
 async def get_gameweek_by_number(db: Prisma, gw_number: int):
     return await db.gameweek.find_unique(where={'gw_number': gw_number})
-
-async def determine_active_gameweek(db: Prisma):
-    """
-    Finds the current gameweek based on status priority:
-    1. LIVE
-    2. UPCOMING
-    3. FINISHED (Last one)
-    """
-    # 1. LIVE
-    gameweek = await db.gameweek.find_first(
-        where={'status': 'LIVE'},
-        order={'gw_number': 'asc'}
-    )
-    if gameweek: return gameweek
-
-    # 2. UPCOMING
-    gameweek = await db.gameweek.find_first(
-        where={'status': 'UPCOMING'},
-        order={'gw_number': 'asc'}
-    )
-    if gameweek: return gameweek
-
-    # 3. FINISHED
-    gameweek = await db.gameweek.find_first(
-        where={'status': 'FINISHED'},
-        order={'gw_number': 'desc'}
-    )
-    return gameweek
-
-async def get_open_gameweek_for_transfers(db: Prisma):
-    """
-    Finds the valid gameweek for transfers:
-    1. Currently LIVE (e.g., during the week)
-    2. Next UPCOMING (e.g., pre-season or between weeks)
-    Returns None if neither exists.
-    """
-    # 1. First, try to find a gameweek that is currently LIVE.
-    target = await db.gameweek.find_first(
-        where={'status': 'LIVE'},
-        order={'gw_number': 'asc'}
-    )
-    if target: 
-        return target
-
-    # 2. If no gameweek is LIVE, find the next UPCOMING one.
-    target = await db.gameweek.find_first(
-        where={'status': 'UPCOMING'},
-        order={'gw_number': 'asc'}
-    )
-    return target

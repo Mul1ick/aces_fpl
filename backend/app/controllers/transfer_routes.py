@@ -22,7 +22,6 @@ async def transfer_stats_endpoint(
     db: Prisma = Depends(get_db),
     gameweek_id: int | None = Query(default=None)
 ):
-    # default to current GW if not provided
     if gameweek_id is None:
         gw = await get_current_gameweek(db)
         gameweek_id = gw.id
@@ -41,20 +40,17 @@ async def confirm_transfers_endpoint(
     current_user: PrismaModels.User = Depends(get_current_user),
 ):
     """
-    Confirms transfers for the current LIVE or next UPCOMING gameweek.
+    Confirms transfers for the next UPCOMING gameweek based strictly on the clock.
     """
-    # 1. Get the correct gameweek using our new Repo function
     target_gw = await get_open_gameweek_for_transfers(db)
 
-    # 2. If no LIVE or UPCOMING gameweek is found, then it's an error.
     if not target_gw:
         raise HTTPException(status_code=400, detail="There is no gameweek currently open for transfers.")
     
-    # 3. Check the deadline as a layer of security
+    # Extra security buffer (redundant but safe)
     if target_gw.deadline < datetime.now(timezone.utc):
          raise HTTPException(status_code=400, detail=f"The deadline for Gameweek {target_gw.gw_number} has passed.")
 
-    # 4. Call the Service
     return await confirm_transfers(
         db=db,
         user_id=str(current_user.id),

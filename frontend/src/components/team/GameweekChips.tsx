@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 
-// ... imports remain the same ...
 import wildcardIcon from '@/assets/images/chips/wildcard-transparent.png';
 import tripleCaptainIcon from '@/assets/images/chips/triplecaptain-transparent.png';
 import benchBoostIcon from '@/assets/images/chips/benchboost-transparent.png';
@@ -133,7 +132,7 @@ export const GameweekChips: React.FC<{
   const getButtonText = (chipId: string, isActive: boolean, isUsed: boolean, isAnyActive: boolean, isRestricted: boolean) => {
     if (isActive) return "Active";
     if (isUsed) return "Used";
-    if (isRestricted) return "Locked GW 1"; // Shortened for mobile fit
+    if (isRestricted) return "Locked GW 1"; 
     if (isAnyActive && !isActive) return "Unavailable";
     
     return "Play";
@@ -148,8 +147,6 @@ export const GameweekChips: React.FC<{
   return (
     <>
       <div className="bg-gradient-to-br from-[#37003C] to-[#23003F] rounded-xl p-3 sm:p-4 mb-6 shadow-md text-white relative overflow-hidden">
-        
-        {/* CHANGED: grid-cols-4 enforces a single row on all screen sizes. Reduced gap on mobile. */}
         <div className="grid grid-cols-4 gap-1.5 sm:gap-4">
           {chips.map((chip) => {
             const isActive = status.active === chip.id;
@@ -184,7 +181,6 @@ export const GameweekChips: React.FC<{
                       src={chip.icon} 
                       alt={chip.name}
                       className={cn(
-                          // CHANGED: Slightly smaller image on mobile so it fits in 4 columns
                           "w-8 h-8 sm:w-12 sm:h-12 object-contain mb-1.5 sm:mb-2 transition-transform duration-300",
                           "brightness-0 invert",
                           !isDisabled && !isActive && !isLocked && "group-hover:scale-110"
@@ -200,7 +196,6 @@ export const GameweekChips: React.FC<{
                     disabled={isUsed || (isAnyActive && !isActive) || isRestricted} 
                     onClick={() => handleChipClick(chip, isUsed, isDisabled)}
                     className={cn(
-                        // CHANGED: Adjusted padding, margin, and text sizes for mobile fit
                         "w-full mt-2 sm:mt-3 py-1 sm:py-1.5 px-0.5 sm:px-2 rounded text-[8px] sm:text-[10px] font-bold tracking-tighter sm:tracking-wider transition-all duration-300 leading-tight line-clamp-1",
                         isActive 
                             ? "bg-gradient-to-r from-cyan-300 via-blue-600 to-purple-700 text-white shadow-md border-none opacity-100 cursor-default"

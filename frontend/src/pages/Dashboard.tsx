@@ -10,13 +10,12 @@ import { TransfersCard } from "@/components/dashboard/TransfersCard";
 import { TeamOfTheWeekCard } from "@/components/dashboard/TeamOfTheWeekCard";
 import { DreamTeamCard } from "@/components/dashboard/DreamTeamCard";
 import { DeadlineCard } from "@/components/dashboard/DeadlineCard";
-import { TeamOfTheSeasonStrip } from "@/components/dashboard/TeamOfTheSeasonStrip"; // ✅ Imported
+import { TeamOfTheSeasonStrip } from "@/components/dashboard/TeamOfTheSeasonStrip";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { API } from "@/lib/api";
 import { TeamResponse } from "@/types";
 
-// ... [Keep existing types: TransferStatItem, GameweekStats, etc.] ...
 type TransferStatItem = {
   player_id: number;
   count: number;
@@ -26,13 +25,15 @@ type TransferStatItem = {
 };
 
 type GameweekStats = {
+  id: number;
   gw_number: number;
-  status?: string;
+  finished?: boolean;
+  is_current?: boolean;
+  is_next?: boolean;
   most_captained?: { name: string; team_name: string; };
   most_vice_captained?: { name: string; team_name: string; };
   most_selected?: { name: string; team_name: string; };
   chips_played?: number;
-  id: number;
 };
 
 type TransferStatsResponse =
@@ -103,7 +104,7 @@ const Dashboard: React.FC = () => {
   const [xferLoading, setXferLoading] = useState(true);
   const [xferError, setXferError] = useState<string | null>(null);
 
-  const [tots, setTots] = useState(null); // ✅ TOTS State
+  const [tots, setTots] = useState(null);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -124,8 +125,6 @@ const Dashboard: React.FC = () => {
     transfers: (row.count ?? 0).toLocaleString(),
   }));
 
-  // --- DATA FETCHING (Same as before) ---
-  
   useEffect(() => {
     const fetchDeadlineData = async () => {
       const token = localStorage.getItem("access_token");
@@ -232,6 +231,40 @@ const Dashboard: React.FC = () => {
   }, [user, leaderboard]);
 
   useEffect(() => {
+    const fetchDisplayGameweekStats = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token || !gameweek) return;
+      
+      let gwNumberToFetch = gameweek.gw_number;
+      
+      // --- FIXED LOGIC: No longer subtracts 1 if gameweek is LIVE! ---
+      // We only subtract 1 to get stats if the gameweek is strictly UPCOMING (e.g. between gameweeks)
+      if (gameweek.is_next && !gameweek.is_current && gameweek.gw_number > 1) {
+        gwNumberToFetch = gameweek.gw_number - 1;
+      }
+
+      try {
+        const statsEndpoint = `${API.BASE_URL}/gameweeks/${gwNumberToFetch}/stats`;
+        const response = await fetch(statsEndpoint, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setGameweekStats(data);
+        } else {
+          setGameweekStats({ user_points: 0, average_points: 0, highest_points: 0 });
+        }
+        setDisplayGameweek({ gw_number: gwNumberToFetch });
+      } catch (error) {
+        console.error("Failed to fetch display gameweek stats:", error);
+        setGameweekStats({ user_points: 0, average_points: 0, highest_points: 0 });
+        setDisplayGameweek({ gw_number: gwNumberToFetch });
+      }
+    };
+    fetchDisplayGameweekStats();
+  }, [user, gameweek]);
+
+  useEffect(() => {
     const fetchBestTeams = async () => {
       const token = localStorage.getItem("access_token");
       if (!token) return;
@@ -245,6 +278,7 @@ const Dashboard: React.FC = () => {
             const data = await response.json();
             setTeamOfTheWeek(data);
           } else if (response.status === 404 && gwToFetch > 1) {
+            // Graceful fallback to previous week if current is LIVE and not finalized
             const prevGwResponse = await fetch(API.endpoints.teamOfTheWeekByGameweek(gwToFetch - 1), {
                headers: { Authorization: `Bearer ${token}` },
             });
@@ -291,36 +325,6 @@ const Dashboard: React.FC = () => {
     };
     if (user && (gameweek || displayGameweek)) fetchBestTeams();
   }, [user, gameweek, displayGameweek]);
-
-  useEffect(() => {
-    const fetchDisplayGameweekStats = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token || !gameweek) return;
-      let gwNumberToFetch = gameweek.gw_number;
-      let status = gameweek.status;
-      if ((status === 'LIVE' || status === 'UPCOMING') && gameweek.gw_number > 1) {
-        gwNumberToFetch = gameweek.gw_number - 1;
-      }
-      try {
-        const statsEndpoint = `${API.BASE_URL}/gameweeks/${gwNumberToFetch}/stats`;
-        const response = await fetch(statsEndpoint, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setGameweekStats(data);
-        } else {
-          setGameweekStats({ user_points: 0, average_points: 0, highest_points: 0 });
-        }
-        setDisplayGameweek({ gw_number: gwNumberToFetch });
-      } catch (error) {
-        console.error("Failed to fetch display gameweek stats:", error);
-        setGameweekStats({ user_points: 0, average_points: 0, highest_points: 0 });
-        setDisplayGameweek({ gw_number: gwNumberToFetch });
-      }
-    };
-    fetchDisplayGameweekStats();
-  }, [user, gameweek]);
   
   useEffect(() => {
     const fetchTeam = async () => {
@@ -360,7 +364,6 @@ const Dashboard: React.FC = () => {
     if (user) fetchHubStats();
   }, [user]);
 
-  // ✅ Fetch TOTS
   useEffect(() => {
     const fetchTots = async () => {
         const token = localStorage.getItem("access_token");

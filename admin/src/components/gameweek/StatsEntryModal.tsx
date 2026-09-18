@@ -21,13 +21,14 @@ import {
 } from '@/components/ui/select';
 import type { Team, Player, PlayerGameweekStats } from '@/types';
 import { CompactInput } from '@/components/shared/CompactInput';
+// Added Clock to imports
 import { Goal, PlusCircle, ShieldCheck, ShieldX, Square, ShieldAlert, Ban, Star, Timer, AlertTriangle, UserCheck, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ExtendedPlayerGameweekStats = PlayerGameweekStats & {
   suspension_duration?: number;
   penalties_saved?: number;
-  played_majority?: boolean;
+  played_majority?: boolean; // <-- Added back
 };
 
 type PlayerStatInputs = {
@@ -36,7 +37,7 @@ type PlayerStatInputs = {
 
 const DEFAULT_ROW_STATS: ExtendedPlayerGameweekStats = {
   played: false,
-  played_majority: false,
+  played_majority: false, // <-- Added back
   goals_scored: 0, assists: 0, clean_sheets: false,
   goals_conceded: 0, own_goals: 0, penalties_missed: 0, penalties_saved: 0, yellow_cards: 0,
   red_cards: 0, bonus_points: 0,
@@ -69,7 +70,7 @@ interface StatsEntryModalProps {
 const StatsTableHeader = () => {
     const headers = [
         { icon: <UserCheck className="h-5 w-5 text-purple-500" />, label: 'Played' },
-        { icon: <Clock className="h-5 w-5 text-blue-400" />, label: 'Played Majority' },
+        { icon: <Clock className="h-5 w-5 text-blue-400" />, label: 'Played Majority' }, // <-- Added back
         { icon: <Goal className="h-5 w-5 text-blue-500" />, label: 'Goals' },
         { icon: <PlusCircle className="h-5 w-5 text-green-500" />, label: 'Assists' },
         { icon: <ShieldCheck className="h-5 w-5 text-green-500" />, label: 'Clean Sheet' },
@@ -83,6 +84,7 @@ const StatsTableHeader = () => {
     ];
 
     return (
+        // Changed repeat(11) to repeat(12) to fit the new column
         <div className="grid grid-cols-[minmax(200px,_1.5fr)_repeat(12,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 font-semibold text-xs text-muted-foreground border-b sticky top-0 bg-card z-10">
             <div className="text-left font-bold">Player</div>
             {headers.map(h => (
@@ -109,6 +111,7 @@ const PlayerStatRow = ({
   const isUnavailable = player.status && player.status !== 'ACTIVE';
 
   return (
+    // Changed repeat(11) to repeat(12)
     <div className={cn(
       "grid grid-cols-[minmax(200px,_1.5fr)_repeat(12,_minmax(80px,_1fr))] items-center gap-3 px-3 py-2 border-b last:border-b-0",
       isUnavailable && "bg-red-50/60 dark:bg-red-950/20"
@@ -133,6 +136,7 @@ const PlayerStatRow = ({
         />
       </div>
 
+      {/* Added Played Majority Switch back */}
       <div className="flex justify-center">
         <Switch 
           checked={stats.played_majority || false} 
@@ -256,7 +260,7 @@ export function StatsEntryModal({
   const isReadOnly = mode === 'view';
 
   const renderPlayerTable = (teamPlayers: Player[]) => (
-    <div className="border rounded-lg bg-card min-w-[1100px]">
+    <div className="border rounded-lg bg-card">
       <StatsTableHeader />
       <div className="flex flex-col">
         {teamPlayers.map(player => (
@@ -302,7 +306,7 @@ export function StatsEntryModal({
         </DialogHeader>
         
         <div className="p-6 overflow-x-auto">
-          <ScrollArea className="h-[55vh] w-full pr-4">
+          <ScrollArea className="h-[55vh] w-full pr-4 min-w-[1100px]">
             {loading ? (
               <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading players…</div>
             ) : (

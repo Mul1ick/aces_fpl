@@ -18,7 +18,7 @@ from app.services.team_service import (
     get_public_team_view
 )
 from app.services.transfer_service import transfer_player
-from app.repositories.gameweek_repo import get_current_gameweek
+from app.repositories.gameweek_repo import get_open_gameweek_for_transfers
 
 router = APIRouter()
 
@@ -29,12 +29,14 @@ async def submit_team(
     current_user: PrismaModels.User = Depends(get_current_user)
 ):
     corrected_players = await auto_correct_squad_formation(db, team.players)
-    current_gameweek = await get_current_gameweek(db)
+    target_gw = await get_open_gameweek_for_transfers(db)
+    if not target_gw:
+        raise HTTPException(400, "No gameweek is currently open for team submission.")
 
     await save_user_team(
         db=db,
         user_id=str(current_user.id),
-        gameweek_id=current_gameweek.id,
+        gameweek_id=target_gw.id,
         players=[p.dict() for p in corrected_players],
         team_name=team.team_name
     )
@@ -50,7 +52,10 @@ async def get_team(
 ):
     gameweek_id: int
     if gameweek_number is None:
-        gw = await get_current_gameweek(db)
+        # User requested "My Team". Fetch the open gameweek so they can edit it.
+        gw = await get_open_gameweek_for_transfers(db)
+        if not gw:
+            raise HTTPException(status_code=400, detail="No open gameweek found.")
         gameweek_id = gw.id
     else:
         gw = await db.gameweek.find_unique(where={'gw_number': gameweek_number})
@@ -72,11 +77,14 @@ async def transfer_player_route(
     db: Prisma = Depends(get_db),
     current_user: PrismaModels.User = Depends(get_current_user),
 ):
-    current_gw = await get_current_gameweek(db)
+    target_gw = await get_open_gameweek_for_transfers(db)
+    if not target_gw:
+        raise HTTPException(400, "No gameweek is open for transfers.")
+
     updated = await transfer_player(
         db=db,
         user_id=str(current_user.id),
-        gameweek_id=current_gw.id,
+        gameweek_id=target_gw.id,
         out_player_id=payload.out_player_id,
         in_player_id=payload.in_player_id,
     )
@@ -88,14 +96,16 @@ async def set_armband(
     db: Prisma = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    current_gw = await get_current_gameweek(db)
+    target_gw = await get_open_gameweek_for_transfers(db)
+    if not target_gw:
+        raise HTTPException(400, "No gameweek open for squad changes.")
 
     if payload.kind == "C":
-        await set_captain(db, str(current_user.id), current_gw.id, payload.player_id)
+        await set_captain(db, str(current_user.id), target_gw.id, payload.player_id)
     else:
-        await set_vice_captain(db, str(current_user.id), current_gw.id, payload.player_id)
+        await set_vice_captain(db, str(current_user.id), target_gw.id, payload.player_id)
 
-    return await get_user_team_full(db, str(current_user.id), current_gw.id)
+    return await get_user_team_full(db, str(current_user.id), target_gw.id)
 
 @router.post("/save-team")
 async def save_team(
@@ -103,12 +113,14 @@ async def save_team(
     db: Prisma = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    gw = await get_current_gameweek(db)
-    # The payload.players comes in as Pydantic models, we convert to dict here
+    target_gw = await get_open_gameweek_for_transfers(db)
+    if not target_gw:
+        raise HTTPException(400, "No gameweek open for squad changes.")
+        
     updated = await save_existing_team(
         db=db,
         user_id=str(user.id),
-        gameweek_id=gw.id,
+        gameweek_id=target_gw.id,
         new_players=[p.dict() for p in payload.players]
     )
     return updated
@@ -129,5 +141,4 @@ async def get_user_team_by_gameweek_number_endpoint(
     db: Prisma = Depends(get_db),
     _: PrismaModels.User = Depends(get_current_user),
 ):
-    # All the complex logic was moved to get_public_team_view in team_service.py
     return await get_public_team_view(db, user_key, gameweek_number)

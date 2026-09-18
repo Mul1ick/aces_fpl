@@ -15,9 +15,9 @@ import { gameweekAPI, statsAPI, API_BASE_URL } from '../lib/api';
 type ExtendedPlayerGameweekStats = PlayerGameweekStats & {
   suspension_duration?: number;
   penalties_saved?: number;
+  played_majority?: boolean; // <--- ADD THIS LINE
 };
 
-// A new component for navigation
 const GameweekNavigator = ({ allGameweeks, selectedId, onNavigate, onSelect }: any) => {
   const currentIndex = allGameweeks.findIndex((gw: any) => gw.id === selectedId);
   const isFirst = currentIndex === 0;
@@ -75,6 +75,7 @@ export function GameweekPage() {
         const sortedGws = allGws.sort((a, b) => a.gw_number - b.gw_number);
         setAllGameweeks(sortedGws);
 
+        // The Admin explicitly targets LIVE or UPCOMING gameweeks 
         const liveGw = sortedGws.find(gw => gw.status === 'LIVE');
         const upcomingGw = sortedGws.find(gw => gw.status === 'UPCOMING');
         
@@ -174,12 +175,24 @@ export function GameweekPage() {
   const handleSaveStats = async (fixtureId: number, scores: {home_score: number, away_score: number}, statsMap: {[playerId: number]: ExtendedPlayerGameweekStats}) => {
     const t = token || localStorage.getItem("admin_token");
     if (!t || !gameweek) return;
+    
+    // --- FIXED: Included played_majority in the mapping ---
     const player_stats = Object.entries(statsMap).map(([pid, s]) => ({
-      player_id: Number(pid), played: s.played ?? false, goals_scored: s.goals_scored ?? 0,
-      assists: s.assists ?? 0, clean_sheets: s.clean_sheets ?? false, goals_conceded: s.goals_conceded ?? 0,
-      own_goals: s.own_goals ?? 0, penalties_missed: s.penalties_missed ?? 0, penalties_saved: s.penalties_saved ?? 0,
-      yellow_cards: s.yellow_cards ?? 0, red_cards: s.red_cards ?? 0, bonus_points: s.bonus_points ?? 0,
+      player_id: Number(pid), 
+      played: s.played ?? false, 
+      played_majority: s.played_majority ?? false, 
+      goals_scored: s.goals_scored ?? 0,
+      assists: s.assists ?? 0, 
+      clean_sheets: s.clean_sheets ?? false, 
+      goals_conceded: s.goals_conceded ?? 0,
+      own_goals: s.own_goals ?? 0, 
+      penalties_missed: s.penalties_missed ?? 0, 
+      penalties_saved: s.penalties_saved ?? 0,
+      yellow_cards: s.yellow_cards ?? 0, 
+      red_cards: s.red_cards ?? 0, 
+      bonus_points: s.bonus_points ?? 0,
     }));
+    
     try {
       await gameweekAPI.submitPlayerStats(gameweek.id, fixtureId, { home_score: scores.home_score, away_score: scores.away_score, player_stats }, t);
       setFixtures(prev => prev.map(f => f.id === fixtureId ? { ...f, stats_entered: true, ...scores } : f));
@@ -199,9 +212,9 @@ export function GameweekPage() {
     const updatePromises: Promise<any>[] = [];
     let updateCount = 0;
 
-    // --- CHANGED: Added 'played' and 'penalties_saved' to the check list ---
+    // --- FIXED: Included played_majority in the check list ---
     const fieldsToCheck = [
-        'played', 'goals_scored', 'assists', 'clean_sheets', 
+        'played', 'played_majority', 'goals_scored', 'assists', 'clean_sheets', 
         'goals_conceded', 'own_goals', 'penalties_missed', 'penalties_saved',
         'yellow_cards', 'red_cards', 'bonus_points'
     ] as const;
@@ -218,11 +231,12 @@ export function GameweekPage() {
             });
 
             if (hasChanged) {
-                // --- CHANGED: Added played to the payload ---
+                // --- FIXED: Included played_majority in the payload ---
                 const payload = {
                     player_id: playerId,
                     gameweek_id: gameweek.id,
                     played: Boolean(newStat.played), 
+                    played_majority: Boolean(newStat.played_majority),
                     goals: Number(newStat.goals_scored), 
                     assists: Number(newStat.assists),
                     clean_sheets: Boolean(newStat.clean_sheets),

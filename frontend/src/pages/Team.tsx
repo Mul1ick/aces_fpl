@@ -20,7 +20,6 @@ import { Reorder } from "framer-motion";
 import { Player } from "../types";
 
 import pitchBackground from '@/assets/images/pitch.png';
-import acesLogo from "@/assets/aces-logo.png";
 
 const TeamPageSkeleton = () => (
     <div className="w-full min-h-screen bg-white flex flex-col lg:h-screen lg:flex-row font-sans">
@@ -71,9 +70,10 @@ const Team: React.FC = () => {
     const [hubStats, setHubStats] = useState(null);
     const [leaderboard, setLeaderboard] = useState([]);
     const [isExtraDataLoading, setIsExtraDataLoading] = useState(true);
+    
+    // This now strictly tracks the UPCOMING gameweek based on the clock
     const [gameweek, setGameweek] = useState<{ gw_number: number; deadline: string; id: number } | null>(null);
 
-    // --- ADDED: State for fixtures ---
     const [allGameweeks, setAllGameweeks] = useState<any[]>([]);
     const [allFixtures, setAllFixtures] = useState<any[]>([]);
     const [fixtureView, setFixtureView] = useState<'previous' | 'current' | 'next'>('current');
@@ -81,7 +81,6 @@ const Team: React.FC = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") || "" : "";
 
     useEffect(() => {
-        const token = localStorage.getItem("access_token");
         if (!token) return;
 
         setIsLoading(true);
@@ -89,70 +88,50 @@ const Team: React.FC = () => {
 
         const fetchAllData = async () => {
             try {
-                // --- MODIFIED: Fetch gameweeks and fixtures ---
-                const [teamRes, hubRes, leaderboardRes, gameweekRes, allGameweeksRes, allFixturesRes] = await Promise.all([
+                // Notice we removed the fetch to '/gameweeks/gameweek/current' because we don't care about the LIVE status
+                const [teamRes, hubRes, leaderboardRes, allGameweeksRes, allFixturesRes] = await Promise.all([
                     fetch(API.endpoints.team(), { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.userStats, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.leaderboard, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API.BASE_URL}/gameweeks/gameweek/current`, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.gameweek, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(API.endpoints.fixtures, { headers: { Authorization: `Bearer ${token}` } })
                 ]);
 
                 if (!teamRes.ok) throw new Error("Failed to fetch team data");
-                if (!hubRes.ok || !leaderboardRes.ok || !gameweekRes.ok) console.warn("Failed to fetch manager or gameweek data");
+                if (!hubRes.ok || !leaderboardRes.ok || !allGameweeksRes.ok) console.warn("Failed to fetch ancillary data");
 
                 // Process Team Data
                 const teamData: TeamResponse = await teamRes.json();
                 
-                // const transformPlayer = (p: any) => {
-                //     // This finds the correct current fixture from the data the modal uses.
-                //     const correctFixtureData = p.recent_fixtures?.[0];
-                //     const correctFixtureString = correctFixtureData ? `${correctFixtureData.opp} (${correctFixtureData.ha})` : '-';
-
-                //     return {
-                //         id: p.id, name: p.full_name, full_name: p.full_name, pos: p.position,
-                //         position: p.position, team: p.team?.name, team_obj: p.team,
-                //         price: p.price, points: p.points, 
-                //         // --- THIS IS THE FIX ---
-                //         // Both fixture properties now use the correct data source.
-                //         fixture: correctFixtureString, 
-                //         fixture_str: correctFixtureString,
-                //         isCaptain: p.is_captain, isVice: p.is_vice_captain, is_captain: p.is_captain,
-                //         is_vice_captain: p.is_vice_captain, is_benched: p.is_benched,
-                //         recent_fixtures: p.recent_fixtures, raw_stats: p.raw_stats, breakdown: p.breakdown,
-                //     };
-                // };
-
-                // const starting = teamData.starting.map((p: any) => ({
-                //     ...transformApiPlayer(p),
-                //     status: p.status ?? 'ACTIVE',
-                //     chance_of_playing: p.chance_of_playing ?? null,
-                //     news: p.news ?? null,
-                // }));
-
-                // const bench = teamData.bench.map((p: any) => ({
-                //     ...transformApiPlayer(p),
-                //     status: p.status ?? 'ACTIVE',
-                //     chance_of_playing: p.chance_of_playing ?? null,
-                //     news: p.news ?? null,
-                // }));
-                // const currentSquad = { starting, bench, team_name: teamData.team_name };
-                // setSquad(currentSquad);
-                // setInitialSquadState(JSON.stringify(currentSquad));
-
                 const starting = teamData.starting.map(transformApiPlayer);
                 const bench = teamData.bench.map(transformApiPlayer);
                 
                 const currentSquad = { starting, bench, team_name: teamData.team_name };
                 setSquad(currentSquad);
+                setInitialSquadState(JSON.stringify(currentSquad));
                 
-                // Process Hub, Leaderboard, Gameweek and Fixture Data
+                // Process Ancillary Data
                 if (hubRes.ok) setHubStats(await hubRes.json());
                 if (leaderboardRes.ok) setLeaderboard(await leaderboardRes.json());
-                if (gameweekRes.ok) setGameweek(await gameweekRes.json());
-                if (allGameweeksRes.ok) setAllGameweeks(await allGameweeksRes.json());
                 if (allFixturesRes.ok) setAllFixtures(await allFixturesRes.json());
+
+                // Clock-Based Dynamic Gameweek Resolution
+                if (allGameweeksRes.ok) {
+                    const allGws = await allGameweeksRes.json();
+                    setAllGameweeks(allGws);
+
+                    const now = new Date();
+                    // Find the very next gameweek where the deadline is in the future
+                    const upcomingGws = allGws.filter((gw: any) => new Date(gw.deadline) > now);
+                    upcomingGws.sort((a: any, b: any) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+                    
+                    if (upcomingGws.length > 0) {
+                        setGameweek(upcomingGws[0]);
+                    } else if (allGws.length > 0) {
+                        // Season is over, default to the last one
+                        setGameweek(allGws[allGws.length - 1]);
+                    }
+                }
 
             } catch (err) {
                 console.error("Failed to fetch initial data:", err);
@@ -165,8 +144,10 @@ const Team: React.FC = () => {
         };
         
         fetchAllData();
-    }, [toast]);
+    }, [toast, token]);
 
+    // isLocked will virtually always be false here now, unless the season is completely over
+    // because gameweek.deadline is guaranteed to be in the future by our new filter logic above.
     const isLocked = useMemo(() => {
         if (!gameweek) return false;
         if (gameweek.deadline) {
@@ -181,17 +162,13 @@ const Team: React.FC = () => {
         return userEntry?.rank;
     }, [leaderboard, user]);
 
-    // --- ADDED: Memo hook to filter fixtures for the selected view ---
     const displayedFixtures = useMemo(() => {
         if (!gameweek || allFixtures.length === 0 || allGameweeks.length === 0) return [];
-
-        const currentGw = allGameweeks.find(gw => gw.id === gameweek.id);
-        if (!currentGw) return [];
         
         let targetGwNumber;
-        if (fixtureView === 'current') targetGwNumber = currentGw.gw_number;
-        else if (fixtureView === 'previous') targetGwNumber = currentGw.gw_number - 1;
-        else targetGwNumber = currentGw.gw_number + 1;
+        if (fixtureView === 'current') targetGwNumber = gameweek.gw_number;
+        else if (fixtureView === 'previous') targetGwNumber = gameweek.gw_number - 1;
+        else targetGwNumber = gameweek.gw_number + 1;
 
         const targetGw = allGameweeks.find(gw => gw.gw_number === targetGwNumber);
         if (!targetGw) return [];
@@ -304,12 +281,9 @@ const Team: React.FC = () => {
     };
 
     const handleSaveTeam = async () => {
-        const token = localStorage.getItem("access_token");
         if (!isDirty || !token) return;
 
-        // Combine for validation checks only
         const allPlayersCheck = [...squad.starting, ...squad.bench];
-
         const captain = allPlayersCheck.find(p => p.isCaptain);
         const viceCaptain = allPlayersCheck.find(p => p.isVice);
 
@@ -322,8 +296,6 @@ const Team: React.FC = () => {
             return;
         }
         
-        // --- LOGIC CHANGE START ---
-        // 1. Map Starters (Priority is null)
         const formattedStarters = squad.starting.map((p) => ({
             id: p.id,
             position: p.pos,
@@ -333,7 +305,6 @@ const Team: React.FC = () => {
             bench_priority: null, 
         }));
 
-        // 2. Map Bench (Priority based on drag order: Index + 1)
         const formattedBench = squad.bench.map((p, index) => ({
             id: p.id,
             position: p.pos,
@@ -346,7 +317,6 @@ const Team: React.FC = () => {
         const payload = {
             players: [...formattedStarters, ...formattedBench]
         };
-        // --- LOGIC CHANGE END ---
 
         try {
             const response = await fetch(API.endpoints.saveTeam, {
@@ -363,7 +333,6 @@ const Team: React.FC = () => {
             const updatedSquadData: TeamResponse = await response.json();
             
             const newSquadState = { 
-                // USE the global transformApiPlayer function instead
                 starting: updatedSquadData.starting.map(transformApiPlayer), 
                 bench: updatedSquadData.bench.map(transformApiPlayer), 
                 team_name: updatedSquadData.team_name
@@ -418,7 +387,6 @@ const Team: React.FC = () => {
         visible: { y: 0, opacity: 1 }
     };
 
-
     return (
         <motion.div 
           className="w-full min-h-screen bg-white flex flex-col lg:h-screen lg:flex-row font-sans"
@@ -447,6 +415,7 @@ const Team: React.FC = () => {
                          <p className="text-sm text-gray-500">{deadlineText}</p>
                     </div>
                 </div>
+                {/* The Chips component dynamically checks its own availability internally based on the open gameweek */}
                 {token && <GameweekChips token={token} isLocked={isLocked} />}
             </motion.div>
             
@@ -481,13 +450,8 @@ const Team: React.FC = () => {
 
             <motion.footer variants={itemVariants} className="flex-shrink-0 p-3 bg-gray-100 border-t select-none">
                 <div className="flex justify-center items-center gap-x-12">
-                    
-                    {/* --- STATIC GOALKEEPER (Cannot be dragged) --- */}
                     {benchLayout.goalkeeper && (
                         <div className="relative">
-                            {/* Visual badge to show GK is always Priority 3 (Last resort) or 1 depending on logic, 
-                                usually GK sub logic is separate. We can hide priority or show a Lock icon. */}
-                            
                             <motion.div
                                 key={benchLayout.goalkeeper.id}
                                 onClick={() => handlePlayerClick(benchLayout.goalkeeper)}
@@ -500,28 +464,21 @@ const Team: React.FC = () => {
                             </motion.div>
                         </div>
                     )}
-
-                    {/* Divider */}
                     <div className="h-16 w-px bg-gray-300"></div>
-
-                    {/* --- DRAGGABLE OUTFIELDERS --- */}
                     <Reorder.Group
                         axis="x"
                         values={benchLayout.outfielders}
                         onReorder={handleOutfieldReorder}
-                        className="grid grid-cols-2 gap-12" // Maintain your Grid Layout
+                        className="grid grid-cols-2 gap-12"
                     >
-                        {benchLayout.outfielders.map((player: any, index: number) => (
+                        {benchLayout.outfielders.map((player: any) => (
                             <Reorder.Item
                                 key={player.id}
                                 value={player}
-                                // 'layout' prop makes neighboring items slide smoothly
                                 layout 
                                 whileDrag={{ scale: 1.05, cursor: "grabbing", zIndex: 50 }}
-                                className="relative touch-none" // touch-none essential for mobile drag
+                                className="relative touch-none"
                             >
-                                
-
                                 <div
                                     onClick={() => handlePlayerClick(player)}
                                     className={cn(
@@ -534,7 +491,6 @@ const Team: React.FC = () => {
                             </Reorder.Item>
                         ))}
                     </Reorder.Group>
-
                 </div>
             </motion.footer>
 
@@ -549,7 +505,6 @@ const Team: React.FC = () => {
             </motion.div>
 
             <motion.div variants={itemVariants} className="p-4">
-                {/* --- MODIFIED: Pass fixture data and handlers to the card --- */}
                 <FixturesCard 
                     fixtures={displayedFixtures}
                     view={fixtureView}
@@ -571,7 +526,6 @@ const Team: React.FC = () => {
               />
           </motion.div>
 
-          
           <AnimatePresence>
              {detailedPlayer && <EditablePlayerCard player={detailedPlayer} onClose={() => setDetailedPlayer(null)} onSubstitute={handleSelectForSub} onSetArmband={setArmband} onViewProfile={handleViewProfile} />}
           </AnimatePresence>
