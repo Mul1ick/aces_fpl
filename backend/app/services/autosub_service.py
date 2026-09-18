@@ -114,11 +114,8 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
             and did_player_play(stats_map.get(p['player_id']))
         ]
         
-        # <--- WARNING 7 FIXED: Enforcing Bench Priority Sort
-        # Keep GKs separated (already handled), but ensure we process outfield subs 
-        # in the exact order the user designated (1, 2, 3). If priority is missing, they drop to the end.
+        # Enforcing Bench Priority Sort
         active_bench_outfield.sort(key=lambda x: x.get('bench_priority') if x.get('bench_priority') is not None else 999)
-        # ------------------------------------------------------------------------------------------
         
         for bench_player in active_bench_outfield:
             if not current_inactive_starters:
@@ -148,17 +145,59 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
             if not swap_successful:
                 logger.debug(f"User {user_id}: Could not sub in {bench_player['player_id']} - formation constraint.")
 
+        # --- CRITICAL FIX: CAPTAINCY AUDIT ---
+        # 1. Strip captaincy from any player that ended up on the bench
+        for p in bench:
+            p['is_captain'] = False
+            p['is_vice_captain'] = False
+            
+        has_cap = any(p['is_captain'] for p in starters)
+        has_vice = any(p['is_vice_captain'] for p in starters)
+        
+        def get_player_points(p_dict):
+            s = stats_map.get(p_dict['player_id'], {})
+            return s.get('points', 0) if s else 0
+
+        # 2. Fix Missing Captain
+        if not has_cap:
+            old_vice = next((p for p in starters if p['is_vice_captain']), None)
+            if old_vice:
+                old_vice['is_captain'] = True
+                old_vice['is_vice_captain'] = False
+                has_vice = False # Vice is now Captain, we need a new Vice
+            else:
+                # Pick the highest scoring starter as the new Captain
+                sorted_starters = sorted(starters, key=get_player_points, reverse=True)
+                sorted_starters[0]['is_captain'] = True
+                
+        # 3. Fix Missing Vice-Captain
+        if not has_vice:
+            sorted_starters = sorted(starters, key=get_player_points, reverse=True)
+            for p in sorted_starters:
+                if not p['is_captain']:
+                    p['is_vice_captain'] = True
+                    break
+        # -------------------------------------
+
         # 4. COMMIT UPDATES TO DB
         async with db.tx() as tx:
             for p in starters:
                 await tx.userteam.update(
                     where={'id': p['db_id']},
-                    data={'is_benched': False}
+                    data={
+                        'is_benched': False,
+                        'is_captain': p['is_captain'],
+                        'is_vice_captain': p['is_vice_captain']
+                    }
                 )
             for p in bench:
                 await tx.userteam.update(
                     where={'id': p['db_id']},
-                    data={'is_benched': True}
+                    data={
+                        'is_benched': True,
+                        'is_captain': False,
+                        'is_vice_captain': False
+                    }
                 )
         
         updates_made += 1

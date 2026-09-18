@@ -8,8 +8,10 @@ alog = logging.getLogger("aces.admin_tasks")
 async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
     """
     Cleans up after a gameweek is finalized.
-    Because team rollovers are handled automatically via time-checks (carry_forward_team),
-    this function strictly handles exceptions like Free Hit reverts and transfer resets.
+    Because team rollovers are handled automatically via time-checks and 
+    Free Hit logic is baked directly into `carry_forward_team()`, 
+    this function strictly handles global state updates like 
+    first-time player tracking and free transfer resets.
     """
     alog.info(f"--- Starting Gameweek Post-Processing for GW ID: {live_gw_id} ---")
 
@@ -18,46 +20,7 @@ async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
         alog.error(f"Post-processing failed: Could not find live_gw with id {live_gw_id}")
         return
 
-    next_gw = await db.gameweek.find_first(where={'gw_number': live_gw.gw_number + 1})
-    
-    # 1. Handle Free Hit Reverts ONLY
-    if next_gw:
-        free_hit_chips = await db.userchip.find_many(
-            where={'gameweek_id': live_gw_id, 'chip': 'FREE_HIT'}
-        )
-        if free_hit_chips:
-            for chip in free_hit_chips:
-                user_id = chip.user_id
-                
-                # Find the team they had BEFORE the free hit week
-                prev_team_entry = await db.userteam.find_first(
-                    where={'user_id': user_id, 'gameweek_id': {'lt': live_gw_id}},
-                    order={'gameweek_id': 'desc'}
-                )
-                
-                if prev_team_entry:
-                    prev_gw_id = prev_team_entry.gameweek_id
-                    team_to_restore = await db.userteam.find_many(where={'user_id': user_id, 'gameweek_id': prev_gw_id})
-                    
-                    if team_to_restore:
-                        # Wipe whatever was generated in next_gw (in case they made transfers assuming FH was permanent)
-                        await db.userteam.delete_many(where={'user_id': user_id, 'gameweek_id': next_gw.id})
-                        
-                        # Copy the pre-FH team exactly
-                        new_data = [
-                            {
-                                "user_id": user_id,
-                                "gameweek_id": next_gw.id,
-                                "player_id": p.player_id,
-                                "is_captain": p.is_captain,
-                                "is_vice_captain": p.is_vice_captain,
-                                "is_benched": p.is_benched
-                            } for p in team_to_restore
-                        ]
-                        await db.userteam.create_many(data=new_data, skip_duplicates=True)
-                        alog.info(f"Reverted Free Hit for user {user_id} into GW {next_gw.gw_number}")
-
-    # 2. Update first GW flags
+    # 1. Update first GW flags (Checks who participated in GW1)
     if live_gw.gw_number == 1:
         user_ids_in_gw1 = [
             ut.user_id for ut in await db.userteam.find_many(
@@ -71,11 +34,13 @@ async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
                 data={'played_first_gameweek': True}
             )
 
-    # 3. Give everyone 2 free transfers for the new week
+    # 2. Give everyone 2 free transfers for the new week
+    # (Note: In Aces FPL, free transfers reset to 2 every gameweek instead of rolling over to 5)
     await db.user.update_many(
         where={'is_active': True, 'played_first_gameweek': True},
         data={'free_transfers': 2}
     )
+    
     alog.info(f"--- Gameweek Post-Processing for GW ID: {live_gw_id} Completed ---")
 
 

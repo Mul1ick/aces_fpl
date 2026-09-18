@@ -200,9 +200,24 @@ const Team: React.FC = () => {
             const benched = selectedPlayer.isBenched ? selectedPlayer : clickedPlayer;
 
             const tempStartingXI = squad.starting.filter(p => p.id !== starter.id).concat(benched);
+            
+            // --- CRITICAL FIX: FULL FORMATION VALIDATION ---
             const goalkeepers = tempStartingXI.filter(p => p.pos === 'GK').length;
+            const defenders = tempStartingXI.filter(p => p.pos === 'DEF').length;
+            const forwards = tempStartingXI.filter(p => p.pos === 'FWD').length;
+
             if (goalkeepers !== 1) {
-                 toast({ variant: "destructive", title: "Invalid Substitution", description: "Your starting team must have exactly one goalkeeper." });
+                toast({ variant: "destructive", title: "Invalid Substitution", description: "Your starting team must have exactly 1 Goalkeeper." });
+                setSelectedPlayer(null);
+                return;
+            }
+            if (defenders < 2) {
+                toast({ variant: "destructive", title: "Invalid Substitution", description: "Your starting team must have at least 2 Defenders." });
+                setSelectedPlayer(null);
+                return;
+            }
+            if (forwards < 1) {
+                toast({ variant: "destructive", title: "Invalid Substitution", description: "Your starting team must have at least 1 Forward." });
                 setSelectedPlayer(null);
                 return;
             }

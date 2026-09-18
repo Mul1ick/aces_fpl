@@ -106,36 +106,48 @@ async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
         if existing:
             return  # Already exists, no need to copy
 
-        # 2. Find the latest gameweek before this one
+        # 2. Find the latest gameweek before this one where the user had a team
         prev_entry = await db.userteam.find_first(
             where={'user_id': user_id, 'gameweek_id': {'lt': new_gameweek_id}},
             order={'gameweek_id': 'desc'}
         )
         if not prev_entry:
-            return  # User has no previous team (maybe new user)
+            return  # User has no previous team (e.g., new user)
 
         prev_gw_id = prev_entry.gameweek_id
-        prev_team: List = await db.userteam.find_many(
-            where={'user_id': user_id, 'gameweek_id': prev_gw_id}
+        source_gw_id = prev_gw_id
+
+        # --- CRITICAL FIX: FREE HIT AWARENESS ---
+        # Check if the user played a Free Hit in the previous gameweek
+        fh_chip = await db.userchip.find_first(
+            where={'user_id': user_id, 'gameweek_id': prev_gw_id, 'chip': 'FREE_HIT'}
+        )
+
+        if fh_chip:
+            # If Free Hit was played, we must skip it and fetch the team from the week BEFORE the Free Hit
+            pre_fh_entry = await db.userteam.find_first(
+                where={'user_id': user_id, 'gameweek_id': {'lt': prev_gw_id}},
+                order={'gameweek_id': 'desc'}
+            )
+            if pre_fh_entry:
+                source_gw_id = pre_fh_entry.gameweek_id
+                logger.info(f"Free Hit detected in GW {prev_gw_id} for user {user_id}. Sourcing team from GW {source_gw_id} instead.")
+            else:
+                # Edge case fallback: If no team existed before the Free Hit, we just fallback to the FH team.
+                logger.warning(f"Free Hit in GW {prev_gw_id} but no prior team found for user {user_id}.")
+        # ----------------------------------------
+
+        prev_team = await db.userteam.find_many(
+            where={'user_id': user_id, 'gameweek_id': source_gw_id}
         )
 
         if not prev_team:
             return
 
-        # 3. Copy forward into new gameweek
-        team_to_create = [
-            {
-                'user_id': user_id,
-                'gameweek_id': new_gameweek_id,
-                'player_id': entry.player_id,
-                'is_captain': entry.is_captain,
-                'is_vice_captain': entry.is_vice_captain,
-                'is_benched': entry.is_benched,
-            }
-            for entry in prev_team
-        ]
+        # --- CRITICAL FIX: VALIDATE & FIX BEFORE PHOTOCOPYING ---
         cap_count = sum(1 for e in prev_team if e.is_captain)
         vice_count = sum(1 for e in prev_team if e.is_vice_captain)
+        
         if cap_count != 1 or vice_count != 1:
             starters = [e for e in prev_team if not e.is_benched]
             if starters:
@@ -145,8 +157,24 @@ async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
                 starters[0].is_captain = True
                 if len(starters) > 1:
                     starters[1].is_vice_captain = True
+        # --------------------------------------------------------
+
+        # 3. Copy forward into new gameweek (Now using the safely mutated prev_team)
+        team_to_create = [
+            {
+                'user_id': user_id,
+                'gameweek_id': new_gameweek_id,
+                'player_id': entry.player_id,
+                'is_captain': entry.is_captain,
+                'is_vice_captain': entry.is_vice_captain,
+                'is_benched': entry.is_benched,
+                'bench_priority': entry.bench_priority # Preserves bench order!
+            }
+            for entry in prev_team
+        ]
+                    
         await db.userteam.create_many(data=team_to_create)
-        logger.info(f"Carried forward team for user {user_id} to GW {new_gameweek_id}")
+        logger.info(f"Carried forward team for user {user_id} to GW {new_gameweek_id} (Sourced from GW {source_gw_id})")
 
     except Exception as e:
         logger.error(f"Error carrying forward team for user {user_id}", exc_info=True)
@@ -498,13 +526,29 @@ async def save_existing_team(
 
     from app.utils.team_algo import _normalize_8p3
     async with db.tx() as tx:
+        # --- CRITICAL FIX: PESSIMISTIC LOCK ---
+        # Lock the user row so concurrent 'Save' clicks queue up sequentially
+        await tx.query_raw("SELECT id FROM users WHERE id = $1 FOR UPDATE", user_id)
+
         await tx.userteam.delete_many(
             where={'user_id': user_id, 'gameweek_id': gameweek_id}
         )
 
         new_snapshot = await _normalize_8p3(tx, to_create)
 
-        await tx.userteam.create_many(data=new_snapshot)
+        # --- FIX: Explicit Type Assignment (Keeps the IDE/Type-Checker happy) ---
+        await tx.userteam.create_many(data=[
+            {
+                "user_id": r["user_id"], 
+                "gameweek_id": r["gameweek_id"], 
+                "player_id": r["player_id"],
+                "is_benched": r["is_benched"],
+                "is_captain": r["is_captain"],
+                "is_vice_captain": r["is_vice_captain"],
+                "bench_priority": r.get("bench_priority")
+            } 
+            for r in new_snapshot
+        ])
 
         for out_id in removed_ids:
             await tx.transfer_log.create(
@@ -659,11 +703,33 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
 
     # 2. Get Overall Stats from Leaderboard
     try:
-        lb = await get_leaderboard(db)
-        me = next((r for r in lb if r.get("user_id") == str(user.id)), None)
-        overall_points = int(me["total_points"]) if me else 0
-        overall_rank = int(me["rank"]) if me and me.get("rank") is not None else None
-    except Exception:
+        # A) Calculate Net Overall Points using direct DB aggregation
+        agg = await db.usergameweekscore.group_by(
+            by=['user_id'],
+            where={'user_id': str(user.id)},
+            sum={'total_points': True, 'transfer_hits': True}
+        )
+        
+        overall_points = 0
+        if agg:
+            sums = agg[0].get('_sum') or agg[0].get('sum') or {}
+            raw_pts = int(sums.get('total_points') or 0)
+            hits = int(sums.get('transfer_hits') or 0)
+            overall_points = raw_pts - hits
+
+        # B) Fetch the frozen overall rank from the latest finished gameweek
+        latest_finished_score = await db.usergameweekscore.find_first(
+            where={
+                'user_id': str(user.id),
+                'gameweek': {'is': {'status': 'FINISHED'}}
+            },
+            order={'gameweek_id': 'desc'} 
+        )
+        
+        overall_rank = latest_finished_score.overall_rank if latest_finished_score else None
+
+    except Exception as e:
+        logger.error(f"Error fetching stats for public view: {e}")
         overall_points, overall_rank = 0, None
 
     # 3. Get Specific Gameweek Score

@@ -32,7 +32,6 @@ def validate_squad_structure(players: list):
     }
 
     # 3. Count Positions in the provided list
-    # NOTE: Adjust 'p.position' to 'p['position']' if passing raw dictionaries
     current_counts = Counter(p.position for p in players)
 
     # 4. Compare and Collect Errors
@@ -52,7 +51,6 @@ def validate_squad_structure(players: list):
     return True
 
 
-
 async def transfer_player(
     db: Prisma,
     user_id: str,
@@ -60,14 +58,8 @@ async def transfer_player(
     out_player_id: int,
     in_player_id: int,
 ):
-
     await carry_forward_team(db, user_id, gameweek_id)
-    user = await db.user.find_unique(where={'id': user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    wildcard = await is_wildcard_active(db, user_id, gameweek_id)
-
+    
     # 1) Find outgoing row
     out_entry = await db.userteam.find_first(
         where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': out_player_id},
@@ -90,22 +82,43 @@ async def transfer_player(
     if in_player.position != out_entry.player.position:
         raise HTTPException(status_code=400, detail="Position mismatch for transfer.")
 
-    flags = {
-        'is_benched': out_entry.is_benched,
-        'is_captain': out_entry.is_captain,
-        'is_vice_captain': out_entry.is_vice_captain,
-    }
-
-    # Decide charge policy before tx for clarity
-    charge_transfers = bool(user.played_first_gameweek and not wildcard)
-
     async with db.tx() as tx:
+        # --- CRITICAL FIX: PESSIMISTIC LOCK ---
+        # Lock the user row to prevent concurrent transfer API calls from bypassing the cost deductions
+        await tx.query_raw("SELECT id FROM users WHERE id = $1 FOR UPDATE", user_id)
+        
+        user = await tx.user.find_unique(where={'id': user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        # --- CRITICAL FIX: FREE HIT AWARENESS ---
+        # Check if the user has EITHER a Wildcard or a Free Hit active
+        active_chip = await tx.userchip.find_first(
+            where={
+                "user_id": user_id,
+                "gameweek_id": gameweek_id,
+                "chip": {"in": ["WILDCARD", "FREE_HIT"]}
+            }
+        )
+        
+        is_unlimited_transfers = (active_chip is not None) or (not user.played_first_gameweek)
+        charge_transfers = not is_unlimited_transfers
+
         # swap
         await tx.userteam.delete_many(
             where={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': out_player_id}
         )
+        
+        # --- FIX: Explicit Type Assignment instead of ** dictionary unpacking
         await tx.userteam.create(
-            data={'user_id': user_id, 'gameweek_id': gameweek_id, 'player_id': in_player_id, **flags}
+            data={
+                'user_id': user_id, 
+                'gameweek_id': gameweek_id, 
+                'player_id': in_player_id,
+                'is_benched': out_entry.is_benched,
+                'is_captain': out_entry.is_captain,
+                'is_vice_captain': out_entry.is_vice_captain,
+            }
         )
 
         # log the transfer action
@@ -127,16 +140,17 @@ async def transfer_player(
                 )
             else:
                 # apply a -4 hit for this transfer
-                # upsert GW score row and increment hits by 4
                 await tx.usergameweekscore.upsert(
                     where={'user_id_gameweek_id': {'user_id': user_id, 'gameweek_id': gameweek_id}},
-                    create={
-                        'user_id': user_id,
-                        'gameweek_id': gameweek_id,
-                        'total_points': 0,
-                        'transfer_hits': 4,
-                    },
-                    update={'transfer_hits': {'increment': 4}},
+                    data={
+                        'create': {
+                            'user_id': user_id,
+                            'gameweek_id': gameweek_id,
+                            'total_points': 0,
+                            'transfer_hits': 4,
+                        },
+                        'update': {'transfer_hits': {'increment': 4}},
+                    }
                 )
         # else: no cost during first GW or wildcard
 
@@ -155,13 +169,17 @@ async def confirm_transfers(
     - Checks for an active WILDCARD chip.
     - If WILDCARD is active, allows unlimited transfers with no point cost.
     - If not, validates against the user's free transfers and calculates a point hit.
-    - Performs all operations in a single transaction.
+    - Performs all operations in a single transaction with pessimistic locking.
     """
     if not transfers:
         raise HTTPException(status_code=400, detail="No transfers provided.")
 
     async with db.tx() as tx:
-        # Fetch essential user and gameweek data in one go
+        # --- CRITICAL FIX: PESSIMISTIC LOCK ---
+        # Lock the user row immediately inside the transaction so concurrent requests queue up
+        await tx.query_raw("SELECT id FROM users WHERE id = $1 FOR UPDATE", user_id)
+        
+        # Fetch essential user and gameweek data safely
         user = await tx.user.find_unique(where={"id": user_id})
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
@@ -187,29 +205,22 @@ async def confirm_transfers(
             raise HTTPException(status_code=404, detail="User has no team for this gameweek.")
         
         # --- START: REVISED CAPTAIN RE-ASSIGNMENT LOGIC ---
-        
         players_out_ids = {t.out_player_id for t in transfers}
         current_captain = next((p for p in current_team if p.is_captain), None)
         current_vice_captain = next((p for p in current_team if p.is_vice_captain), None)
 
+        # If the captain is leaving...
         if current_captain and current_captain.player_id in players_out_ids:
+            current_captain.is_captain = False
+            # ...and the vice-captain is staying, promote the vice-captain IN MEMORY
             if current_vice_captain and current_vice_captain.player_id not in players_out_ids:
-                # Use the compound unique key to ensure the correct record is updated
-                await tx.userteam.update(
-                    where={
-                        "user_id_gameweek_id_player_id": {
-                            "user_id": user_id,
-                            "gameweek_id": gameweek_id,
-                            "player_id": current_vice_captain.player_id,
-                        }
-                    },
-                    data={
-                        "is_captain": True,
-                        "is_vice_captain": False
-                    }
-                )
+                current_vice_captain.is_captain = True
+                current_vice_captain.is_vice_captain = False
+                
+        # If the vice-captain is leaving, just strip their role
+        if current_vice_captain and current_vice_captain.player_id in players_out_ids:
+            current_vice_captain.is_vice_captain = False
         # --- END: REVISED CAPTAIN RE-ASSIGNMENT LOGIC ---
-
 
         # --- TRANSFER VALIDATION & COST CALCULATION ---
         is_unlimited_transfers = (active_chip is not None) or (not user.played_first_gameweek)
@@ -226,11 +237,6 @@ async def confirm_transfers(
             
             # Deduct used transfers, but don't go below zero
             new_free_transfers = max(0, user.free_transfers - num_transfers)
-
-
-        
-        # --- (Your existing budget and squad validation logic would go here) ---
-        # For now, we are focusing on the transfer cost logic.
 
         # --- EXECUTE TRANSFERS ---
         snap = [{
@@ -274,18 +280,27 @@ async def confirm_transfers(
         has_cap  = any(r["is_captain"] for r in by_id.values())
         has_vice = any(r["is_vice_captain"] for r in by_id.values())
 
-        if not (has_cap and has_vice):
-            # clear any partial flags
-            for r in by_id.values():
-                r["is_captain"] = False
-                r["is_vice_captain"] = False
-
+        # If either role is missing, securely assign a replacement without wiping existing valid roles
+        if not has_cap or not has_vice:
             starters = [pid for pid, r in by_id.items() if not r["is_benched"]]
             pool = starters if len(starters) >= 2 else list(by_id.keys())
 
-            cap_id, vice_id = random.sample(pool, 2)
-            by_id[cap_id]["is_captain"] = True
-            by_id[vice_id]["is_vice_captain"] = True
+            # Identify anyone who already has a role so we don't double-assign
+            existing_cap = next((pid for pid, r in by_id.items() if r["is_captain"]), None)
+            existing_vice = next((pid for pid, r in by_id.items() if r["is_vice_captain"]), None)
+            
+            # Create a pool of available players
+            available_pool = [pid for pid in pool if pid not in (existing_cap, existing_vice)]
+
+            # Fill missing captain
+            if not has_cap and available_pool:
+                new_cap_id = available_pool.pop(0)
+                by_id[new_cap_id]["is_captain"] = True
+            
+            # Fill missing vice-captain
+            if not has_vice and available_pool:
+                new_vice_id = available_pool.pop(0)
+                by_id[new_vice_id]["is_vice_captain"] = True
 
         # then normalize and write
         new_snapshot = await _normalize_8p3(tx, list(by_id.values()))
@@ -297,15 +312,24 @@ async def confirm_transfers(
         added_ids   = new_ids - old_ids
 
         await tx.userteam.delete_many(where={"user_id": user_id, "gameweek_id": gameweek_id})
+        
+        # --- FIX: Explicit Type Assignment instead of ** dictionary unpacking
         await tx.userteam.create_many(data=[
-            {"user_id": user_id, "gameweek_id": gameweek_id, **r} for r in new_snapshot
+            {
+                "user_id": user_id, 
+                "gameweek_id": gameweek_id, 
+                "player_id": r["player_id"],
+                "is_benched": r["is_benched"],
+                "is_captain": r["is_captain"],
+                "is_vice_captain": r["is_vice_captain"]
+            } 
+            for r in new_snapshot
         ])
 
         for pid in removed_ids:
             await tx.transfer_log.create(data={"user_id": user_id, "gameweek_id": gameweek_id, "out_player": int(pid), "in_player": None})
         for pid in added_ids:
             await tx.transfer_log.create(data={"user_id": user_id, "gameweek_id": gameweek_id, "out_player": None, "in_player": int(pid)})
-
 
         # --- UPDATE USER STATE ---
         if not is_unlimited_transfers:
@@ -322,7 +346,5 @@ async def confirm_transfers(
                     },
                 )
 
-
     # Return the updated team view
     return await get_user_team_full(db, user_id, gameweek_id)
-
