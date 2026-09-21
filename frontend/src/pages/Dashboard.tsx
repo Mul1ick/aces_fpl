@@ -27,6 +27,7 @@ type TransferStatItem = {
 type GameweekStats = {
   id: number;
   gw_number: number;
+  status?: string; // <--- ADD THIS LINE
   finished?: boolean;
   is_current?: boolean;
   is_next?: boolean;
@@ -237,9 +238,9 @@ const Dashboard: React.FC = () => {
       
       let gwNumberToFetch = gameweek.gw_number;
       
-      // --- FIXED LOGIC: No longer subtracts 1 if gameweek is LIVE! ---
-      // We only subtract 1 to get stats if the gameweek is strictly UPCOMING (e.g. between gameweeks)
-      if (gameweek.is_next && !gameweek.is_current && gameweek.gw_number > 1) {
+      // <--- FIXED LOGIC: Check status instead of non-existent is_next flag --->
+      // If the current tracked gameweek hasn't kicked off yet, display the previous one's stats
+      if (gameweek.status === 'UPCOMING' && gameweek.gw_number > 1) {
         gwNumberToFetch = gameweek.gw_number - 1;
       }
 
