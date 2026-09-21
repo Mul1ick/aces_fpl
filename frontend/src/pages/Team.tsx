@@ -253,7 +253,8 @@ const Team: React.FC = () => {
     const setArmband = (playerId: number, kind: 'C' | 'VC') => {
         const player = squad.starting.find(p => p.id === playerId) || squad.bench.find(p => p.id === playerId);
         
-        if (player.is_benched) {
+        // <--- FIXED: Check for isBenched instead of is_benched --->
+        if (player.isBenched || player.is_benched) {
             toast({ variant: "destructive", title: "Invalid Action", description: "Captain and Vice-Captain must be in the starting XI." });
             return;
         }
@@ -297,6 +298,12 @@ const Team: React.FC = () => {
 
     const handleSaveTeam = async () => {
         if (!isDirty || !token) return;
+        
+        // <--- ADD THIS SAFETY CHECK --->
+        if (!gameweek) {
+            toast({ variant: "destructive", title: "Error", description: "Gameweek data not loaded. Cannot save." });
+            return;
+        }
 
         const allPlayersCheck = [...squad.starting, ...squad.bench];
         const captain = allPlayersCheck.find(p => p.isCaptain);
@@ -330,6 +337,7 @@ const Team: React.FC = () => {
         }));
 
         const payload = {
+            gameweek_id: gameweek.id, // <--- ADD THIS LINE
             players: [...formattedStarters, ...formattedBench]
         };
 
@@ -512,7 +520,7 @@ const Team: React.FC = () => {
             <motion.div variants={itemVariants} className="p-4 text-center bg-white border-t-2 border-gray-200">
                 <Button 
                     onClick={handleSaveTeam} 
-                    disabled={!isDirty}
+                    disabled={!isDirty || isLocked} // <--- FIXED: Added '|| isLocked'
                     className="bg-accent-pink text-white font-bold text-lg px-8 py-6 rounded-lg shadow-lg disabled:opacity-50"
                 >
                     Save Changes

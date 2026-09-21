@@ -8,6 +8,9 @@ from collections import Counter
 import uuid
 from app.utils.stats_utils import calculate_breakdown
 
+from datetime import datetime, timezone
+from app.repositories.gameweek_repo import get_open_gameweek_for_transfers
+
 logger = logging.getLogger(__name__)
 
 async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: str, players: list[dict]):
@@ -74,7 +77,8 @@ async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: 
                 'player_id': p_obj.id,
                 'is_captain': p_input.get('is_captain', False),
                 'is_vice_captain': p_input.get('is_vice_captain', False),
-                'is_benched': p_input.get('is_benched', False) 
+                'is_benched': p_input.get('is_benched', False),
+                'bench_priority': p_input.get('bench_priority', None) # <--- ADD THIS LINE
             })
         
         # 4. Final safety check: ensure captain/vice exist (in case input was weird)
@@ -99,12 +103,23 @@ async def save_user_team(db: Prisma, user_id: str, gameweek_id: int, team_name: 
 
 async def carry_forward_team(db: Prisma, user_id: str, new_gameweek_id: int):
     try:
+        # <--- FIX FOR BUG #2: The "Time Traveler's Photocopy" Bug --->
+        target_gw = await db.gameweek.find_unique(where={'id': new_gameweek_id})
+        open_gw = await get_open_gameweek_for_transfers(db)
+        
+        if target_gw and open_gw:
+            if target_gw.gw_number > open_gw.gw_number:
+                logger.warning(f"Blocked future team generation: User {user_id} requested GW {target_gw.gw_number}, but open GW is {open_gw.gw_number}.")
+                return
+        # <--- END OF FIX --->
+
         # 1. Check if the user already has a team for this GW
         existing = await db.userteam.find_first(
             where={'user_id': user_id, 'gameweek_id': new_gameweek_id}
         )
         if existing:
             return  # Already exists, no need to copy
+
 
         # 2. Find the latest gameweek before this one where the user had a team
         prev_entry = await db.userteam.find_first(
@@ -677,6 +692,15 @@ async def auto_correct_squad_formation(db: Prisma, players: list[schemas.PlayerS
                      next((p for p in active_starters if p['position'] == 'MID'), active_starters[0]))
         cap_choice['is_captain'] = True
 
+    # <--- ADD THIS BLOCK TO ASSIGN BENCH PRIORITIES --->
+    bench_idx = 1
+    for p in rich_players:
+        if p['is_benched']:
+            p['bench_priority'] = bench_idx
+            bench_idx += 1
+        else:
+            p['bench_priority'] = None
+
     return [schemas.PlayerSelection(**p) for p in rich_players]
 
 async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
@@ -693,6 +717,14 @@ async def get_public_team_view(db: Prisma, user_key: str, gameweek_number: int):
     gw = await db.gameweek.find_unique(where={"gw_number": gameweek_number})
     if not gw:
         raise HTTPException(status_code=404, detail="Gameweek not found")
+
+    # <--- ADDED: Privacy check to prevent viewing teams before the deadline --->
+    if gw.deadline > datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=403, 
+            detail="You cannot view a team for a gameweek before the deadline has passed."
+        )
+    # <--- END OF PRIVACY CHECK --->
 
     # 1. Get Team Data
     data = await get_user_team_full(db, str(user.id), gw.id)

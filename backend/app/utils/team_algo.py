@@ -65,4 +65,18 @@ async def _normalize_8p3(db: Prisma, snapshot: list[dict]) -> list[dict]:
             by_id[benchable]['is_benched'] = True
             by_id[startable]['is_benched'] = False
 
+    # <--- ADD THIS ENTIRE BLOCK --->
+    # Guarantee bench_priority is perfectly sequential (1, 2, 3) 
+    benched_pids = [pid for pid, r in by_id.items() if r['is_benched']]
+    # Sort by existing priority so we don't accidentally shuffle them during transfers
+    benched_pids.sort(key=lambda pid: by_id[pid].get('bench_priority') or 99)
+    
+    for i, pid in enumerate(benched_pids):
+        by_id[pid]['bench_priority'] = i + 1
+        
+    for pid, r in by_id.items():
+        if not r['is_benched']:
+            r['bench_priority'] = None
+    # <--- END OF ADDED BLOCK --->
+
     return [by_id[pid] for pid in sorted(by_id)]

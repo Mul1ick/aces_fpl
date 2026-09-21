@@ -296,6 +296,12 @@ const Transfers: React.FC = () => {
   const handleConfirmTransfers = async (teamNameFromModal?: string) => {
     if (!token) return;
 
+    // <--- ADD THIS SAFETY CHECK --->
+    if (!gameweek) {
+        toast({ variant: "destructive", title: "Error", description: "Gameweek data not loaded. Cannot save." });
+        return;
+    }
+
     if (!hasTeam) {
         if (playersSelected !== 11) {
             toast({ variant: "destructive", title: "Incomplete Squad", description: "You must select 11 players to save your team." });
@@ -303,6 +309,7 @@ const Transfers: React.FC = () => {
         }
         const allPlayers = Object.values(squad).flat().filter(p => p !== null);
         const payload = {
+            gameweek_id: gameweek.id, // <--- ADD THIS LINE
             team_name: teamNameFromModal,
             players: allPlayers.map((p: any) => ({ id: p.id, position: p.pos, is_captain: false, is_vice_captain: false, is_benched: false })),
         };
@@ -328,6 +335,7 @@ const Transfers: React.FC = () => {
     }
 
     const transferPayload = {
+      gameweek_id: gameweek.id, // <--- ADD THIS LINE
       transfers: playersOut.map((pOut, index) => ({
         out_player_id: pOut.id,
         in_player_id: playersIn[index].id,

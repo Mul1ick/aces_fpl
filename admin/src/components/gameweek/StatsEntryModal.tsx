@@ -306,7 +306,7 @@ export function StatsEntryModal({
         </DialogHeader>
         
         <div className="p-6 overflow-x-auto">
-          <ScrollArea className="h-[55vh] w-full pr-4 min-w-[1100px]">
+          <ScrollArea className="h-[55vh] w-full pr-4 min-w-[1500px]">
             {loading ? (
               <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading players…</div>
             ) : (

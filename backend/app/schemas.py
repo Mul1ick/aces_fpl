@@ -110,10 +110,12 @@ class PlayerSelection(BaseModel):
     bench_priority: Optional[int] = None
 
 class SubmitTeamRequest(BaseModel):
+    gameweek_id: int 
     team_name: str
     players: List[PlayerSelection]
 
 class SaveTeamPayload(BaseModel):
+    gameweek_id: int
     players: List[PlayerSelection]
 
 class PlayerDisplay(BaseModel):
@@ -160,6 +162,7 @@ class TransferItem(BaseModel):
     in_player_id: int
 
 class ConfirmTransfersRequest(BaseModel):
+    gameweek_id: int
     transfers: List[TransferItem]
 
 class SetArmbandRequest(BaseModel):

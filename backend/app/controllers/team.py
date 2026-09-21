@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from prisma import models as PrismaModels
 from prisma import Prisma
+from datetime import datetime, timezone
+
 
 from app import schemas
 from app.auth import get_current_user
@@ -29,9 +31,15 @@ async def submit_team(
     current_user: PrismaModels.User = Depends(get_current_user)
 ):
     corrected_players = await auto_correct_squad_formation(db, team.players)
-    target_gw = await get_open_gameweek_for_transfers(db)
+    
+    # <--- FIXED: Look up the exact gameweek the user was looking at --->
+    target_gw = await db.gameweek.find_unique(where={'id': team.gameweek_id})
     if not target_gw:
-        raise HTTPException(400, "No gameweek is currently open for team submission.")
+        raise HTTPException(404, "Gameweek not found.")
+        
+    # Check if the deadline for THIS gameweek has passed
+    if target_gw.deadline < datetime.now(timezone.utc):
+        raise HTTPException(400, f"The deadline for Gameweek {target_gw.gw_number} has passed. Please refresh the page.")
 
     await save_user_team(
         db=db,
@@ -113,9 +121,14 @@ async def save_team(
     db: Prisma = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    target_gw = await get_open_gameweek_for_transfers(db)
+    # <--- FIXED: Look up the exact gameweek the user was looking at --->
+    target_gw = await db.gameweek.find_unique(where={'id': payload.gameweek_id})
     if not target_gw:
-        raise HTTPException(400, "No gameweek open for squad changes.")
+        raise HTTPException(404, "Gameweek not found.")
+        
+    # Check if the deadline for THIS gameweek has passed
+    if target_gw.deadline < datetime.now(timezone.utc):
+        raise HTTPException(400, f"The deadline for Gameweek {target_gw.gw_number} has passed. Please refresh the page.")
         
     updated = await save_existing_team(
         db=db,

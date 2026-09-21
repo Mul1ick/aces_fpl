@@ -238,12 +238,12 @@ async def confirm_transfers(
             # Deduct used transfers, but don't go below zero
             new_free_transfers = max(0, user.free_transfers - num_transfers)
 
-        # --- EXECUTE TRANSFERS ---
         snap = [{
             "player_id": p.player_id,
             "is_benched": bool(p.is_benched),
             "is_captain": bool(p.is_captain),
             "is_vice_captain": bool(p.is_vice_captain),
+            "bench_priority": p.bench_priority, # <--- ADD THIS LINE
         } for p in current_team]
         by_id = {r["player_id"]: r for r in snap}
 
@@ -253,17 +253,23 @@ async def confirm_transfers(
             out_row = by_id.get(out_id)
             if not out_row:
                 raise HTTPException(400, f"Outgoing player {out_id} is not in your team.")
+            
             inherited_bench = out_row["is_benched"]
+            inherited_priority = out_row.get("bench_priority") # <--- ADD THIS LINE
             was_leader = out_row["is_captain"] or out_row["is_vice_captain"]
+            
             by_id.pop(out_id)
             if in_id in by_id:
                 raise HTTPException(400, "Incoming player already in team.")
+            
             by_id[in_id] = {
                 "player_id": in_id,
                 "is_benched": False if was_leader else inherited_bench,
                 "is_captain": False,
                 "is_vice_captain": False,
+                "bench_priority": None if was_leader else inherited_priority, # <--- ADD THIS LINE
             }
+
         
         # 1. Get the list of IDs for the final squad
         new_squad_ids = list(by_id.keys())

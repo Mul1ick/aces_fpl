@@ -40,16 +40,16 @@ async def confirm_transfers_endpoint(
     current_user: PrismaModels.User = Depends(get_current_user),
 ):
     """
-    Confirms transfers for the next UPCOMING gameweek based strictly on the clock.
+    Confirms transfers for the requested gameweek.
     """
-    target_gw = await get_open_gameweek_for_transfers(db)
-
+    # <--- FIXED: Look up the exact gameweek the user was looking at --->
+    target_gw = await db.gameweek.find_unique(where={'id': payload.gameweek_id})
     if not target_gw:
-        raise HTTPException(status_code=400, detail="There is no gameweek currently open for transfers.")
-    
-    # Extra security buffer (redundant but safe)
+        raise HTTPException(404, "Gameweek not found.")
+
+    # Reject if the deadline has passed
     if target_gw.deadline < datetime.now(timezone.utc):
-         raise HTTPException(status_code=400, detail=f"The deadline for Gameweek {target_gw.gw_number} has passed.")
+         raise HTTPException(status_code=400, detail=f"The deadline for Gameweek {target_gw.gw_number} has passed. Please refresh the page.")
 
     return await confirm_transfers(
         db=db,
