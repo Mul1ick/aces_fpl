@@ -302,7 +302,7 @@ async def main() -> None:
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         
         # --- HARDCODED TARGET TIME ---
-        start_time = datetime(2026, 9, 19, 12, 0, 0, tzinfo=ist_tz)
+        start_time = datetime(2026, 9, 21, 13, 0, 0, tzinfo=ist_tz)
         
         gw_interval = timedelta(minutes=20)
         match_interval = timedelta(minutes=2)

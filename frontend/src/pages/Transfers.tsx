@@ -389,6 +389,7 @@ const Transfers: React.FC = () => {
             onPlayerSelect={handlePlayerSelect}
             positionFilter={positionToFill?.position}
             squad={squad}
+            targetGameweek={gameweek}
           />
         </motion.div>
         
@@ -452,6 +453,7 @@ const Transfers: React.FC = () => {
         onPlayerSelect={handlePlayerSelect}
         positionFilter={positionToFill?.position}
         squad={squad}
+        targetGameweek={gameweek}
       />
       <EnterSquadModal
         isOpen={isEnterSquadModalOpen}

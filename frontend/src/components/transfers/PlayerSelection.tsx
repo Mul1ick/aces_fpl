@@ -209,7 +209,7 @@ const PlayerFilterControls = ({ filters, setFilters, resetFilters, allTeamNames 
 // ============================================================================
 // MAIN COMPONENT: PlayerSelectionList
 // ============================================================================
-export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, positionFilter, squad }) => {
+export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, positionFilter, squad, targetGameweek }) => {
     const [players, setPlayers] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
@@ -227,10 +227,14 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
             const token = localStorage.getItem('access_token');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-            // 1. Fetch Players and Fixtures (gameweek is no longer needed here)
+            // 1. Fetch Players and Fixtures (Use targetGameweek if available)
+            const fixtureUrl = targetGameweek?.id 
+                ? `${API.endpoints.fixtures}?gameweek_id=${targetGameweek.id}` 
+                : API.endpoints.fixtures;
+
             const [playerRes, fixtureRes] = await Promise.all([
                 fetch(API.endpoints.playerStats),
-                fetch(API.endpoints.fixtures, { headers })
+                fetch(fixtureUrl, { headers })
             ]);
 
             if (!playerRes.ok) throw new Error('API failed to fetch player stats');
@@ -241,23 +245,22 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
             const teamFixtureMap: Record<string, string> = {};
 
             if (fixtureData.length > 0) {
-                const now = new Date();
-                // Filter for upcoming fixtures only (this naturally aligns with the clock-based logic)
-                const upcomingFixtures = fixtureData.filter((f: any) => new Date(f.kickoff) > now);
-                
-                // Sort by time to get the very next one
-                upcomingFixtures.sort((a: any, b: any) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
+                // If we have the target gameweek, use ALL its fixtures. 
+                // Otherwise, fallback to the clock-based filter.
+                const relevantFixtures = targetGameweek?.id 
+                    ? fixtureData 
+                    : fixtureData.filter((f: any) => new Date(f.kickoff) > new Date()).sort((a: any, b: any) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
 
-                // Populate map with the NEXT fixture for each team
-                upcomingFixtures.forEach((f: any) => {
-                    const homeName = f.home.name;
-                    const awayName = f.away.name;
+                // Populate map with the fixture for each team
+                relevantFixtures.forEach((f: any) => {
+                    const homeName = f.home?.name;
+                    const awayName = f.away?.name;
                     
-                    if (!teamFixtureMap[homeName]) {
-                        teamFixtureMap[homeName] = `${f.away.short_name} (H)`;
+                    if (homeName && !teamFixtureMap[homeName]) {
+                        teamFixtureMap[homeName] = `${f.away?.short_name} (H)`;
                     }
-                    if (!teamFixtureMap[awayName]) {
-                        teamFixtureMap[awayName] = `${f.home.short_name} (A)`;
+                    if (awayName && !teamFixtureMap[awayName]) {
+                        teamFixtureMap[awayName] = `${f.home?.short_name} (A)`;
                     }
                 });
             }
@@ -275,7 +278,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
                     status: player.status ?? 'ACTIVE',
                     news: player.news ?? null,
                     chance_of_playing: player.chance_of_playing ?? null,
-                    fixture_str: teamFixtureMap[teamName] || '-' 
+                    fixture_str: teamFixtureMap[teamName] || '-' // Now correctly populated!
                 };
             });
             setPlayers(mapped);
@@ -284,7 +287,7 @@ export const PlayerSelectionList: React.FC<any> = ({ onClose, onPlayerSelect, po
           }
         };
         fetchData();
-      }, []);
+      }, [targetGameweek]); // <--- Ensure it refetches when targetGameweek loads
 
     useEffect(() => {
         if (positionFilter) {
