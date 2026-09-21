@@ -297,12 +297,12 @@ async def main() -> None:
 
         
         # 4. GENERATE TEST SCHEDULE
-        print("⏰ Generating TEST schedule: Starting Sep 19, 2026, 12:00 PM IST.")
+        print("⏰ Generating TEST schedule: Starting Sep 21, 2026, 2:00 PM IST.")
         
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         
         # --- HARDCODED TARGET TIME ---
-        start_time = datetime(2026, 9, 21, 13, 0, 0, tzinfo=ist_tz)
+        start_time = datetime(2026, 9, 21, 14, 0, 0, tzinfo=ist_tz)
         
         gw_interval = timedelta(minutes=20)
         match_interval = timedelta(minutes=2)
