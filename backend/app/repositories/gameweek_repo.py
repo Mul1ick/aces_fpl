@@ -20,28 +20,24 @@ async def get_open_gameweek_for_transfers(db: Prisma):
 
 async def determine_active_gameweek(db: Prisma):
     """
-    Finds the LIVE gameweek based on the clock.
-    This is the gameweek whose deadline has passed, but hasn't been finalized.
+    Finds the 'Current' gameweek based purely on the clock.
+    In FPL, the current gameweek is always the latest one whose deadline has passed.
+    It remains the current gameweek until the exact moment the NEXT deadline passes.
     """
     now_utc = datetime.now(timezone.utc)
     
-    # 1. Try to find the LIVE one (deadline passed, but not finalized)
+    # 1. Find the latest gameweek where the deadline has PASSED
     gw = await db.gameweek.find_first(
-        where={'deadline': {'lte': now_utc}, 'status': {'not': 'FINISHED'}},
-        order={'deadline': 'asc'}
+        where={'deadline': {'lte': now_utc}},
+        order={'deadline': 'desc'}
     )
-    # 2. If no LIVE gameweek (e.g., pre-season), get the next UPCOMING
+    
+    # 2. If no deadlines have passed yet (e.g., pre-season before GW1), get the very first gameweek
     if not gw:
         gw = await db.gameweek.find_first(
-            where={'deadline': {'gt': now_utc}},
             order={'deadline': 'asc'}
         )
-    # 3. If still no gameweek (end of season), get the last FINISHED
-    if not gw:
-        gw = await db.gameweek.find_first(
-            where={'status': 'FINISHED'},
-            order={'deadline': 'desc'}
-        )
+        
     return gw
 
 async def get_current_gameweek(db: Prisma):

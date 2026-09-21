@@ -125,9 +125,12 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
   };
 
   const isChipActive = activeChip === 'WILDCARD' || activeChip === 'FREE_HIT';
+  
+  // --- NEW: Centralized condition for Unlimited status ---
+  const isUnlimited = isChipActive || user?.played_first_gameweek === false;
 
   const getTransfersText = () => {
-    if (isChipActive || user?.played_first_gameweek === false) {
+    if (isUnlimited) {
       return "Unlimited";
     }
     return `${user?.free_transfers ?? 0}`;
@@ -139,8 +142,10 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
     ? `Deadline: ${format(deadlineDate, "E dd MMM, HH:mm")}`
     : "Deadline: TBC";
 
-  const displayTransfersValue = isChipActive ? "Unlimited" : (transferCount > 0 ? transferCount : transfersText);
-  const displayCostValue = isChipActive ? 0 : transferCost;
+  // --- FIX: Safely assign values using the 'isUnlimited' flag ---
+  const displayTransfersValue = isUnlimited ? "Unlimited" : (transferCount > 0 ? transferCount : transfersText);
+  const displayCostValue = isUnlimited ? 0 : transferCost;
+
 
   const renderChip = (chipId: 'WILDCARD' | 'FREE_HIT', name: string, icon: string) => {
     const isActive = activeChip === chipId;
@@ -256,10 +261,13 @@ export const TransfersHeroCard: React.FC<TransfersHeroCardProps> = ({
             <div className="flex flex-row items-center justify-between w-full flex-1 gap-1 sm:gap-3">
               <StatItem value={`${playersSelected} / 11`} label="Players Selected" isPill />
               <StatItem value={`£${bank.toFixed(1)}m`} label="Budget" isPill />
-              <StatItem value={displayTransfersValue} label={transferCount > 0 && !isChipActive ? "Transfers" : "Free Transfers"} />
+              
+              {/* --- FIX: Apply isUnlimited to the label logic as well --- */}
+              <StatItem value={displayTransfersValue} label={transferCount > 0 && !isUnlimited ? "Transfers" : "Free Transfers"} />
               <StatItem value={`${displayCostValue} pts`} label="Cost" />
             </div>
           </div>
+
 
           {user?.has_team && (
             <div className="flex md:hidden bg-gray-100 p-1 rounded-lg border border-gray-200 mt-2">

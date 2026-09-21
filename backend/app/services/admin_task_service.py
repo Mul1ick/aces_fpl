@@ -20,19 +20,22 @@ async def perform_gameweek_rollover_tasks(db: Prisma, live_gw_id: int):
         alog.error(f"Post-processing failed: Could not find live_gw with id {live_gw_id}")
         return
 
-    # 1. Update first GW flags (Checks who participated in GW1)
-    if live_gw.gw_number == 1:
-        user_ids_in_gw1 = [
-            ut.user_id for ut in await db.userteam.find_many(
-                where={'gameweek_id': live_gw.id},
-                distinct=['user_id']
-            )
-        ]
-        if user_ids_in_gw1:
-            await db.user.update_many(
-                where={'id': {'in': user_ids_in_gw1}},
-                data={'played_first_gameweek': True}
-            )
+    # 1. Update first GW flags for ANY user who participated in this finalized gameweek
+    # (Fixes bug where late joiners were stuck with unlimited transfers forever)
+    user_ids_in_gw = [
+        ut.user_id for ut in await db.userteam.find_many(
+            where={'gameweek_id': live_gw.id},
+            distinct=['user_id']
+        )
+    ]
+    if user_ids_in_gw:
+        await db.user.update_many(
+            where={
+                'id': {'in': user_ids_in_gw},
+                'played_first_gameweek': False
+            },
+            data={'played_first_gameweek': True}
+        )
 
     # 2. Give everyone 2 free transfers for the new week
     # (Note: In Aces FPL, free transfers reset to 2 every gameweek instead of rolling over to 5)

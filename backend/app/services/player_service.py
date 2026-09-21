@@ -13,7 +13,10 @@ from app.repositories.fixture_repo import (
     get_fixture_for_history,
     get_upcoming_fixtures_for_team
 )
-from app.repositories.gameweek_repo import get_current_gameweek
+
+# --- CHANGED: Use the future-anchored gameweek function instead of the current one ---
+from app.repositories.gameweek_repo import get_open_gameweek_for_transfers
+
 
 async def get_players_with_stats_service(db: Prisma):
     players = await get_all_players_with_teams(db)
@@ -75,12 +78,13 @@ async def get_player_details_service(db: Prisma, player_id: int):
             rc=stat.red_cards
         ))
 
-    # 4. Fetch Upcoming Fixtures
-    current_gw = await get_current_gameweek(db)
-    # Handle edge case where no current GW exists (start of season -> 1)
-    current_gw_num = current_gw.gw_number if current_gw else 1
+    # --- CHANGED: Fetch Upcoming Fixtures using the future-anchored gameweek ---
+    upcoming_gw = await get_open_gameweek_for_transfers(db)
     
-    upcoming_db_fixtures = await get_upcoming_fixtures_for_team(db, player.team_id, current_gw_num)
+    if upcoming_gw:
+        upcoming_db_fixtures = await get_upcoming_fixtures_for_team(db, player.team_id, upcoming_gw.gw_number)
+    else:
+        upcoming_db_fixtures = [] # Season is over, no upcoming fixtures
 
     upcoming_items = [
         {

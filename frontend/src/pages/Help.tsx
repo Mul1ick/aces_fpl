@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // --- UPDATED: New data structure with scoring table ---
 const scoringData = [
+    { action: "Appearance", points: 1 },
+    { action: "Playing majority of the match", points: 2 },
     { action: "Goal scored by a goalkeeper", points: 10 },
     { action: "Goal scored by a defender", points: 6 },
     { action: "Goal scored by a midfielder", points: 5 },

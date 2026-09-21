@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getTeamJersey } from '@/lib/player-utils';
 
@@ -30,7 +30,7 @@ export const DreamTeamCard: React.FC<DreamTeamCardProps> = ({ team, gameweekNumb
           className={`flex items-center justify-between group ${!canView && 'pointer-events-none'}`}
         >
           <div className="flex items-center gap-2">
-            <CardTitle className="text-xl group-hover:underline text-black">Team Of the Week</CardTitle>
+            <CardTitle className="text-xl group-hover:underline text-black">Team of the Week</CardTitle>
           </div>
           {canView && <ChevronRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />}
         </Link>
@@ -43,29 +43,42 @@ export const DreamTeamCard: React.FC<DreamTeamCardProps> = ({ team, gameweekNumb
             <div className="space-y-3">
               {/* --- STARTERS (Best 8) --- */}
               <h4 className="font-bold text-gray-500 text-sm">Best VIII</h4>
-              {team.starting.map((player: any) => (
+              {team.starting.map((player: any) => {
+                const isCaptain = player.is_captain || player.isCaptain;
+                const isVice = player.is_vice_captain || player.isVice;
+                
+                // Dream Team natively doubles the captain's points on the frontend Pitch View, 
+                // so we reflect that double points logic here on the dashboard card as well.
+                const displayPoints = (player.points || 0) * (isCaptain ? 2 : 1);
+
+                return (
                   <div key={player.id} className="flex items-center space-x-3 text-sm">
-                    <img src={getTeamJersey(player.team?.name)} alt="jersey" className="w-6 h-8 object-contain"/>
+                    <img src={getTeamJersey(player.team?.name || player.team)} alt="jersey" className="w-6 h-8 object-contain"/>
                     <div className="flex-1">
                         <p className="font-bold text-black">
-                        {player.full_name}
-                        {player.is_captain && <span className="text-[13px] ml-1 font-extrabold text-black">(C)</span>}
-                        {player.is_vice_captain && <span className="text-[13px] ml-1 font-bold text-gray-500">(VC)</span>}
+                          {player.full_name || player.name}
+                          {isCaptain && (
+                              <span className="text-[10px] ml-1 font-extrabold text-pl-purple">(C)</span>
+                          )}
+                          {isVice && (
+                              <span className="text-[10px] ml-1 font-bold text-gray-400">(V)</span>
+                          )}
                         </p>
-                        <p className="text-xs text-gray-500">{player.team?.short_name} · {player.position}</p>
+                        <p className="text-xs text-gray-500">{player.team?.short_name} · {player.position || player.pos}</p>
                     </div>
-                    <p className="font-bold text-black tabular-nums">{player.points} pts</p>
+                    <p className="font-bold text-black tabular-nums">{displayPoints} pts</p>
                   </div>
-              ))}
+                );
+              })}
 
               {/* --- BENCH (The other 3) --- */}
               <h4 className="font-bold text-gray-500 text-sm pt-2 border-t border-gray-100">Bench</h4>
               {team.bench.map((player: any) => (
                   <div key={player.id} className="flex items-center space-x-3 text-sm opacity-75">
-                    <img src={getTeamJersey(player.team?.name)} alt="jersey" className="w-6 h-8 object-contain"/>
+                    <img src={getTeamJersey(player.team?.name || player.team)} alt="jersey" className="w-6 h-8 object-contain"/>
                     <div className="flex-1">
-                        <p className="font-bold text-black">{player.full_name}</p>
-                        <p className="text-xs text-gray-500">{player.team?.short_name} · {player.position}</p>
+                        <p className="font-bold text-black">{player.full_name || player.name}</p>
+                        <p className="text-xs text-gray-500">{player.team?.short_name} · {player.position || player.pos}</p>
                     </div>
                     <p className="font-bold text-black tabular-nums">{player.points} pts</p>
                   </div>

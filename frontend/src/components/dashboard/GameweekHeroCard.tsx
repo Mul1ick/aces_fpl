@@ -13,19 +13,17 @@ interface GameweekHeroCardProps {
   highestPoints: number;
   teamName?: string; 
   currentGameweekNumber: number;
+  totwGameweekNumber: number; // <--- ADD THIS
 }
 
-
-export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamName, points, averagePoints, highestPoints,currentGameweekNumber  }) => {
+export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamName, points, averagePoints, highestPoints, currentGameweekNumber, totwGameweekNumber  }) => {
   const navigate = useNavigate();
 
-  // Helper to determine if highest points link should be active
   const canViewHighest = highestPoints > 0;
 
   return (
     <Card className="border-none p-6 text-white rounded-2xl shadow-lg bg-[linear-gradient(to_top_right,_#00c6ff,_#2196f3,_#6a11cb)]">
       <div className="flex flex-col space-y-5">
-        {/* Team and Manager Name */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-white">
             {teamName || "Aces United"}
@@ -35,14 +33,12 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamNam
           </p>
         </div>
 
-        {/* Divider and Gameweek Label */}
         <div className="flex items-center justify-center space-x-4">
             <div className="flex-grow border-t border-white/20"></div>
             <p className="text-sm font-semibold text-white/80">Gameweek {currentGameweekNumber}</p>
             <div className="flex-grow border-t border-white/20"></div>
         </div>
 
-        {/* Points Section */}
         <div className="flex justify-around items-center text-center">
           <div>
             <p className="text-3xl font-bold tabular-nums">{averagePoints}</p>
@@ -72,7 +68,8 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamNam
             whileHover={canViewHighest ? { scale: 1.1 } : {}}
             onClick={() => {
               if (canViewHighest) {
-                navigate(`/team-of-the-week/${currentGameweekNumber}`);
+                // <--- FIXED THE LINK HERE --->
+                navigate(`/team-of-the-week/${totwGameweekNumber}`);
               }
             }} 
             className={`flex flex-col items-center ${canViewHighest ? "cursor-pointer" : "cursor-default"}`}
@@ -86,7 +83,6 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamNam
 
         </div>
 
-        {/* CTA Buttons */}
         <div className="grid grid-cols-2 gap-4 pt-4">
           <motion.button 
             whileHover={{ y: -2, scale: 1.02 }}
@@ -111,5 +107,3 @@ export const GameweekHeroCard: React.FC<GameweekHeroCardProps> = ({ user,teamNam
     </Card>
   );
 };
-
-export default GameweekHeroCard;
