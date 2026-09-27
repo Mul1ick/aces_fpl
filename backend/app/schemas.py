@@ -264,6 +264,7 @@ class TeamOfTheWeekOut(BaseModel):
     points: int
     starting: List[PlayerDisplay]
     bench: List[PlayerDisplay]
+    active_chip: Optional[str] = None # <--- ADD THIS
     
 # --- Admin Dashboard Schemas ---
 class Gameweek(BaseModel):

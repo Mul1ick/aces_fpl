@@ -396,6 +396,11 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
         include={'player': {'include': {'team': True}}}
     )
     
+    active_chip_row = await db.userchip.find_first(
+        where={'user_id': top_user_id, 'gameweek_id': target_gw.id}
+    )
+    active_chip = str(active_chip_row.chip) if active_chip_row else None
+    
     player_ids = [entry.player.id for entry in user_team_entries]
     player_stats = await db.gameweekplayerstats.find_many(
         where={
@@ -440,7 +445,8 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
         "team_name": team_name,
         "points": top_score.total_points,
         "starting": [p for p in all_players if not p["is_benched"]],
-        "bench": [p for p in all_players if p["is_benched"]]
+        "bench": [p for p in all_players if p["is_benched"]],
+        "active_chip": active_chip # <--- ADD THIS TO THE RETURN DICT
     }
 
 

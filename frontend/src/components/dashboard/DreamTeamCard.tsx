@@ -47,9 +47,9 @@ export const DreamTeamCard: React.FC<DreamTeamCardProps> = ({ team, gameweekNumb
                 const isCaptain = player.is_captain || player.isCaptain;
                 const isVice = player.is_vice_captain || player.isVice;
                 
-                // Dream Team natively doubles the captain's points on the frontend Pitch View, 
-                // so we reflect that double points logic here on the dashboard card as well.
-                const displayPoints = (player.points || 0) * (isCaptain ? 2 : 1);
+                // FIXED: Removed the manual 2x multiplier so it matches the 
+                // actual Dream Team page (PitchView/ListView) and backend totals.
+                const displayPoints = player.points || 0;
 
                 return (
                   <div key={player.id} className="flex items-center space-x-3 text-sm">
@@ -64,7 +64,7 @@ export const DreamTeamCard: React.FC<DreamTeamCardProps> = ({ team, gameweekNumb
                               <span className="text-[10px] ml-1 font-bold text-gray-400">(V)</span>
                           )}
                         </p>
-                        <p className="text-xs text-gray-500">{player.team?.short_name} · {player.position || player.pos}</p>
+                        <p className="text-xs text-gray-500">{player.team?.short_name || player.team} · {player.position || player.pos}</p>
                     </div>
                     <p className="font-bold text-black tabular-nums">{displayPoints} pts</p>
                   </div>
@@ -78,7 +78,7 @@ export const DreamTeamCard: React.FC<DreamTeamCardProps> = ({ team, gameweekNumb
                     <img src={getTeamJersey(player.team?.name || player.team)} alt="jersey" className="w-6 h-8 object-contain"/>
                     <div className="flex-1">
                         <p className="font-bold text-black">{player.full_name || player.name}</p>
-                        <p className="text-xs text-gray-500">{player.team?.short_name} · {player.position || player.pos}</p>
+                        <p className="text-xs text-gray-500">{player.team?.short_name || player.team} · {player.position || player.pos}</p>
                     </div>
                     <p className="font-bold text-black tabular-nums">{player.points} pts</p>
                   </div>

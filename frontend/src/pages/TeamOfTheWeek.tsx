@@ -6,7 +6,7 @@ import { PitchView } from '@/components/gameweek/PitchView';
 import { ListView } from '@/components/gameweek/ListView';
 import { PlayerDetailCard } from '@/components/gameweek/PlayerDetailCard';
 import { TeamViewInfoCard } from '@/components/team/TeamViewInfoCard';
-import { API, ChipName } from '@/lib/api';
+import { API } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -35,6 +35,7 @@ type TeamOfTheWeekData = {
   points: number;
   starting: PlayerView[];
   bench: PlayerView[];
+  active_chip?: string | null; // <--- ADD THIS
 };
 
 const LoadingSkeleton = () => (
@@ -85,19 +86,19 @@ const TeamOfTheWeek: React.FC = () => {
             
             return {
                 ...p,
+                id: Number(p.id), // <--- CRITICAL FIX: Force number for strict === checking
                 full_name: p.full_name || p.name || '',
                 name: p.full_name || p.name || '',
                 position: p.position || p.pos || '',
                 pos: p.position || p.pos || '',
                 team: p.team?.name || p.team_name || p.team || '',
-                is_captain: p.is_captain || p.isCaptain || false,
-                is_vice_captain: p.is_vice_captain || p.isVice || false,
+                is_captain: Boolean(p.is_captain || p.isCaptain), // Ensure boolean
+                is_vice_captain: Boolean(p.is_vice_captain || p.isVice), // Ensure boolean
                 is_benched: isBenched,
                 status: p.status ?? 'ACTIVE',
                 news: p.news ?? null,
                 chance_of_playing: p.chance_of_playing ?? null,
                 return_date: p.return_date ?? null,
-                // <--- FIXED: Strict boolean check --->
                 raw_stats: {
                     ...statsObj,
                     played: statsObj.played === true
@@ -109,7 +110,8 @@ const TeamOfTheWeek: React.FC = () => {
         setTeamData({
             ...data,
             starting: (data.starting || []).map((p: any) => mapPlayer(p, false)),
-            bench: (data.bench || []).map((p: any) => mapPlayer(p, true))
+            bench: (data.bench || []).map((p: any) => mapPlayer(p, true)),
+            active_chip: data.active_chip // <--- CAPTURE ACTIVE CHIP
         });
       } catch (err: any) {
         if (err.name !== 'AbortError') {
@@ -125,7 +127,6 @@ const TeamOfTheWeek: React.FC = () => {
     return () => controller.abort();
   }, [gw, toast]);
 
-  // <--- FIXED: Completely purged the score-math logic and replaced with strict boolean --->
   const effectiveCaptainId = useMemo(() => {
     if (!teamData) return null;
 
@@ -133,29 +134,14 @@ const TeamOfTheWeek: React.FC = () => {
     const captain = allPlayers.find(p => p.is_captain);
     const viceCaptain = allPlayers.find(p => p.is_vice_captain);
 
-    if (!captain) return viceCaptain?.id ?? null;
+    if (!captain) return viceCaptain ? Number(viceCaptain.id) : null;
 
     const stats = captain.raw_stats || {};
     const captainPlayed = stats.played === true; 
     
-    return (captainPlayed ? captain.id : viceCaptain?.id) ?? null;
+    const effId = captainPlayed ? captain.id : viceCaptain?.id;
+    return effId ? Number(effId) : null;
   }, [teamData]);
-
-  // We keep derivedActiveChip logic intact, because it safely detects if TC was used by verifying the total score math
-  const derivedActiveChip = useMemo<ChipName | null>(() => {
-    if (!teamData || !teamData.starting || !effectiveCaptainId) return null;
-
-    const bonusTarget = teamData.starting.find((p) => p.id === effectiveCaptainId);
-    if (!bonusTarget || bonusTarget.points === 0) return null;
-
-    const rawTotal = teamData.starting.reduce((sum, p) => sum + p.points, 0);
-    const bonusPointsPart = teamData.points - rawTotal;
-
-    if (Math.abs(bonusPointsPart - (bonusTarget.points * 2)) < 0.1) {
-      return 'TRIPLE_CAPTAIN';
-    }
-    return null;
-  }, [teamData, effectiveCaptainId]);
 
   const handleNavigation = (direction: 'next' | 'prev') => {
     const currentGw = parseInt(gw || '1', 10);
@@ -208,6 +194,8 @@ const TeamOfTheWeek: React.FC = () => {
                 teamName={teamData.team_name}
                 totalPoints={teamData.points}
                 onNavigate={handleNavigation}
+                activeChip={teamData.active_chip as any} // <--- FIX 2: Pass chip to Header
+                hideTeamOfTheWeekLink={true}
               />
             </div>
 
@@ -216,13 +204,13 @@ const TeamOfTheWeek: React.FC = () => {
                 playersByPos={playersByPos}
                 bench={teamData.bench}
                 onPlayerClick={setDetailedPlayer}
-                activeChip={derivedActiveChip}
+                activeChip={teamData.active_chip as any} // <--- FIX 1: Pass chip to Pitch
                 effectiveCaptainId={effectiveCaptainId}
               />
             ) : (
               <ListView 
                 players={allPlayers} 
-                activeChip={derivedActiveChip}
+                activeChip={teamData.active_chip as any} // <--- FIX 1: Pass chip to List
                 effectiveCaptainId={effectiveCaptainId}
               />
             )}
@@ -249,8 +237,8 @@ const TeamOfTheWeek: React.FC = () => {
           <PlayerDetailCard 
             player={detailedPlayer} 
             onClose={() => setDetailedPlayer(null)} 
-            activeChip={derivedActiveChip}
-            isEffectiveCaptain={detailedPlayer.id === effectiveCaptainId}
+            activeChip={teamData.active_chip as any}
+            isEffectiveCaptain={Number(detailedPlayer.id) === effectiveCaptainId}
           />
         )}
       </AnimatePresence>
