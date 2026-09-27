@@ -346,8 +346,11 @@ async def get_user_team_full(db: Prisma, user_id: str, gameweek_id: int):
     active_chip_row = await db.userchip.find_first(
         where={'user_id': user_id, 'gameweek_id': gameweek_id}
     )
-    # Convert to string to ensure Pydantic validation passes (avoids 500 error)
-    active_chip = str(active_chip_row.chip) if active_chip_row else None
+    
+    active_chip = None
+    if active_chip_row:
+        chip_val = active_chip_row.chip
+        active_chip = chip_val.name if hasattr(chip_val, 'name') else str(chip_val).replace('ChipType.', '')
 
     return {
         "team_name": fantasy_team.name,

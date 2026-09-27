@@ -358,12 +358,8 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
     if gameweek_number:
         target_gw = await db.gameweek.find_unique(where={'gw_number': gameweek_number})
     else:
-        # 1. CHANGE: Logic for finding the gameweek was updated.
-        # ---------------------------------------------------------------------
         # Instead of just finding the latest gameweek whose deadline has passed,
         # this now finds the latest gameweek that has an official 'FINISHED' status.
-        # This is more reliable because it ensures the Team of the Week is only
-        # shown after you, the admin, have finalized all scores and bonus points.
         target_gw = await db.gameweek.find_first(
             where={'status': 'FINISHED'},
             order={'gw_number': 'desc'}
@@ -396,10 +392,16 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
         include={'player': {'include': {'team': True}}}
     )
     
+    # 1. Safely extract the active chip as a clean string
     active_chip_row = await db.userchip.find_first(
         where={'user_id': top_user_id, 'gameweek_id': target_gw.id}
     )
-    active_chip = str(active_chip_row.chip) if active_chip_row else None
+    
+    active_chip = None
+    if active_chip_row:
+        chip_val = active_chip_row.chip
+        # Ensures we get "TRIPLE_CAPTAIN" and not "ChipType.TRIPLE_CAPTAIN"
+        active_chip = chip_val.name if hasattr(chip_val, 'name') else str(chip_val).replace('ChipType.', '')
     
     player_ids = [entry.player.id for entry in user_team_entries]
     player_stats = await db.gameweekplayerstats.find_many(
@@ -417,20 +419,16 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
         raw_stats, breakdown_list = calculate_breakdown(entry.player.position, player_points)
         
         return {
-            "id": entry.player.id, "full_name": entry.player.full_name,
+            "id": entry.player.id, 
+            "full_name": entry.player.full_name,
             "position": entry.player.position,
-            
-            # 2. CHANGE: Fixed a bug with the player price.
-            # ---------------------------------------------------------------------
-            # The database stores 'price' as a special Decimal type.
-            # We must convert it to a float() so the API can send it as a
-            # standard number that the frontend can understand.
             "price": float(entry.player.price),
-            
-            "is_captain": entry.is_captain, "is_vice_captain": entry.is_vice_captain,
-            "is_benched": entry.is_benched, "team": entry.player.team,
+            "is_captain": entry.is_captain, 
+            "is_vice_captain": entry.is_vice_captain,
+            "is_benched": entry.is_benched, 
+            "team": entry.player.team,
             "points": final_points,
-            "stats": raw_stats,
+            "raw_stats": raw_stats,  # <--- CRITICAL FIX: Changed from "stats" to "raw_stats"
             "breakdown": breakdown_list,
             "status": entry.player.status,
             "news": entry.player.news,
@@ -446,7 +444,7 @@ async def get_team_of_the_week(db: Prisma, gameweek_number: Optional[int] = None
         "points": top_score.total_points,
         "starting": [p for p in all_players if not p["is_benched"]],
         "bench": [p for p in all_players if p["is_benched"]],
-        "active_chip": active_chip # <--- ADD THIS TO THE RETURN DICT
+        "active_chip": active_chip 
     }
 
 
