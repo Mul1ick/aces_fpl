@@ -1,3 +1,5 @@
+# backend/app/services/autosub_service.py
+
 import logging
 from typing import List, Dict, Set
 from prisma import Prisma
@@ -98,6 +100,12 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
                 bench_gk_stats = stats_map.get(bench[bench_gk_idx]['player_id'])
                 if did_player_play(bench_gk_stats):
                     logger.info(f"User {user_id}: Subbing GK {starters[starter_idx]['player_id']} OUT, {bench[bench_gk_idx]['player_id']} IN")
+                    
+                    # Fix Priority state
+                    temp_priority = bench[bench_gk_idx].get('bench_priority')
+                    bench[bench_gk_idx]['bench_priority'] = None
+                    starters[starter_idx]['bench_priority'] = temp_priority
+
                     starters[starter_idx], bench[bench_gk_idx] = bench[bench_gk_idx], starters[starter_idx]
                     inactive_starter_indices.pop(gk_idx) 
 
@@ -121,7 +129,6 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
             if not current_inactive_starters:
                 break 
 
-            swap_successful = False
             for starter_to_remove in current_inactive_starters:
                 hypothetical_starters = [s for s in starters if s != starter_to_remove] + [bench_player]
                 
@@ -133,17 +140,18 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
                     
                     logger.info(log_msg)
                     
+                    # Fix Priority state
+                    temp_priority = bench_player.get('bench_priority')
+                    bench_player['bench_priority'] = None
+                    starter_to_remove['bench_priority'] = temp_priority
+
                     starters.remove(starter_to_remove)
                     starters.append(bench_player)
                     bench.remove(bench_player)
                     bench.append(starter_to_remove)
                     
                     current_inactive_starters.remove(starter_to_remove)
-                    swap_successful = True
                     break 
-            
-            if not swap_successful:
-                logger.debug(f"User {user_id}: Could not sub in {bench_player['player_id']} - formation constraint.")
 
         # --- CRITICAL FIX: CAPTAINCY AUDIT ---
         # 1. Strip captaincy from any player that ended up on the bench
@@ -153,10 +161,6 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
             
         has_cap = any(p['is_captain'] for p in starters)
         has_vice = any(p['is_vice_captain'] for p in starters)
-        
-        def get_player_points(p_dict):
-            s = stats_map.get(p_dict['player_id'], {})
-            return s.get('points', 0) if s else 0
 
         # 2. Fix Missing Captain
         if not has_cap:
@@ -165,15 +169,11 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
                 old_vice['is_captain'] = True
                 old_vice['is_vice_captain'] = False
                 has_vice = False # Vice is now Captain, we need a new Vice
-            else:
-                # Pick the highest scoring starter as the new Captain
-                sorted_starters = sorted(starters, key=get_player_points, reverse=True)
-                sorted_starters[0]['is_captain'] = True
                 
         # 3. Fix Missing Vice-Captain
         if not has_vice:
-            sorted_starters = sorted(starters, key=get_player_points, reverse=True)
-            for p in sorted_starters:
+            # Just ensure the team is structurally sound by randomly making someone else a VC
+            for p in starters:
                 if not p['is_captain']:
                     p['is_vice_captain'] = True
                     break
@@ -187,7 +187,8 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
                     data={
                         'is_benched': False,
                         'is_captain': p['is_captain'],
-                        'is_vice_captain': p['is_vice_captain']
+                        'is_vice_captain': p['is_vice_captain'],
+                        'bench_priority': None # Reset explicit None
                     }
                 )
             for p in bench:
@@ -196,7 +197,8 @@ async def process_autosubs_for_gameweek(db: Prisma, gameweek_id: int):
                     data={
                         'is_benched': True,
                         'is_captain': False,
-                        'is_vice_captain': False
+                        'is_vice_captain': False,
+                        'bench_priority': p.get('bench_priority') # Persist the swapped 1, 2, or 3
                     }
                 )
         
